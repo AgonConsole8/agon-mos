@@ -2,7 +2,7 @@
 ; Title:	AGON MOS - API for user projects
 ; Author:	Dean Belfield
 ; Created:	03/08/2022
-; Last Updated:	05/06/2023
+; Last Updated:	10/08/2023
 ;
 ; Modinfo:
 ; 05/08/2022:	Added mos_feof
@@ -22,6 +22,8 @@
 ; 15/04/2023:	Added mos_getfil, mos_fread, mos_fwrite and mos_flseek
 ; 19/05/2023:	Added sysvar_scrMode
 ; 05/06/2023:	Added sysvar_rtcEnable
+; 03/08/2023:	Added mos_setkbvector
+; 10/08/2023:	Added mos_getkbmap
 
 ; VDP control (VDU 23, 0, n)
 ;
@@ -68,6 +70,8 @@ mos_getfil:		EQU	19h
 mos_fread:		EQU	1Ah
 mos_fwrite:		EQU	1Bh
 mos_flseek:		EQU	1Ch
+mos_setkbvector:	EQU	1Dh
+mos_getkbmap:		EQU	1Eh
 
 ; FatFS file access functions
 ;
