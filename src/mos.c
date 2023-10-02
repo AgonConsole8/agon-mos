@@ -52,6 +52,8 @@
 #include "ff.h"
 #include "strings.h"
 
+char  	cmd[256];				// Array for the command line handler
+
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
@@ -87,6 +89,7 @@ static t_mosCommand mosCommands[] = {
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU,	NULL	},
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME,	NULL	},
 	{ "CREDITS",		&mos_cmdCREDITS,	NULL,			HELP_CREDITS,	NULL	},
+	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC,	NULL	},
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE,	NULL	},
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL	},
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL	},
@@ -420,6 +423,27 @@ int mos_cmdLOAD(char * ptr) {
 	if(!mos_parseNumber(NULL, &addr)) addr = MOS_defaultLoadAddress;
 	fr = mos_LOAD(filename, addr, 0);
 	return fr;	
+}
+
+// EXEC <filename>
+//   Run a batch file containing MOS commands
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdEXEC(char *ptr) {
+	FRESULT	fr;
+	char *  filename;
+	UINT24 	addr;
+	
+	if(
+		!mos_parseString(NULL, &filename)
+	) {
+		return 19; // Bad Parameter
+	}
+	fr = mos_EXEC(filename, cmd, sizeof cmd);
+	return fr;
 }
 
 // SAVE <filename> <addr> <len> command
@@ -1013,6 +1037,36 @@ UINT24 mos_BOOT(char * filename, char * buffer, UINT24 size) {
 		while(!f_eof(&fil)) {
 			f_gets(buffer, size, &fil);
 			mos_exec(buffer);
+		}
+	}
+	f_close(&fil);	
+	return fr;	
+}
+
+// Load and run a batch file of MOS commands.
+// It is similar to mos_BOOT, but stops if a command returns an error
+// Parameters:
+// - filename: The config file to execute
+// - buffer: Storage for each line to be loaded into and executed from (recommend 256 bytes)
+// - size: Size of buffer (in bytes)
+// Returns:
+// - FatFS return code (of the last command)
+//
+UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
+	FRESULT	fr;
+	FIL	   	fil;
+	UINT   	br;	
+	void * 	dest;
+	FSIZE_t fSize;
+	
+	fr = f_open(&fil, filename, FA_READ);
+	if(fr == FR_OK) {
+		while(!f_eof(&fil)) {
+			f_gets(buffer, size, &fil);
+			fr = mos_exec(buffer);
+			if (fr != FR_OK) {
+				break;
+			}
 		}
 	}
 	f_close(&fil);	

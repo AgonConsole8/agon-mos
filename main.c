@@ -56,8 +56,6 @@ extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
 
-static char  	cmd[256];				// Array for the command line handler
-
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
 // - pUART: Pointer to a UART structure
