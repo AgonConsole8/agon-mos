@@ -55,6 +55,9 @@ extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
 
+extern volatile BYTE history_no;
+extern volatile BYTE history_size;
+
 static char  	cmd[256];				// Array for the command line handler
 
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
@@ -100,7 +103,7 @@ void init_interrupts(void) {
 
 // The main loop
 //
-int main(void) {
+int main(void) {	
 	UART 	pUART0;
 
 	DI();											// Ensure interrupts are disabled before we do anything
@@ -131,6 +134,8 @@ int main(void) {
 	(void)mos_mount();							// Mount the SD card
 	
 	putch(7);										// Startup beep
+	history_no = 0;
+	history_size = 0;
 
 	// Load the autoexec.bat config file
 	//
