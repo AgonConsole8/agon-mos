@@ -53,6 +53,9 @@ extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
 
+extern volatile BYTE history_no;
+extern volatile BYTE history_size;
+
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
 // - pUART: Pointer to a UART structure
@@ -131,6 +134,8 @@ int main(void) {
 	(void)mos_mount();								// Mount the SD card
 
 	putch(7);										// Startup beep
+	history_no = 0;
+	history_size = 0;
 
 	// Load the autoexec.bat config file
 	//
