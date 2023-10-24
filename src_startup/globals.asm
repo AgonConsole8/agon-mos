@@ -2,7 +2,7 @@
 ; Title:	AGON MOS - Globals
 ; Author:	Dean Belfield
 ; Created:	01/08/2022
-; Last Updated:	19/05/2023
+; Last Updated:	13/08/2023
 ;
 ; Modinfo:
 ; 09/08/2022:	Added sysvars structure, cursorX, cursorY
@@ -17,6 +17,9 @@
 ; 29/03/2023:	Added serialFlags
 ; 14/04/2023:	Added scratchpad
 ; 19/05/2023	Added scrmode
+; 05/06/2023:	Added RTC enable flag
+; 03/08/2023:	Added user_kbvector
+; 13/08/2023:	Added keymap
 
 			INCLUDE	"../src/equs.inc"
 			
@@ -45,6 +48,7 @@
 			XDEF	_keyrate 
 			XDEF 	_keyled
 			XDEF	_scrmode
+			XDEF	_rtc_enable
 
 			XDEF	_errno
 			XDEF 	_coldBoot
@@ -52,6 +56,7 @@
 			XDEF	_serialFlags
 			XDEF 	_callSM
 			XDEF	_scratchpad
+			XDEF	_keymap 
 
 			XDEF	_vpd_protocol_flags
 			XDEF	_vdp_protocol_state
@@ -59,6 +64,8 @@
 			XDEF	_vdp_protocol_len
 			XDEF	_vdp_protocol_ptr
 			XDEF	_vdp_protocol_data
+
+			XDEF	_user_kbvector
 
 			SEGMENT BSS		; This section is reset to 0 in cstartup.asm
 			
@@ -83,11 +90,13 @@ _scrpixelIndex:		DS	1		; + 16h: Index of pixel data read from screen
 _keycode:		DS	1		; + 17h: Virtual key code from FabGL
 _keydown:		DS	1		; + 18h; Virtual key state from FabGL (0=up, 1=down)
 _keycount:		DS	1		; + 19h: Incremented every time a key packet is received
-_rtc:			DS	8		; + 1Ah: Real time clock data
+_rtc:			DS	6		; + 1Ah: Real time clock data
+			DS	2		; + 20h: Spare, previously used by rtc
 _keydelay:		DS	2		; + 22h: Keyboard repeat delay
 _keyrate:		DS	2		; + 24h: Keyboard repeat rate
 _keyled:		DS	1		; + 26h: Keyboard LED status
 _scrmode:		DS	1		; + 27h: Screen mode
+_rtc_enable:		DS	1		; + 28h: RTC enable status
 
 _errno:			DS 	3		; extern int _errno
 _coldBoot:		DS	1		; extern char _coldBoot
@@ -105,6 +114,9 @@ _serialFlags:		DS	1		; extern char _serialFlags
 _callSM:		DS	5		; Self-modding code for CALL.IS (HL)
 _scratchpad:		DS	8		; General purpose scratchpad RAM for use within functions
 
+; Keyboard map
+;
+_keymap:		DS	16		; A bitmap of pressed keys
 
 ; VDP Protocol Flags
 ;
@@ -124,7 +136,12 @@ _vdp_protocol_cmd:	DS	1		; Command
 _vdp_protocol_len:	DS	1		; Size of packet data
 _vdp_protocol_ptr:	DS	3		; Pointer into data
 _vdp_protocol_data:	DS	VDPP_BUFFERLEN
-		
+
+;
+; Userspace hooks
+;
+_user_kbvector: 	DS	3		; Pointer to keyboard function
+
 			SECTION DATA		; This section is copied to RAM in cstartup.asm
 
 			END

@@ -2,7 +2,7 @@
  * Title:			AGON MOS
  * Author:			Dean Belfield
  * Created:			19/06/2022
- * Last Updated:	16/05/2023
+ * Last Updated:	27/08/2023
  *
  * Modinfo:
  * 11/07/2022:		Version 0.01: Tweaks for Agon Light, Command Line code added
@@ -23,7 +23,9 @@
  * 23/03/2023:				RC2	+ Increased baud rate to 1152000
  * 								+ Improved ESP32->eZ80 boot sync
  * 29/03/2023:				RC3 + Added UART1 initialisation, tweaked startup sequence timings
- * 16/05/2023:		Version 1.04: Fixed MASTERCLOCK value in uart.h
+ * 16/05/2023:		Version 1.04: Fixed MASTERCLOCK value in uart.h, added startup beep
+ * 03/08/2023:				RC2	+ Enhanced low-level keyboard functionality
+ * 27/09/2023:					+ Updated RTC
  */
 
 #include <eZ80.h>
@@ -43,7 +45,7 @@
 
 #define		MOS_version		1
 #define		MOS_revision 	4
-#define		MOS_rc			1
+#define		MOS_rc			2
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -77,7 +79,7 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 	open_UART0(pUART);					// Open the UART 
 	init_timer0(10, 16, 0x00);  		// 10ms timer for delay
 	gp = 0;								// Reset the general poll byte	
-	for(t = 0; t < 20; t++) {			// A timeout loop (20 x 50ms = 1s)
+	for(t = 0; t < 200; t++) {			// A timeout loop (200 x 50ms = 10s)
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
@@ -129,6 +131,8 @@ int main(void) {
 	#endif
 
 	f_mount(&fs, "", 1);							// Mount the SD card
+	
+	putch(7);										// Startup beep
 
 	// Load the autoexec.bat config file
 	//

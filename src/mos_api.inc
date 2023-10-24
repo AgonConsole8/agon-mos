@@ -2,7 +2,7 @@
 ; Title:	AGON MOS - API for user projects
 ; Author:	Dean Belfield
 ; Created:	03/08/2022
-; Last Updated:	19/05/2023
+; Last Updated:	10/08/2023
 ;
 ; Modinfo:
 ; 05/08/2022:	Added mos_feof
@@ -21,6 +21,9 @@
 ; 13/04/2023:	Added FatFS file structures (FFOBJID, FIL, DIR, FILINFO)
 ; 15/04/2023:	Added mos_getfil, mos_fread, mos_fwrite and mos_flseek
 ; 19/05/2023:	Added sysvar_scrMode
+; 05/06/2023:	Added sysvar_rtcEnable
+; 03/08/2023:	Added mos_setkbvector
+; 10/08/2023:	Added mos_getkbmap
 
 ; VDP control (VDU 23, 0, n)
 ;
@@ -67,6 +70,8 @@ mos_getfil:		EQU	19h
 mos_fread:		EQU	1Ah
 mos_fwrite:		EQU	1Bh
 mos_flseek:		EQU	1Ch
+mos_setkbvector:	EQU	1Dh
+mos_getkbmap:		EQU	1Eh
 
 ; FatFS file access functions
 ;
@@ -150,11 +155,13 @@ sysvar_scrpixelIndex:	EQU	16h	; 1: Index of pixel data read from screen
 sysvar_vkeycode:	EQU	17h	; 1: Virtual key code from FabGL
 sysvar_vkeydown		EQU	18h	; 1: Virtual key state from FabGL (0=up, 1=down)
 sysvar_vkeycount:	EQU	19h	; 1: Incremented every time a key packet is received
-sysvar_rtc:		EQU	1Ah	; 8: Real time clock data
+sysvar_rtc:		EQU	1Ah	; 6: Real time clock data
+sysvar_spare:		EQU	20h	; 2: Spare, previously used by rtc
 sysvar_keydelay:	EQU	22h	; 2: Keyboard repeat delay
 sysvar_keyrate:		EQU	24h	; 2: Keyboard repeat reat
 sysvar_keyled:		EQU	26h	; 1: Keyboard LED status
 sysvar_scrMode:		EQU	27h	; 1: Screen mode
+sysvar_rtcEnable:	EQU	28h	; 1: RTC enable flag (0: disabled, 1: use ESP32 RTC)
 	
 ; Flags for the VPD protocol
 ;

@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS code
  * Author:			Dean Belfield
  * Created:			10/07/2022
- * Last Updated:	30/05/2023
+ * Last Updated:	26/09/2023
  * 
  * Modinfo:
  * 11/07/2022:		Added mos_cmdDIR, mos_cmdLOAD, removed mos_cmdBYE
@@ -30,6 +30,9 @@
  * 14/04/2023:		Added fat_EOF
  * 15/04/2023:		Added mos_GETFIL, mos_FREAD, mos_FWRITE, mos_FLSEEK, refactored MOS file commands
  * 30/05/2023:		Fixed bug in mos_parseNumber to detect invalid numeric characters, mos_FGETC now returns EOF flag
+ * 08/07/2023:		Added mos_trim function; mos_exec now trims whitespace from input string, various bug fixes
+ * 15/09/2023:		Function mos_trim now includes the asterisk character as whitespace
+ * 26/09/2023:		Refactored mos_GETRTC and mos_SETRTC
  */
 
 #include <eZ80.h>
@@ -187,6 +190,33 @@ BOOL mos_cmp(const char *p1, const char *p2) {
 	return (const unsigned char*)c1 - (const unsigned char*)c2;
 }
 
+// String trim function
+// NB: This also includes the asterisk character as whitespace
+// Parameters:
+// - s: Pointer to the string to trim
+// Returns:
+// - s: Pointer to the start of the new string
+//
+char * mos_trim(char * s) {
+    char * ptr;
+
+    if(!s) {								// Return NULL if a null string is passed
+        return NULL;
+	}
+    if(!*s) {
+        return s;      						// Handle empty string
+	}
+	while(isspace(*s) || *s == '*') {		// Advance the pointer to the first non-whitespace or asterisk character in the string
+		s++;
+	}
+	ptr = s + strlen(s) - 1;
+	while(ptr > s && isspace(*ptr)) {
+		ptr--;
+	}
+	ptr[1] = '\0';
+    return s;
+}
+
 // String tokeniser
 // Parameters:
 // - s1: String to tokenise
@@ -292,7 +322,8 @@ int mos_exec(char * buffer) {
 	char	path[256];
 	UINT8	mode;
 
-	ptr = mos_strtok(buffer, " ");
+	ptr = mos_trim(buffer);
+	ptr = mos_strtok(ptr, " ");
 	if(ptr != NULL) {
 		func = mos_getCommand(ptr);
 		if(func != 0) {
@@ -748,7 +779,7 @@ UINT24	mos_DIR(char * path) {
 			hr = (fno.ftime & 0xF800) >> 11;	// Bits 15 to 11
 			mi = (fno.ftime & 0x07E0) >>  5;	// Bits 10 to  5
 			
-			printf("%04d/%02d/%02d\t%02d:%02d %c %*d %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+			printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
 		}
 	}
 	f_closedir(&dir);
@@ -896,7 +927,7 @@ UINT24 mos_FCLOSE(UINT8 fh) {
 	
 	if(fh > 0 && fh <= MOS_maxOpenFiles) {
 		i = fh - 1;
-		if(&mosFileObjects[i].free > 0) {
+		if(mosFileObjects[i].free > 0) {
 			fr = f_close(&mosFileObjects[i].fileObject);
 			mosFileObjects[i].free = 0;
 		}
@@ -1051,22 +1082,12 @@ UINT24 mos_OSCLI(char * cmd) {
 // - size of string
 //
 UINT8 mos_GETRTC(UINT24 address) {
-	BYTE	month, day, dayOfWeek, hour, minute, second;
-	char	year;
-
-	BYTE *	p = &rtc;
+	vdp_time_t t;
 
 	rtc_update();
+	rtc_unpack(&rtc, &t);
+	rtc_formatDateTime((char *)address, &t);
 
-	year		= *(p+0);
-	month		= *(p+1);
-	day   		= *(p+2);
-	dayOfWeek	= *(p+4);
-	hour		= *(p+5);
-	minute		= *(p+6);
-	second 		= *(p+7);
-
-	rtc_formatDateTime((char *)address, year, month, day, dayOfWeek, hour, minute, second);
 	return strlen((char *)address);
 }
 
@@ -1078,18 +1099,18 @@ UINT8 mos_GETRTC(UINT24 address) {
 //
 void mos_SETRTC(UINT24 address) {
 	BYTE * p = (BYTE *)address;
-	
+
 	putch(23);				// Set the ESP32 time
 	putch(0);
 	putch(VDP_rtc);
 	putch(1);				// 1: Set time (6 byte buffer mode)
 	//
-	putch(*(p+0));			// Year
-	putch(*(p+1));			// Month
-	putch(*(p+2));			// Day
-	putch(*(p+3));			// Hour
-	putch(*(p+4));			// Minute
-	putch(*(p+5));			// Second
+	putch(*p++);			// Year
+	putch(*p++);			// Month
+	putch(*p++);			// Day
+	putch(*p++);			// Hour
+	putch(*p++);			// Minute
+	putch(*p);				// Second
 }
 
 // Set an interrupt vector
