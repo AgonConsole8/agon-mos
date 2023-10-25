@@ -2,7 +2,7 @@
 ; Title:	AGON MOS - VDP serial protocol
 ; Author:	Dean Belfield
 ; Created:	03/08/2022
-; Last Updated:	13/08/2023
+; Last Updated:	26/09/2023
 ;
 ; Modinfo:
 ; 09/08/2022:	Added vdp_protocol_CURSOR
@@ -18,6 +18,7 @@
 ; 19/05/2023:	Extended vdp_protocol_MODE to store scrmode
 ; 03/08/2023:	Added user_kbvector in vdp_protocol_KEY
 ; 13/08/2023:	Moved keyboard handling to keyboard.asm
+; 26/09/2023:	RTC packet length reduced to 6 bytes
 
 			INCLUDE	"macros.inc"
 			INCLUDE	"equs.inc"
@@ -51,6 +52,7 @@
 			XREF	_keydelay 
 			XREF	_keyrate 
 			XREF 	_keyled
+			XREF	_mouseX
 			XREF	_gp
 			XREF	_vpd_protocol_flags
 			XREF	_vdp_protocol_state
@@ -141,7 +143,8 @@ vdp_protocol_vector:	JP	vdp_protocol_GP
 			JP	vdp_protocol_AUDIO
 			JP	vdp_protocol_MODE
 			JP	vdp_protocol_RTC
-			JP	vdp_protocol_KEYSTATE 
+			JP	vdp_protocol_KEYSTATE
+			JP	vdp_protocol_MOUSE
 ;
 vdp_protocol_vesize:	EQU	($-vdp_protocol_vector)/4
 	
@@ -284,20 +287,13 @@ vdp_protocol_MODE:	LD	A, (_vdp_protocol_data+0)
 ; RTC
 ; Received after VDU 23,0,7
 ;
-; Byte: Year (offset from 1970)
-; Byte: Month (0-11)
-; Byte: Day (1-31)
-; Byte: Day of Year (0-365)
-; Byte: Day of Week (0-6)
-; Byte: Hour (0-23)
-; Byte: Minute (0-59)
-; Byte: Second (0-59)
+; See vdp_time_t struct in clock.h for details
 ;
 ; Sets vpd_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_RTC:	LD	HL, _vdp_protocol_data
 			LD	DE, _rtc 
-			LD	BC,  8
+			LD	BC,  6
 			LDIR 
 			LD	A, (_vpd_protocol_flags)
 			OR	VDPP_FLAG_RTC
@@ -315,4 +311,23 @@ vdp_protocol_KEYSTATE:	LD	HL, _vdp_protocol_data
 			LD	DE, _keydelay
 			LD	BC, 5
 			LDIR 
-			RET 
+			RET
+
+; Mouse data
+; Received after a mouse movement event, if mouse has been activated
+;
+; Word: X position
+; Word: Y position
+; Byte: Button state
+; Byte: Wheel delta
+; Word: X delta
+; Word: Y delta
+;
+vdp_protocol_MOUSE:	LD	HL, _vdp_protocol_data
+			LD	DE, _mouseX
+			LD	BC, 10
+			LDIR 
+			LD	A, (_vpd_protocol_flags)
+			OR	VDPP_FLAG_MOUSE
+			LD	(_vpd_protocol_flags), A
+			RET

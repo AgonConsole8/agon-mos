@@ -26,6 +26,7 @@
  * 21/03/2023:		Added mos_SETINTVECTOR
  * 14/04/2023:		Added fat_EOF
  * 15/04/2023:		Added mos_GETFIL, mos_FREAD, mos_FWRITE, mos_FLSEEK
+ * 24/05/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT
  * 30/05/2023:		Function mos_FGETC now returns EOF flag
  * 08/07/2023		Added mos_trim function
  */
@@ -34,6 +35,8 @@
 #define MOS_H
 
 #include "ff.h"
+
+extern char  	cmd[256];				// Array for the command line handler
 
 typedef struct {
 	char * name;
@@ -79,6 +82,7 @@ int		mos_cmdSET(char *ptr);
 int		mos_cmdVDU(char *ptr);
 int		mos_cmdTIME(char *ptr);
 int		mos_cmdCREDITS(char *ptr);
+int		mos_cmdEXEC(char * ptr);
 int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
@@ -93,7 +97,7 @@ UINT24	mos_DEL(char * filename);
 UINT24 	mos_REN(char * filename1, char * filename2);
 UINT24	mos_COPY(char * filename1, char * filename2);
 UINT24	mos_MKDIR(char * filename);
-UINT24 	mos_BOOT(char * filename, char * buffer, UINT24 size);
+UINT24 	mos_EXEC(char * filename, char * buffer, UINT24 size);
 
 UINT24	mos_FOPEN(char * filename, UINT8 mode);
 UINT24	mos_FCLOSE(UINT8 fh);
@@ -184,6 +188,9 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_CLS	"Clear the screen\r\n"
 
 #define HELP_MOUNT	"(Re-)mount the MicroSD card\r\n"
+
+#define HELP_EXEC	"Run a batch file containing MOS commands\r\n"
+#define HELP_EXEC_ARGS	"<filename>"
 
 #define HELP_HELP	"Display help on a single or all commands.\r\n"	\
 			"List of commands:\r\n"				\

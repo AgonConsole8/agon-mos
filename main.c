@@ -2,7 +2,7 @@
  * Title:			AGON MOS
  * Author:			Dean Belfield
  * Created:			19/06/2022
- * Last Updated:	03/08/2023
+ * Last Updated:	27/08/2023
  *
  * Modinfo:
  * 11/07/2022:		Version 0.01: Tweaks for Agon Light, Command Line code added
@@ -24,7 +24,8 @@
  * 								+ Improved ESP32->eZ80 boot sync
  * 29/03/2023:				RC3 + Added UART1 initialisation, tweaked startup sequence timings
  * 16/05/2023:		Version 1.04: Fixed MASTERCLOCK value in uart.h, added startup beep
- * 03/08/2023:					+ Enhanced low-level keyboard functionality
+ * 03/08/2023:				RC2	+ Enhanced low-level keyboard functionality
+ * 27/09/2023:					+ Updated RTC
  */
 
 #include <eZ80.h>
@@ -44,7 +45,7 @@
 
 #define		MOS_version		1
 #define		MOS_revision 	4
-#define		MOS_rc			1
+#define		MOS_rc			2
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -57,8 +58,6 @@ extern volatile char	gp;				// General poll variable
 
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
-
-static char  	cmd[256];				// Array for the command line handler
 
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
@@ -131,8 +130,8 @@ int main(void) {
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
 
-	(void)mos_mount();							// Mount the SD card
-	
+	(void)mos_mount();								// Mount the SD card
+
 	putch(7);										// Startup beep
 	history_no = 0;
 	history_size = 0;
@@ -141,7 +140,10 @@ int main(void) {
 	//
 	#if enable_config == 1	
 	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
-		mos_BOOT("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		if (err > 0) {
+			mos_error(err);
+		}
 	}	
 	#endif
 

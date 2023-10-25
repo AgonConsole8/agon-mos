@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS code
  * Author:			Dean Belfield
  * Created:			10/07/2022
- * Last Updated:	08/07/2023
+ * Last Updated:	26/09/2023
  * 
  * Modinfo:
  * 11/07/2022:		Added mos_cmdDIR, mos_cmdLOAD, removed mos_cmdBYE
@@ -29,8 +29,11 @@
  * 26/03/2023:		Fixed SET KEYBOARD command
  * 14/04/2023:		Added fat_EOF
  * 15/04/2023:		Added mos_GETFIL, mos_FREAD, mos_FWRITE, mos_FLSEEK, refactored MOS file commands
+ * 23/04/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT, mos_mount
  * 30/05/2023:		Fixed bug in mos_parseNumber to detect invalid numeric characters, mos_FGETC now returns EOF flag
- * 08/07/2023		Added mos_trim function; mos_exec now trims whitespace from input string, various bug fixes
+ * 08/07/2023:		Added mos_trim function; mos_exec now trims whitespace from input string, various bug fixes
+ * 15/09/2023:		Function mos_trim now includes the asterisk character as whitespace
+ * 26/09/2023:		Refactored mos_GETRTC and mos_SETRTC
  */
 
 #include <eZ80.h>
@@ -48,6 +51,8 @@
 #include "clock.h"
 #include "ff.h"
 #include "strings.h"
+
+char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -86,6 +91,7 @@ static t_mosCommand mosCommands[] = {
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU,	NULL	},
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME,	NULL	},
 	{ "CREDITS",		&mos_cmdCREDITS,	NULL,			HELP_CREDITS,	NULL	},
+	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC,	NULL	},
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE,	NULL	},
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL	},
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL	},
@@ -197,6 +203,7 @@ BOOL mos_cmp(const char *p1, const char *p2) {
 }
 
 // String trim function
+// NB: This also includes the asterisk character as whitespace
 // Parameters:
 // - s: Pointer to the string to trim
 // Returns:
@@ -205,13 +212,13 @@ BOOL mos_cmp(const char *p1, const char *p2) {
 char * mos_trim(char * s) {
     char * ptr;
 
-    if(!s) {					// Return NULL if a null string is passed
+    if(!s) {								// Return NULL if a null string is passed
         return NULL;
 	}
     if(!*s) {
-        return s;      			// Handle empty string
+        return s;      						// Handle empty string
 	}
-	while(isspace(*s)) {		// Advance the pointer to the first non-whitespace character in the string
+	while(isspace(*s) || *s == '*') {		// Advance the pointer to the first non-whitespace or asterisk character in the string
 		s++;
 	}
 	ptr = s + strlen(s) - 1;
@@ -418,6 +425,28 @@ int mos_cmdLOAD(char * ptr) {
 	if(!mos_parseNumber(NULL, &addr)) addr = MOS_defaultLoadAddress;
 	fr = mos_LOAD(filename, addr, 0);
 	return fr;	
+}
+
+// EXEC <filename>
+//   Run a batch file containing MOS commands
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdEXEC(char *ptr) {
+	FRESULT	fr;
+	char *  filename;
+	UINT24 	addr;
+	char    buf[256];
+	
+	if(
+		!mos_parseString(NULL, &filename)
+	) {
+		return 19; // Bad Parameter
+	}
+	fr = mos_EXEC(filename, buf, sizeof buf);
+	return fr;
 }
 
 // SAVE <filename> <addr> <len> command
@@ -991,26 +1020,32 @@ UINT24 mos_MKDIR(char * filename) {
 	return fr;
 }
 
-// Load and run the config file 
+// Load and run a batch file of MOS commands.
 // Parameters:
-// - filename: The config file to execute
+// - filename: The batch file to execute
 // - buffer: Storage for each line to be loaded into and executed from (recommend 256 bytes)
 // - size: Size of buffer (in bytes)
 // Returns:
-// - FatFS return code
+// - FatFS return code (of the last command)
 //
-UINT24 mos_BOOT(char * filename, char * buffer, UINT24 size) {
+UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
 	FRESULT	fr;
 	FIL	   	fil;
 	UINT   	br;	
 	void * 	dest;
 	FSIZE_t fSize;
+	int     line =  0;
 	
 	fr = f_open(&fil, filename, FA_READ);
 	if(fr == FR_OK) {
 		while(!f_eof(&fil)) {
+			line++;
 			f_gets(buffer, size, &fil);
-			mos_exec(buffer);
+			fr = mos_exec(buffer);
+			if (fr != FR_OK) {
+				printf("\r\nError executing %s at line %d\r\n", filename, line);
+				break;
+			}
 		}
 	}
 	f_close(&fil);	
@@ -1207,22 +1242,12 @@ UINT24 mos_OSCLI(char * cmd) {
 // - size of string
 //
 UINT8 mos_GETRTC(UINT24 address) {
-	BYTE	month, day, dayOfWeek, hour, minute, second;
-	char	year;
-
-	BYTE *	p = &rtc;
+	vdp_time_t t;
 
 	rtc_update();
+	rtc_unpack(&rtc, &t);
+	rtc_formatDateTime((char *)address, &t);
 
-	year		= *(p+0);
-	month		= *(p+1);
-	day   		= *(p+2);
-	dayOfWeek	= *(p+4);
-	hour		= *(p+5);
-	minute		= *(p+6);
-	second 		= *(p+7);
-
-	rtc_formatDateTime((char *)address, year, month, day, dayOfWeek, hour, minute, second);
 	return strlen((char *)address);
 }
 
@@ -1234,18 +1259,18 @@ UINT8 mos_GETRTC(UINT24 address) {
 //
 void mos_SETRTC(UINT24 address) {
 	BYTE * p = (BYTE *)address;
-	
+
 	putch(23);				// Set the ESP32 time
 	putch(0);
 	putch(VDP_rtc);
 	putch(1);				// 1: Set time (6 byte buffer mode)
 	//
-	putch(*(p+0));			// Year
-	putch(*(p+1));			// Month
-	putch(*(p+2));			// Day
-	putch(*(p+3));			// Hour
-	putch(*(p+4));			// Minute
-	putch(*(p+5));			// Second
+	putch(*p++);			// Year
+	putch(*p++);			// Month
+	putch(*p++);			// Day
+	putch(*p++);			// Hour
+	putch(*p++);			// Minute
+	putch(*p);				// Second
 }
 
 // Set an interrupt vector

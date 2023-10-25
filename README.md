@@ -1,20 +1,26 @@
 # agon-mos
 
-Part of the official Quark firmware for the Agon series of microcomputers
+Part of the official firmware for the [Agon Console8](https://www.heber.co.uk/agon-console8)
+
+This firmware is intended for use on the Agon Console8, but should be fully compatible with other Agon Light hardware.  As well as the Console8, it has been tested on the Olimex Agon Light 2.
+
+This version of agon-mos may differ from the [official Quark firmware](https://github.com/breakintoprogram/agon-mos) and contain some extensions, but software written for the official Quark firmware should be fully compatible with this version.
 
 ### What is the Agon
 
-Agon is a modern, fully open-source, 8-bit microcomputer and microcontroller in one small, low-cost board. As a computer, it is a standalone device that requires no host PC: it puts out its own video (VGA), audio (2 identical mono channels), accepts a PS/2 keyboard and has its own mass-storage in the form of a µSD card.
+Agon is a modern, fully open-source, 8-bit microcomputer and microcontroller in one small, low-cost board. As a computer, it is a standalone device that requires no host PC: it puts out its own video (VGA), audio (2 identical mono channels), accepts a PS/2 keyboard and has its own mass-storage in the form of a micro-SD card.
 
 https://www.thebyteattic.com/p/agon.html
 
+The Agon Console8 is a fully compatible variant of the Agon Light from the same designer, with the addition of a built-in PS/2 mouse port and two Atari-style DB-9 joystick ports.
+
 ### What is a MOS
 
-The MOS is a command line machine operating system, similar to CP/M or DOS, that provides a human interface to the Agon file system.
+The MOS is a command line Machine Operating System, similar to CP/M or DOS, that provides a human interface to the Agon file system.  It runs on the eZ80 CPU of the Agon.
 
 It also provides an API for file I/O and other common operations for BBC Basic for Z80 and other third-party applications.
 
-### Loadig BBC Basic for Z80
+### Loading BBC Basic for Z80
 
 1. Download bbcbasic.bin from [agon-bbc-basic releases](https://github.com/breakintoprogram/agon-bbc-basic/releases)
 2. Copy it to the root directory of the Agon SD card
@@ -27,12 +33,51 @@ It also provides an API for file I/O and other common operations for BBC Basic f
 
 ### Etiquette
 
-Please do not issue pull requests or issues for this project; it is very much a work-in-progress.
-I will review this policy once the code is approaching live status and I have time to collaborate more.
+Reporting issues and pull requests are welcome.
+
+A Contributing guide will be added in due course.
 
 ### Build
 
-The eZ80 is programmed via the ZDI connector on the left-hand side of the board. This requires a Zilog Smart Cable that can be purchased from online stockists such as Mouser or RS Components.
+The MOS is built using the Zilog Developer Studio II (ZDS II - eZ80Acclaim! version 5.3.5) tools.
+
+You can download the ZDS II tools for free via the following link. The software contains an IDE, Debugger, C Compiler and eZ80 Assembler.
+
+- [Zilog ZDS II Tools version 5.3.5](https://zilog.com/index.php?option=com_zcm&task=view&soft_id=54&Itemid=74)
+
+ZDS II is a Windows application.  Development of the MOS for the Console8 has been conducted on a MacBook Pro with an M1Max CPU running Windows 10 for ARM in a Parallels VM.  Other developers have used differing combinations of Windows, Linux and OSX, using VMs or Wine to run the ZDS II tools.
+
+#### Creating a .bin file
+
+The ZDS II tooling will compile the firmware and produce a `MOS.hex` file.  Unless you are programming the eZ80 on your Agon directly using ZDS II (see below), you will need to convert this to a `.bin` file to flash to the eZ80.
+
+To convert the `.hex` file to a `.bin` file, use the [Hex2Bin utility](https://sourceforge.net/projects/hex2bin/).
+
+### Testing the MOS
+
+#### Using the Agon Emulator
+
+MOS can be tested out without the need to reprogram your Agon Console8 or Agon Light by using the [Fab Agon Emulator](https://github.com/tomm/fab-agon-emulator).
+
+To test using the emulator, create a new `MOS.bin` file and place that into the emulator directory and run the emulator.  The emulator will automatically load the `MOS.bin` file and run it.
+
+It should be noted that the emulator is not 100% accurate, so some features may not work as expected, but it is a very close simulation.
+
+Unless you are using the ZDS II tools to program the eZ80 directly, it is recommended that you test your MOS on the emulator before testing on real hardware.
+
+#### Flashing your Agon Console8 or Agon Light
+
+The MOS can also be flashed on your device using the [agon-flash Agon MOS firmware upgrade utility](https://github.com/envenomator/agon-flash).  This is a command line utility that runs on the Agon itself, and can flash MOS to the eZ80 from a file stored on your SD card.
+
+In the event that you flash a MOS that does not work, you will need to revert your Agon back to a known working version.  This can be done using the [agon-vdpflash utility](https://github.com/envenomator/agon-vdpflash).  
+
+NB At this time to use this utility on an Agon Console8 you may need to use an external ESP32-based machine, or make some physical modifications to your Agon Console8.  Generally speaking this is not recommended unless you are an advanced user, and should only be necessary in only the most exceptional circumstances.  This is a developing situation and may change in the future, so you are advised to consult with the community on Discord.
+
+It is recommended when using the agon-flash utility that you use a filename other than `MOS.bin` for your new experimental MOS version, and keep a known working version of the `MOS.bin` file in the root of your SD card, as this is the file that the agon-vdpflash utility uses.
+
+#### Programming the eZ80 directly
+
+To program the eZ80 directly using ZDS II you will need a Zilog Smart Cable to connect to the ZDI connector on the board.  These are available from online stockists such as Mouser or RS Components.  Please note however that development of the MOS for the Console8 has *not* been conducted using a Zilog USB Smart Cable.
 
 There are three compatible cables with the following part numbers:
 
@@ -42,30 +87,21 @@ There are three compatible cables with the following part numbers:
 
 Important! Make sure you get the exact model of cable; there are variants for the Zilog Encore CPU that have similar part numbers, but are not compatible with the Acclaim! eZ80 CPU.
 
-You can download the ZDS II tools for free via these links. The software contains an IDE, Debugger, C Compiler and eZ80 Assembler.
-
-- [Zilog ZDS II Tools version 5.3.4](https://zilog.com/index.php?option=com_zcm&task=view&soft_id=38&Itemid=74)
-- [Zilog ZDS II Tools version 5.3.5](https://zilog.com/index.php?option=com_zcm&task=view&soft_id=54&Itemid=74)
-
-You will also need a [Hex2Bin utility](https://sourceforge.net/projects/hex2bin/) to convert the MOS.hex file to MOS.bin ready for release.
-
-NB:
-
-- The tools are only available for Windows PC.
-- The tools are compatible with Wine on Linux / OSX, but the USB Smart Cable drivers do not work
-- The Ethernet Smart Cable may be compatible with the tools running on Wine, though this combination has not been tested by me
-
-I currently build the official Quark software on a Windows XP KVM running on Ubuntu 20.04 LTS, using ZDS II Tools version 5.3.4, connecting to the Agon with the discontinued USB smart cable.
-
-It is recommended that building and testing the MOS is done via the ZDS II tools and a Zilog Smart Cable, otherwise there is an increased risk of bricking the Agon.
-
-Other options for developing C and eZ80 on the Agon are available. Please check the [Agon Programmers Group on Facebook](https://www.facebook.com/groups/667325088311886) for more information.
-
 Any custom settings for Agon development is contained within the project files, so no further configuration will need to be done.
+
+Other options for programming the Agon are available, and the community will be happy to advise on these.
 
 ### Documentation
 
-The AGON documentation can now be found on the [Agon Light Documentation Wiki](https://github.com/breakintoprogram/agon-docs/wiki)
+The Agon Light documentation can now be found on the [Agon Light Documentation Wiki](https://github.com/breakintoprogram/agon-docs/wiki)
+
+Documentation for the Agon Console8 is currently being worked on.
+
+### Community
+
+There is a [vibrant and active community on Discord](https://discord.gg/7Ruseg98T9), where you can get help and advice on developing for the Agon.
+
+There is also the [Agon Programmers Group on Facebook](https://www.facebook.com/groups/667325088311886).
 
 ### Licenses
 
@@ -73,7 +109,7 @@ This code is released under an MIT license, with the following exceptions:
 
 * FatFS: The license for the [FAT filing system by ChaN](http://elm-chan.org/fsw/ff/00index_e.html) can be found here [src_fatfs/LICENSE](src_fatfs/LICENSE) along with the accompanying code.
 
-### Links
+### Additional Links
 
 - [Zilog eZ80 User Manual](http://www.zilog.com/docs/um0077.pdf)
 - [ZiLOG Developer Studio II User Manual](http://www.zilog.com/docs/devtools/um0144.pdf)
