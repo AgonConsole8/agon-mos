@@ -56,8 +56,6 @@ extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
 
-static char  	cmd[256];				// Array for the command line handler
-
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
 // - pUART: Pointer to a UART structure
@@ -137,7 +135,10 @@ int main(void) {
 	//
 	#if enable_config == 1	
 	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
-		mos_BOOT("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		if (err > 0) {
+			mos_error(err);
+		}
 	}	
 	#endif
 
