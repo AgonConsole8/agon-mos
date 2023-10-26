@@ -136,7 +136,7 @@ int main(void) {
 	#if enable_config == 1	
 	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
 		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
-		if (err > 0) {
+		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
 	}	

@@ -194,9 +194,9 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_HELP	"Display help on a single or all commands.\r\n"	\
 			"List of commands:\r\n"				\
-			"CAT, CD, COPY, CREDITS, DELETE, JMP, \r\n"	\
-			"LOAD, MKDIR, RENAME, RUN, SAVE, SET, \r\n"	\
-			"TIME, VDU, TYPE, CLS, MOUNT, HELP.\r\n"
+			"CAT, CD, CLS, COPY, CREDITS, DELETE, EXEC, \r\n"	\
+			"HELP, JMP, LOAD, MKDIR, MOUNT, RENAME, RUN, \r\n"	\
+			"SAVE, SET, TIME, TYPE, VDU.\r\n"
 #define HELP_HELP_ARGS	"[ <command> | all ]"
 
 #endif MOS_H
