@@ -43,11 +43,13 @@
 #include "ff.h"
 #include "clock.h"
 #include "mos.h"
+#include "i2c.h"
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
 extern void 	vblank_handler(void);
 extern void 	uart0_handler(void);
+extern void 	i2c_handler(void);
 
 extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
@@ -95,6 +97,7 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 void init_interrupts(void) {
 	set_vector(PORTB1_IVECT, vblank_handler); 	// 0x32
 	set_vector(UART0_IVECT, uart0_handler);		// 0x18
+	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
 }
 
 // The main loop
