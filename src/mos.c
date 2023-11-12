@@ -637,7 +637,7 @@ int mos_cmdSET(char * ptr) {
 	) {
 		return 19; // Bad Parameter
 	}
-	if(strcmp(command, "KEYBOARD") == 0 && value <= 8) {
+	if(strcmp(command, "KEYBOARD") == 0 && value <= 9) {
 		putch(23);
 		putch(0);
 		putch(VDP_keycode);
