@@ -664,36 +664,21 @@ int mos_cmdSET(char * ptr) {
 	return 19; // Bad Parameter
 }
 
-// VDU <char1> <long2;> ... <charN>
+// VDU <char1> <char2> ... <charN>
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
 // - MOS error code
 //
 int	mos_cmdVDU(char *ptr) {
-	char *value_str;
 	UINT24 	value;
 	
-	while (mos_parseString(NULL, &value_str)) {
-		
-		value = strtol(value_str, NULL, 10);
-		
-		if (value_str[strlen(value_str) - 1] == ';') {
-			
-			putch(value & 0xFF); // write LSB
-			putch(value >> 8);	 // write MSB	
-		
-		} else {
-			
-			if(value > 255) {
-				return 19;	// Bad Parameter
-			}
-			putch(value);
-			
+	while(mos_parseNumber(NULL, &value)) {
+		if(value > 255) {
+			return 19;	// Bad Parameter
 		}
-		
+		putch(value);
 	}
-	
 	return 0;
 }
 
