@@ -42,7 +42,7 @@ extern BYTE scrcols;
 // Storage for the command history
 //
 static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
-char hotkey_strings[12][cmd_historyWidth + 1] = {'\0'}; 
+char *hotkey_strings[12] = NULL; 
 
 // Get the current cursor position from the VPD
 //
@@ -257,7 +257,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 			case 0xA9: //F11	
 			case 0xAA: //F12
 			{
-				if (hotkey_strings[keyc - 159][0] != '\0') {
+				if (hotkey_strings[keyc - 159] != NULL) {
 					removeEditLine(buffer, insertPos, len);
 					strcpy(buffer, hotkey_strings[keyc - 159]);
 					printf("%s", buffer);

@@ -98,7 +98,7 @@ static t_mosCommand mosCommands[] = {
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
-	{ "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,		HELP_HOTKEY,	NULL },
+	{ "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY,	NULL },
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -671,14 +671,29 @@ int mos_cmdSET(char * ptr) {
 // - MOS error code
 //
 int	mos_cmdVDU(char *ptr) {
+	char *value_str;
 	UINT24 	value;
 	
-	while(mos_parseNumber(NULL, &value)) {
-		if(value > 255) {
-			return 19;	// Bad Parameter
+	while (mos_parseString(NULL, &value_str)) {
+		
+		value = strtol(value_str, NULL, 10);
+		
+		if (value_str[strlen(value_str) - 1] == ';') {
+			
+			putch(value & 0xFF); // write LSB
+			putch(value >> 8);	 // write MSB	
+		
+		} else {
+			
+			if(value > 255) {
+				return 19;	// Bad Parameter
+			}
+			putch(value);
+			
 		}
-		putch(value);
+		
 	}
+	
 	return 0;
 }
 
@@ -828,7 +843,7 @@ int mos_cmdHELP(char *ptr) {
 //   0: Success (or controlled failure)
 //   20: Failure
 //
-int mos_cmdHOTKEY(char *ptr) {
+int mos_cmdKEY(char *ptr) {
 	
 	UINT24 fn_number = 0;
 	char *hotkey_string;
@@ -842,19 +857,25 @@ int mos_cmdHOTKEY(char *ptr) {
 	}
 	
 	if (!mos_parseString(NULL, &hotkey_string)) {
-		printf("No command provided.\r\n");
+		
+		free(hotkey_strings[fn_number - 1]);
+		hotkey_strings[fn_number - 1] = NULL;
+		
+		printf("F%u cleared.\r\n", fn_number);
 		return 0;
 	}
 	
-	//"hotkey x " = 9 chars
-	//"hotkey xx " = 10 chars
+	//"key x " = 6 chars
+	//"key xx " = 7 chars
 	
 	if (fn_number < 10)	{
-		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + 9, strlen(cmd_shadow) - 9);
-		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - 9] = '\0';
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key x ")) * sizeof(char));
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key x "), strlen(cmd_shadow) - strlen("key x "));
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key x ")] = '\0';
 	} else {
-		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + 10, strlen(cmd_shadow) - 10);
-		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - 10] = '\0';
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key xx ")) * sizeof(char));
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key xx "), strlen(cmd_shadow) - strlen("key xx "));
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key xx ")] = '\0';
 	}
 
 	return 0;
