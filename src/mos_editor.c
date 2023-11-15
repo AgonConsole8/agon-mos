@@ -42,6 +42,7 @@ extern BYTE scrcols;
 // Storage for the command history
 //
 static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
+char hotkey_strings[12][cmd_historyWidth + 1] = {'\0'}; 
 
 // Get the current cursor position from the VPD
 //
@@ -234,12 +235,38 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 			//
 			// First any extended (non-ASCII keys)
 			//
+			
 			case 0x85: {	// HOME
 				insertPos = gotoEditLineStart(insertPos);
 			} break;
 			case 0x87: {	// END
 				insertPos = gotoEditLineEnd(insertPos, len);
 			} break;
+			
+			
+			case 0x9F: //F1
+			case 0xA0: //F2
+			case 0xA1: //F3
+			case 0xA2: //F4
+			case 0xA3: //F5
+			case 0xA4: //F6
+			case 0xA5: //F7
+			case 0xA6: //F8
+			case 0xA7: //F9
+			case 0xA8: //F10
+			case 0xA9: //F11	
+			case 0xAA: //F12
+			{
+				if (hotkey_strings[keyc - 159][0] != '\0') {
+					removeEditLine(buffer, insertPos, len);
+					strcpy(buffer, hotkey_strings[keyc - 159]);
+					printf("%s", buffer);
+					len = strlen(buffer);
+					insertPos = len;
+					keya = 0x0D;
+				} else break;
+			}
+			
 			//
 			// Now the ASCII keys
 			//

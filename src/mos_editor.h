@@ -17,4 +17,6 @@
 
 UINT24	mos_EDITLINE(char * filename, int bufferLength, UINT8 clear);
 
+extern char	hotkey_strings[12][cmd_historyWidth + 1];
+
 #endif MOS_EDITOR_H

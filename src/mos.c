@@ -53,7 +53,8 @@
 #include "ff.h"
 #include "strings.h"
 
-char  	cmd[256];				// Array for the command line handler
+char  	cmd[256];				// Array for the command line handler - will be tokenized in place later
+char	cmd_shadow[256];		// Will hold preserved edit line
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -97,6 +98,7 @@ static t_mosCommand mosCommands[] = {
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
+	{ "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,		HELP_HOTKEY,	NULL },
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -340,6 +342,9 @@ int mos_exec(char * buffer) {
 	UINT8	mode;
 
 	ptr = mos_trim(buffer);
+	
+	strcpy (cmd_shadow, ptr);
+	
 	ptr = mos_strtok(ptr, " ");
 	if(ptr != NULL) {
 		func = mos_getCommand(ptr);
@@ -813,6 +818,45 @@ int mos_cmdHELP(char *ptr) {
 	if (cmd != NULL && !found) {
 		return 20;
 	}
+	return 0;
+}
+
+// HOT
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+//   0: Success (or controlled failure)
+//   20: Failure
+//
+int mos_cmdHOTKEY(char *ptr) {
+	
+	UINT24 fn_number = 0;
+	char *hotkey_string;
+	char *hotkey_string_token;
+
+	mos_parseNumber(NULL, &fn_number);
+	
+	if (fn_number < 1 || fn_number > 12) {
+		printf("Invalid FN-key number.\r\n");
+		return 0;
+	}
+	
+	if (!mos_parseString(NULL, &hotkey_string)) {
+		printf("No command provided.\r\n");
+		return 0;
+	}
+	
+	//"hotkey x " = 9 chars
+	//"hotkey xx " = 10 chars
+	
+	if (fn_number < 10)	{
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + 9, strlen(cmd_shadow) - 9);
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - 9] = '\0';
+	} else {
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + 10, strlen(cmd_shadow) - 10);
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - 10] = '\0';
+	}
+
 	return 0;
 }
 
