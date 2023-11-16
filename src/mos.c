@@ -872,11 +872,11 @@ int mos_cmdKEY(char *ptr) {
 	//"key xx " = 7 chars
 	
 	if (fn_number < 10)	{
-		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key x ")) * sizeof(char));
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key x ") + 1) * sizeof(char));
 		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key x "), strlen(cmd_shadow) - strlen("key x "));
 		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key x ")] = '\0';
 	} else {
-		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key xx ")) * sizeof(char));
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key xx ") + 1) * sizeof(char));
 		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key xx "), strlen(cmd_shadow) - strlen("key xx "));
 		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key xx ")] = '\0';
 	}
