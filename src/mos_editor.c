@@ -258,12 +258,47 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 			case 0xAA: //F12
 			{
 				if (hotkey_strings[keyc - 159] != NULL) {
-					removeEditLine(buffer, insertPos, len);
-					strcpy(buffer, hotkey_strings[keyc - 159]);
-					printf("%s", buffer);
-					len = strlen(buffer);
-					insertPos = len;
-					keya = 0x0D;
+					
+					char *wildcardPos = strstr(hotkey_strings[keyc - 159], "%s");
+					
+					if (wildcardPos == NULL) { //No wildcard in the hotkey string
+					
+						removeEditLine(buffer, insertPos, len);
+						strcpy(buffer, hotkey_strings[keyc - 159]);
+						printf("%s", buffer);
+						len = strlen(buffer);
+						insertPos = len;
+						keya = 0x0D;
+					} else {
+					
+						UINT8 prefixLength = wildcardPos - hotkey_strings[keyc - 159];
+						UINT8 replacementLength = strlen(buffer);
+						UINT8 suffixLength = strlen(wildcardPos + 2);
+						char *result;
+
+						if (prefixLength + replacementLength + suffixLength + 1 >= bufferLength) {
+							break;  // Exceeds max command length (256 chars)
+						}
+						
+						result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
+						
+						strncpy(result, hotkey_strings[keyc - 159], prefixLength); //Copy the portion preceding the wildcard to the buffer
+						result[prefixLength] = '\0'; //Terminate
+						
+						strcat(result, buffer);
+						strcat(result, wildcardPos + 2);
+						
+						removeEditLine(buffer, insertPos, len);
+						strcpy(buffer, result);
+						printf("%s", buffer);
+						len = strlen(buffer);
+						insertPos = len;
+						keya = 0x0D;
+						
+						free(result);
+						
+					}
+					
 				} else break;
 			}
 			
