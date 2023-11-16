@@ -858,11 +858,14 @@ int mos_cmdKEY(char *ptr) {
 	
 	if (!mos_parseString(NULL, &hotkey_string)) {
 		
-		free(hotkey_strings[fn_number - 1]);
-		hotkey_strings[fn_number - 1] = NULL;
+		if (hotkey_strings[fn_number - 1] != NULL) {
+			free(hotkey_strings[fn_number - 1]);
+			hotkey_strings[fn_number - 1] = NULL;
+			printf("F%u cleared.\r\n", fn_number);
+		} else printf("No string hotkey provided.\r\n");
 		
-		printf("F%u cleared.\r\n", fn_number);
 		return 0;
+		
 	}
 	
 	//"key x " = 6 chars
