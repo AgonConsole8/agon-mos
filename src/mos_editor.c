@@ -338,7 +338,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								FILINFO fno;
 
 								while (*tempPtr != '\0') {
-									if (*tempPtr == ' ') {
+									if (*tempPtr == ' ' || *tempPtr == '"') {
 										search_pos = tempPtr + 1; // Point to the character after the space
 									}
 									tempPtr++;
