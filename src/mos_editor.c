@@ -388,6 +388,67 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									}
 								}
 							} break;
+							
+							case 0x09: {
+							
+								const char *tempPtr = buffer;
+								const char *search_pos = NULL;
+								char *search_term;
+								
+								FRESULT fr;
+								DIR dj;
+								FILINFO fno;
+
+								while (*tempPtr != '\0') {
+									if (*tempPtr == ' ' || *tempPtr == '"') {
+										search_pos = tempPtr + 1; // Point to the character after the space
+									}
+									tempPtr++;
+								}
+
+								if (search_pos != NULL) {
+									
+									search_term = (char*) malloc(strlen(search_pos) + 2);
+									if (search_term == NULL) {
+										printf("Memory allocation failed.\n");
+										return 1;
+									}
+
+									strcpy(search_term, search_pos);
+									strcat(search_term, "*");
+
+									fr = f_findfirst(&dj, &fno, "", search_term);
+									
+									printf("%s", fno.fname + strlen(search_pos));
+									
+									strcat(buffer, fno.fname + strlen(search_pos));
+									
+									len = strlen(buffer);
+									insertPos = strlen(buffer);
+									
+									free(search_term);
+								} else { //No space, probably the only thing on the line.
+									
+									search_term = (char*) malloc(strlen(buffer) + 2);
+									strcpy(search_term, buffer);
+									strcat(search_term, "*");
+									
+									fr = f_findfirst(&dj, &fno, "", search_term);
+									
+									printf("%s", fno.fname + strlen(buffer));
+									
+									strcat(buffer, fno.fname + strlen(buffer));
+									
+									len = strlen(buffer);
+									insertPos = strlen(buffer);
+									
+									free(search_term);									
+									
+								}
+								
+
+							} break;
+							
 							case 0x7F: {	// Backspace
 								if (deleteCharacter(buffer, insertPos, len)) {
 									insertPos--;
