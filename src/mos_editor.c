@@ -365,6 +365,23 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									insertPos = strlen(buffer);
 									
 									free(search_term);
+								} else { //No space, probably the only thing on the line.
+									
+									search_term = (char*) malloc(strlen(buffer) + 2);
+									strcpy(search_term, buffer);
+									strcat(search_term, "*");
+									
+									fr = f_findfirst(&dj, &fno, "", search_term);
+									
+									printf("%s", fno.fname + strlen(buffer));
+									
+									strcat(buffer, fno.fname + strlen(buffer));
+									
+									len = strlen(buffer);
+									insertPos = strlen(buffer);
+									
+									free(search_term);									
+									
 								}
 								
 
