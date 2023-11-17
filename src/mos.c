@@ -910,44 +910,75 @@ UINT24	mos_CD(char *path) {
 // Returns:
 // - FatFS return code
 // 
-UINT24	mos_DIR(char * path) {
-	FRESULT	fr;
-	DIR	  	dir;
-	static 	FILINFO  fno;
-	int		yr, mo, da, hr, mi;
-	char 	str[12];
-	
-	fr = f_getlabel("", str, 0);
-	if(fr != 0) {
-		return fr;
-	}	
-	printf("Volume: ");
-	if(strlen(str) > 0) {
-		printf("%s", str);
-	}
-	else {
-		printf("<No Volume Label>");
-	}
-	printf("\n\r\n\r");
-	
-	fr = f_opendir(&dir, path);
-	if(fr == FR_OK) {
-		for(;;) {
-			fr = f_readdir(&dir, &fno);
-			if (fr != FR_OK || fno.fname[0] == 0) {
-				break;  // Break on error or end of dir
-			}
-			yr = (fno.fdate & 0xFE00) >>  9;	// Bits 15 to  9, from 1980
-			mo = (fno.fdate & 0x01E0) >>  5;	// Bits  8 to  5
-			da = (fno.fdate & 0x001F);			// Bits  4 to  0
-			hr = (fno.ftime & 0xF800) >> 11;	// Bits 15 to 11
-			mi = (fno.ftime & 0x07E0) >>  5;	// Bits 10 to  5
-			
-			printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
-		}
-	}
-	f_closedir(&dir);
-	return fr;
+UINT24 mos_DIR(char * inputPath) {
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char dirPath[256], pattern[32] = {0};
+    BOOL usePattern = FALSE;
+    char str[12]; // Buffer for volume label
+    int yr, mo, da, hr, mi;
+
+    fr = f_getlabel("", str, 0);
+    if (fr != 0) {
+        return fr;
+    }
+    printf("Volume: ");
+    if (strlen(str) > 0) {
+        printf("%s", str);
+    } else {
+        printf("<No Volume Label>");
+    }
+    printf("\n\r\n\r");
+
+    if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
+        strcpy(dirPath, ".");
+        strcpy(pattern, inputPath);
+        usePattern = TRUE;
+    } else if (strcmp(inputPath, ".") == 0) {
+        strcpy(dirPath, ".");
+    } else {
+        char *lastSeparator = strrchr(inputPath, '/');
+        if (lastSeparator != NULL && *(lastSeparator + 1) != '\0') {
+            strncpy(dirPath, inputPath, lastSeparator - inputPath + 1);
+            dirPath[lastSeparator - inputPath + 1] = '\0';
+            strcpy(pattern, lastSeparator + 1);
+            usePattern = TRUE;
+        } else {
+            strcpy(dirPath, inputPath);
+        }
+    }
+
+    fr = f_opendir(&dir, dirPath);
+    if (fr == FR_OK) {
+        if (usePattern) {
+            fr = f_findfirst(&dir, &fno, dirPath, pattern);
+        } else {
+            fr = f_readdir(&dir, &fno);
+        }
+
+        while (fr == FR_OK && fno.fname[0]) {
+
+            yr = (fno.fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
+            mo = (fno.fdate & 0x01E0) >> 5;  // Bits  8 to  5
+            da = (fno.fdate & 0x001F);       // Bits  4 to  0
+            hr = (fno.ftime & 0xF800) >> 11; // Bits 15 to 11
+            mi = (fno.ftime & 0x07E0) >> 5;  // Bits 10 to  5
+
+            printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+
+            if (usePattern) {
+                fr = f_findnext(&dir, &fno);
+            } else {
+                fr = f_readdir(&dir, &fno);
+            }
+
+            if (!usePattern && fno.fname[0] == 0) break;
+        }
+    }
+
+    f_closedir(&dir);
+    return fr;
 }
 
 // Delete file
