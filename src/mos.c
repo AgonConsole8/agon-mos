@@ -35,6 +35,7 @@
  * 26/09/2023:		Refactored mos_GETRTC and mos_SETRTC
  * 10/11/2023:		Added CONSOLE to mos_cmdSET
  * 11/11/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT, mos_mount
+ * 18/11/2023:		Added wildcard support to file handling commands.
  */
 
 #include <eZ80.h>
@@ -53,8 +54,7 @@
 #include "ff.h"
 #include "strings.h"
 
-char  	cmd[256];				// Array for the command line handler - will be tokenized in place later
-char	cmd_shadow[256];		// Will hold preserved edit line
+char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -66,6 +66,7 @@ extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
+TCHAR cwd[256];						// Hold current working directory.
 static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 extern volatile BYTE history_no;
@@ -98,7 +99,6 @@ static t_mosCommand mosCommands[] = {
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
-	{ "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY,	NULL },
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -164,7 +164,7 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	putch(MOS_prompt);
+	printf("%s%c", cwd, MOS_prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	return retval;
@@ -342,9 +342,6 @@ int mos_exec(char * buffer) {
 	UINT8	mode;
 
 	ptr = mos_trim(buffer);
-	
-	strcpy (cmd_shadow, ptr);
-	
 	ptr = mos_strtok(ptr, " ");
 	if(ptr != NULL) {
 		func = mos_getCommand(ptr);
@@ -566,6 +563,7 @@ int mos_cmdCD(char * ptr) {
 		return 19; // Bad Parameter
 	}
 	fr = f_chdir(path);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
 	return fr;
 }
 
@@ -671,29 +669,14 @@ int mos_cmdSET(char * ptr) {
 // - MOS error code
 //
 int	mos_cmdVDU(char *ptr) {
-	char *value_str;
 	UINT24 	value;
 	
-	while (mos_parseString(NULL, &value_str)) {
-		
-		value = strtol(value_str, NULL, 10);
-		
-		if (value_str[strlen(value_str) - 1] == ';') {
-			
-			putch(value & 0xFF); // write LSB
-			putch(value >> 8);	 // write MSB	
-		
-		} else {
-			
-			if(value > 255) {
-				return 19;	// Bad Parameter
-			}
-			putch(value);
-			
+	while(mos_parseNumber(NULL, &value)) {
+		if(value > 255) {
+			return 19;	// Bad Parameter
 		}
-		
+		putch(value);
 	}
-	
 	return 0;
 }
 
@@ -791,6 +774,7 @@ int	mos_cmdMOUNT(char *ptr) {
 	fr = mos_mount();
 	if (fr != FR_OK)
 		mos_error(fr);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
 	return 0;
 }
 
@@ -833,54 +817,6 @@ int mos_cmdHELP(char *ptr) {
 	if (cmd != NULL && !found) {
 		return 20;
 	}
-	return 0;
-}
-
-// HOT
-// Parameters:
-// - ptr: Pointer to the argument string in the line edit buffer
-// Returns:
-//   0: Success (or controlled failure)
-//   20: Failure
-//
-int mos_cmdKEY(char *ptr) {
-	
-	UINT24 fn_number = 0;
-	char *hotkey_string;
-	char *hotkey_string_token;
-
-	mos_parseNumber(NULL, &fn_number);
-	
-	if (fn_number < 1 || fn_number > 12) {
-		printf("Invalid FN-key number.\r\n");
-		return 0;
-	}
-	
-	if (!mos_parseString(NULL, &hotkey_string)) {
-		
-		if (hotkey_strings[fn_number - 1] != NULL) {
-			free(hotkey_strings[fn_number - 1]);
-			hotkey_strings[fn_number - 1] = NULL;
-			printf("F%u cleared.\r\n", fn_number);
-		} else printf("No string hotkey provided.\r\n");
-		
-		return 0;
-		
-	}
-	
-	//"key x " = 6 chars
-	//"key xx " = 7 chars
-	
-	if (fn_number < 10)	{
-		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key x ") + 1) * sizeof(char));
-		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key x "), strlen(cmd_shadow) - strlen("key x "));
-		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key x ")] = '\0';
-	} else {
-		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key xx ") + 1) * sizeof(char));
-		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key xx "), strlen(cmd_shadow) - strlen("key xx "));
-		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key xx ")] = '\0';
-	}
-
 	return 0;
 }
 
@@ -971,6 +907,8 @@ UINT24	mos_CD(char *path) {
 	FRESULT	fr;
 
 	fr = f_chdir(path);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	
 	return fr;
 }
 
@@ -978,44 +916,86 @@ UINT24	mos_CD(char *path) {
 // Returns:
 // - FatFS return code
 // 
-UINT24	mos_DIR(char * path) {
-	FRESULT	fr;
-	DIR	  	dir;
-	static 	FILINFO  fno;
-	int		yr, mo, da, hr, mi;
-	char 	str[12];
+UINT24 mos_DIR(char * inputPath) {
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char dirPath[256], pattern[32] = {0};
+    BOOL usePattern = FALSE;
+    char str[12]; // Buffer for volume label
+    int yr, mo, da, hr, mi;
+
+    fr = f_getlabel("", str, 0);
+    if (fr != 0) {
+        return fr;
+    }
+
+    if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
+        strcpy(dirPath, ".");
+        strcpy(pattern, inputPath);
+        usePattern = TRUE;
+    } else if (strcmp(inputPath, ".") == 0) {
+        strcpy(dirPath, ".");
+		
+    } else {
+        char *lastSeparator = strrchr(inputPath, '/');
+        if (lastSeparator != NULL && *(lastSeparator + 1) != '\0') {
+            strncpy(dirPath, inputPath, lastSeparator - inputPath + 1);
+            dirPath[lastSeparator - inputPath + 1] = '\0';
+            strcpy(pattern, lastSeparator + 1);
+            usePattern = TRUE;
+        } else {
+            strcpy(dirPath, inputPath);
+        }
+    }
 	
-	fr = f_getlabel("", str, 0);
-	if(fr != 0) {
-		return fr;
-	}	
-	printf("Volume: ");
-	if(strlen(str) > 0) {
-		printf("%s", str);
-	}
-	else {
-		printf("<No Volume Label>");
-	}
-	printf("\n\r\n\r");
+    fr = f_opendir(&dir, dirPath);
 	
-	fr = f_opendir(&dir, path);
-	if(fr == FR_OK) {
-		for(;;) {
-			fr = f_readdir(&dir, &fno);
-			if (fr != FR_OK || fno.fname[0] == 0) {
-				break;  // Break on error or end of dir
-			}
-			yr = (fno.fdate & 0xFE00) >>  9;	// Bits 15 to  9, from 1980
-			mo = (fno.fdate & 0x01E0) >>  5;	// Bits  8 to  5
-			da = (fno.fdate & 0x001F);			// Bits  4 to  0
-			hr = (fno.ftime & 0xF800) >> 11;	// Bits 15 to 11
-			mi = (fno.ftime & 0x07E0) >>  5;	// Bits 10 to  5
-			
-			printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
-		}
-	}
-	f_closedir(&dir);
-	return fr;
+    if (fr == FR_OK) {
+		
+    printf("Volume: ");
+    if (strlen(str) > 0) {
+        printf("%s", str);
+    } else {
+        printf("<No Volume Label>");
+    }
+    printf("\n\r\n\r");		
+		
+	if (strcmp(dirPath, ".") == 0) {
+		f_getcwd(cwd, sizeof(cwd));
+		printf("Directory: %s\r\n\r\n", cwd);
+	} else printf("Directory: %s\r\n\r\n", dirPath);
+		
+        if (usePattern) {
+            fr = f_findfirst(&dir, &fno, dirPath, pattern);
+        } else {
+            fr = f_readdir(&dir, &fno);
+        }
+
+        while (fr == FR_OK && fno.fname[0]) {
+
+            yr = (fno.fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
+            mo = (fno.fdate & 0x01E0) >> 5;  // Bits  8 to  5
+            da = (fno.fdate & 0x001F);       // Bits  4 to  0
+            hr = (fno.ftime & 0xF800) >> 11; // Bits 15 to 11
+            mi = (fno.ftime & 0x07E0) >> 5;  // Bits 10 to  5
+
+            printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+
+            if (usePattern) {
+                fr = f_findnext(&dir, &fno);
+            } else {
+                fr = f_readdir(&dir, &fno);
+            }
+
+            if (!usePattern && fno.fname[0] == 0) break;
+        }
+		
+		printf("\r\n");
+    }
+
+    f_closedir(&dir);
+    return fr;
 }
 
 // Delete file
@@ -1025,10 +1005,51 @@ UINT24	mos_DIR(char * path) {
 // - FatFS return code
 // 
 UINT24 mos_DEL(char * filename) {
-	FRESULT	fr;	
-	
-	fr = f_unlink(filename);
-	return fr;
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char dirPath[256] = ".";  // Default to current directory
+    char pattern[32] = {0};
+    BOOL usePattern = FALSE;
+
+    // Check if the filename includes a wildcard
+    char *lastSeparator = strrchr(filename, '/');
+    if (strchr(filename, '*') != NULL) {
+        usePattern = TRUE;
+        if (lastSeparator != NULL) {
+            strncpy(dirPath, filename, lastSeparator - filename);
+            dirPath[lastSeparator - filename] = '\0';  // Don't include '/'
+            strcpy(pattern, lastSeparator + 1);
+        } else {
+            strcpy(pattern, filename);  // Use the entire filename as pattern
+        }
+    } else {
+        strcpy(dirPath, filename);
+    }
+
+    if (usePattern) {
+        // Delete each file matching the pattern
+        fr = f_opendir(&dir, dirPath);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, dirPath, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            char fullPath[260];
+            sprintf(fullPath, "%s/%s", dirPath, fno.fname);  // Construct full path
+
+            fr = f_unlink(fullPath);  // Delete the file
+            if (fr != FR_OK) break;
+
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+        // Delete a single file
+        fr = f_unlink(filename);
+    }
+
+    return fr;
 }
 
 // Rename file
@@ -1038,52 +1059,191 @@ UINT24 mos_DEL(char * filename) {
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_REN(char * filename1, char * filename2) {
-	FRESULT fr;
-	
-	fr = f_rename(filename1, filename2);
-	return fr;
+
+UINT24 mos_REN(char * srcPath, char * dstPath) {
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char srcDir[256], pattern[32] = {0}, fullSrcPath[260], fullDstPath[260];
+	char *asteriskPos;
+    BOOL usePattern = FALSE;
+	UINT8 dstPathLen;
+
+    
+    asteriskPos = strchr(srcPath, '*');
+    if (asteriskPos != NULL) {
+        
+        char *lastSeparator = strrchr(srcPath, '/');
+        if (lastSeparator != NULL) {
+            strncpy(srcDir, srcPath, lastSeparator - srcPath + 1); // Include '/'
+            srcDir[lastSeparator - srcPath + 1] = '\0';
+            strcpy(pattern, asteriskPos);
+        } else {
+            strcpy(srcDir, ""); // Change "." to "" for later use as a desination path...
+            strcpy(pattern, srcPath);
+        }
+        usePattern = TRUE;
+    } else {
+
+        strcpy(srcDir, srcPath);
+        usePattern = FALSE;
+    }
+
+    if (usePattern) {
+        fr = f_opendir(&dir, srcDir);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, srcDir, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            
+            sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
+
+            dstPathLen = strlen(dstPath);
+            if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+                sprintf(fullDstPath, "%s%s", dstPath, fno.fname); // No additional '/' needed
+            } else {
+                sprintf(fullDstPath, "%s/%s", dstPath, fno.fname); // Append '/' before filename
+            }
+
+            // Perform move/rename
+            fr = f_rename(fullSrcPath, fullDstPath);
+            if (fr != FR_OK) break;
+
+            // Find the next file
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+
+        size_t dstPathLen = strlen(dstPath);
+        if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+            char *srcFilename = strrchr(srcPath, '/');
+            srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
+            sprintf(fullDstPath, "%s%s", dstPath, srcFilename);
+            dstPath = fullDstPath;
+        }
+
+        fr = f_rename(srcPath, dstPath);
+    }
+
+    return fr;
 }
 
 // Copy file
 // Parameters:
-// - filename1: Path of file to rename
+// - filename1: Path of file to copy
 // - filename2: New filename
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_COPY(char * filename1, char * filename2) {
-	FRESULT fr;
-	FIL		fsrc, fdst;
-	BYTE	buffer[1024];
-	UINT	br, bw;
+UINT24 mos_COPY(char * srcPath, char * dstPath) {
+    FRESULT fr;
+    FIL fsrc, fdst;
+    DIR dir;
+    static FILINFO fno;
+    BYTE buffer[1024];
+    UINT br, bw;
+    char srcDir[256], pattern[32] = {0}, fullSrcPath[260], fullDstPath[260];
+    BOOL usePattern = FALSE;
+    char *srcFilename, *lastSeparator, *asteriskPos;
+    size_t dstPathLen;
 
-	// Open the file to copy
-	//
-	fr = f_open(&fsrc, filename1, FA_READ);
-	if(fr) {
-		return fr;
-	}
-	// Open the destination file
-	//
-	fr = f_open(&fdst, filename2, FA_WRITE | FA_CREATE_NEW);
-	if(fr) {
-		return fr;
-	}
-	// Copy the file
-	//
-	while(1) {
-        fr = f_read(&fsrc, buffer, sizeof buffer, &br);	// Read a chunk of data from the source file
-        if (br == 0) break;								// Error or EOF
-        fr = f_write(&fdst, buffer, br, &bw);			// Write it to the destination file
-        if (bw < br) break; 							// Error or Disk Full
-	}
-    f_close(&fsrc);										// Close both files
-    f_close(&fdst);
+    if (strchr(dstPath, '*') != NULL) {
+        return FR_INVALID_PARAMETER; // Wildcards are not allowed in destination path
+    }
 
-	return fr;
+    asteriskPos = strchr(srcPath, '*');
+    lastSeparator = strrchr(srcPath, '/');
+    if (asteriskPos != NULL) {
+        usePattern = TRUE;
+        if (lastSeparator != NULL) {
+            strncpy(srcDir, srcPath, lastSeparator - srcPath + 1);
+            srcDir[lastSeparator - srcPath + 1] = '\0';
+            strcpy(pattern, asteriskPos);
+        } else {
+            strcpy(srcDir, "");
+            strcpy(pattern, srcPath);
+        }
+    } else {
+        strcpy(srcDir, srcPath);
+    }
+
+    if (usePattern) {
+        fr = f_opendir(&dir, srcDir);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, srcDir, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
+			
+			sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
+
+            dstPathLen = strlen(dstPath);
+            if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+                sprintf(fullDstPath, "%s%s", dstPath, fno.fname);
+            } else {
+                sprintf(fullDstPath, "%s/%s", dstPath, fno.fname);
+            }
+
+            // File copy operation
+            fr = f_open(&fsrc, fullSrcPath, FA_READ);
+            if (fr != FR_OK) break;
+            fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
+            if (fr != FR_OK) {
+                f_close(&fsrc);
+                break;
+            }
+
+            while (1) {
+                fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+                if (br == 0 || fr != FR_OK) break;
+                fr = f_write(&fdst, buffer, br, &bw);
+                if (bw < br || fr != FR_OK) break;
+            }
+
+            f_close(&fsrc);
+            f_close(&fdst);
+
+            if (fr != FR_OK) break;
+
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+        // Single file copy
+        srcFilename = (lastSeparator != NULL) ? lastSeparator + 1 : srcPath;
+        dstPathLen = strlen(dstPath);
+        if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+            sprintf(fullDstPath, "%s%s", dstPath, srcFilename);
+        } else {
+            strcpy(fullDstPath, dstPath);
+        }
+
+        fr = f_open(&fsrc, srcPath, FA_READ);
+        if (fr != FR_OK) return fr;
+        fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
+        if (fr != FR_OK) {
+            f_close(&fsrc);
+            return fr;
+        }
+
+        while (1) {
+            fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+            if (br == 0) break; // EOF
+            fr = f_write(&fdst, buffer, br, &bw);
+            if (bw < br) break; // Error
+
+            if (fr != FR_OK) break;
+        }
+
+        f_close(&fsrc);
+        f_close(&fdst);
+    }
+
+    return fr;
 }
-
 
 // Make a directory
 // Parameters:
@@ -1404,6 +1564,9 @@ UINT8 fat_EOF(FIL * fp) {
 // - fatfs error code
 //
 int mos_mount(void) {
-	return f_mount(&fs, "", 1);			// Mount the SD card
+	FRESULT fr;
+	fr = f_mount(&fs, "", 1);	// Mount the SD card
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	return fr;
 }
 

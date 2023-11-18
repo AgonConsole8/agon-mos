@@ -12,6 +12,7 @@
  * 21/03/2023:		Improved backspace, and editing of long lines, after scroll, at bottom of screen
  * 22/03/2023:		Added a single-entry command line history
  * 31/03/2023:		Added timeout for VDP protocol
+ * 18/11/2023:		Added tab completion
  */
 
 #include <eZ80.h>
@@ -42,7 +43,6 @@ extern BYTE scrcols;
 // Storage for the command history
 //
 static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
-char *hotkey_strings[12] = NULL; 
 
 // Get the current cursor position from the VPD
 //
@@ -235,73 +235,12 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 			//
 			// First any extended (non-ASCII keys)
 			//
-			
 			case 0x85: {	// HOME
 				insertPos = gotoEditLineStart(insertPos);
 			} break;
 			case 0x87: {	// END
 				insertPos = gotoEditLineEnd(insertPos, len);
 			} break;
-			
-			
-			case 0x9F: //F1
-			case 0xA0: //F2
-			case 0xA1: //F3
-			case 0xA2: //F4
-			case 0xA3: //F5
-			case 0xA4: //F6
-			case 0xA5: //F7
-			case 0xA6: //F8
-			case 0xA7: //F9
-			case 0xA8: //F10
-			case 0xA9: //F11	
-			case 0xAA: //F12
-			{
-				if (hotkey_strings[keyc - 159] != NULL) {
-					
-					char *wildcardPos = strstr(hotkey_strings[keyc - 159], "%s");
-					
-					if (wildcardPos == NULL) { //No wildcard in the hotkey string
-					
-						removeEditLine(buffer, insertPos, len);
-						strcpy(buffer, hotkey_strings[keyc - 159]);
-						printf("%s", buffer);
-						len = strlen(buffer);
-						insertPos = len;
-						keya = 0x0D;
-					} else {
-					
-						UINT8 prefixLength = wildcardPos - hotkey_strings[keyc - 159];
-						UINT8 replacementLength = strlen(buffer);
-						UINT8 suffixLength = strlen(wildcardPos + 2);
-						char *result;
-
-						if (prefixLength + replacementLength + suffixLength + 1 >= bufferLength) {
-							break;  // Exceeds max command length (256 chars)
-						}
-						
-						result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
-						
-						strncpy(result, hotkey_strings[keyc - 159], prefixLength); //Copy the portion preceding the wildcard to the buffer
-						result[prefixLength] = '\0'; //Terminate
-						
-						strcat(result, buffer);
-						strcat(result, wildcardPos + 2);
-						
-						removeEditLine(buffer, insertPos, len);
-						strcpy(buffer, result);
-						printf("%s", buffer);
-						len = strlen(buffer);
-						insertPos = len;
-						keya = 0x0D;
-						
-						free(result);
-						
-					}
-					
-				} else break;
-			}
-			
 			//
 			// Now the ASCII keys
 			//
@@ -388,6 +327,86 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									}
 								}
 							} break;
+							
+							case 0x09: { // Tab
+								char *search_term;
+								char *path;
+
+								FRESULT fr;
+								DIR dj;
+								FILINFO fno;
+								const char *searchTermStart;
+								const char *lastSpace = strrchr(buffer, ' ');
+								const char *lastSlash = strrchr(buffer, '/');
+								
+
+								if (lastSlash != NULL) {
+									int pathLength = 1;
+																		
+									if (lastSpace != NULL && lastSlash > lastSpace) {
+										lastSpace++;
+										pathLength = lastSlash - lastSpace; // Path starts after the last space and includes the slash
+									}
+									if (lastSpace == NULL) {
+										lastSpace = buffer;
+										pathLength = lastSlash - lastSpace;
+										
+									}
+
+									path = (char*) malloc(pathLength + 1); // +1 for null terminator
+									if (path == NULL) {
+										printf("Memory allocation failed.\n");
+										return 1;
+									}
+									strncpy(path, lastSpace, pathLength); // Start after the last space
+									path[pathLength] = '\0'; // Null-terminate the string
+
+									// Determine the start of the search term
+									searchTermStart = lastSlash + 1;
+									if (lastSpace != NULL && lastSpace > lastSlash) {
+										searchTermStart = lastSpace + 1;
+									}
+									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
+								} else {
+									
+									path = (char*) malloc(1);
+									if (path == NULL) {
+										printf("Memory allocation for no path failed.\n");
+										break;
+									}
+									path[0] = '\0'; // Path is empty (current dir, essentially).
+
+									searchTermStart = lastSpace ? lastSpace + 1 : buffer;
+									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
+								}
+
+								if (search_term == NULL) {
+									printf("Memory allocation failed.\n");
+									free(path);
+									return 1;
+								}
+
+								strcpy(search_term, lastSpace && lastSlash > lastSpace ? lastSlash + 1 : lastSpace ? lastSpace + 1 : buffer);
+								strcat(search_term, "*");
+								
+								//printf("Path:\"%s\" Pattern:\"%s\"\r\n", path, search_term);
+								fr = f_findfirst(&dj, &fno, path, search_term);
+
+								if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
+								else printf("%s", fno.fname + strlen(search_term) - 1);
+
+								strcat(buffer, fno.fname + strlen(search_term) - 1);
+								if (fno.fattrib & AM_DIR) strcat(buffer, "/");
+
+								len = strlen(buffer);
+								insertPos = strlen(buffer);
+
+								// Free the allocated memory
+								free(search_term);
+								free(path);
+
+							} break;
+							
 							case 0x7F: {	// Backspace
 								if (deleteCharacter(buffer, insertPos, len)) {
 									insertPos--;
