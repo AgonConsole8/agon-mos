@@ -95,6 +95,7 @@ static t_mosCommand mosCommands[] = {
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC,	NULL },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE,	NULL },
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
+	{ "MODE",		&mos_cmdMODE,		NULL,			HELP_MODE,	NULL },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
 };
@@ -756,6 +757,20 @@ int mos_cmdTYPE(char * ptr) {
 //
 int	mos_cmdCLS(char *ptr) {
 	putchar(12);
+	return 0;
+}
+
+// MODE
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int	mos_cmdMODE(char *ptr) {
+	UINT24 mode;
+	mos_parseNumber(NULL, &mode);
+	putchar(22);
+	putchar(mode);
 	return 0;
 }
 

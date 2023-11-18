@@ -85,6 +85,7 @@ int		mos_cmdCREDITS(char *ptr);
 int		mos_cmdEXEC(char * ptr);
 int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
+int		mos_cmdMODE(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 
@@ -193,6 +194,8 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_TYPE_ARGS		"<filename>"
 
 #define HELP_CLS			"Clear the screen\r\n"
+
+#define HELP_MODE			"Set screen mode to specified mode\r\n"
 
 #define HELP_MOUNT			"(Re-)mount the MicroSD card\r\n"
 
