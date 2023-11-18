@@ -12,6 +12,7 @@
  * 21/03/2023:		Improved backspace, and editing of long lines, after scroll, at bottom of screen
  * 22/03/2023:		Added a single-entry command line history
  * 31/03/2023:		Added timeout for VDP protocol
+ * 18/11/2023:		Added tab completion
  */
 
 #include <eZ80.h>

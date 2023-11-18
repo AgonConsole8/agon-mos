@@ -35,6 +35,7 @@
  * 26/09/2023:		Refactored mos_GETRTC and mos_SETRTC
  * 10/11/2023:		Added CONSOLE to mos_cmdSET
  * 11/11/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT, mos_mount
+ * 18/11/2023:		Added wildcard support to file handling commands.
  */
 
 #include <eZ80.h>
