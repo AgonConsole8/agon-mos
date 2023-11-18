@@ -327,63 +327,82 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								}
 							} break;
 							
-							case 0x09: {
-							
-								const char *tempPtr = buffer;
-								const char *search_pos = NULL;
+							case 0x09: { // Tab
 								char *search_term;
-								
+								char *path;
+
 								FRESULT fr;
 								DIR dj;
 								FILINFO fno;
+								const char *searchTermStart;
+								const char *lastSpace = strrchr(buffer, ' ');
+								const char *lastSlash = strrchr(buffer, '/');
+								
 
-								while (*tempPtr != '\0') {
-									if (*tempPtr == ' ' || *tempPtr == '"') {
-										search_pos = tempPtr + 1; // Point to the character after the space
+								if (lastSlash != NULL) {
+									int pathLength;
+																		
+									if (lastSpace != NULL && lastSlash > lastSpace) {
+										lastSpace++;
+										pathLength = lastSlash - lastSpace; // Path starts after the last space and includes the slash
 									}
-									tempPtr++;
-								}
+									if (lastSpace == NULL) {
+										lastSpace = buffer;
+										pathLength = lastSlash - lastSpace;
+										
+									}
 
-								if (search_pos != NULL) {
-									
-									search_term = (char*) malloc(strlen(search_pos) + 2);
-									if (search_term == NULL) {
+									path = (char*) malloc(pathLength + 1); // +1 for null terminator
+									if (path == NULL) {
 										printf("Memory allocation failed.\n");
 										return 1;
 									}
+									strncpy(path, lastSpace, pathLength); // Start after the last space
+									path[pathLength] = '\0'; // Null-terminate the string
 
-									strcpy(search_term, search_pos);
-									strcat(search_term, "*");
+									// Determine the start of the search term
+									searchTermStart = lastSlash + 1;
+									if (lastSpace != NULL && lastSpace > lastSlash) {
+										searchTermStart = lastSpace + 1;
+									}
+									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
+								} else {
+									
+									path = (char*) malloc(1);
+									if (path == NULL) {
+										printf("Memory allocation for no path failed.\n");
+										break;
+									}
+									path[0] = '\0'; // Path is empty (current dir, essentially).
 
-									fr = f_findfirst(&dj, &fno, "", search_term);
-									
-									printf("%s", fno.fname + strlen(search_pos));
-									
-									strcat(buffer, fno.fname + strlen(search_pos));
-									
-									len = strlen(buffer);
-									insertPos = strlen(buffer);
-									
-									free(search_term);
-								} else { //No space, probably the only thing on the line.
-									
-									search_term = (char*) malloc(strlen(buffer) + 2);
-									strcpy(search_term, buffer);
-									strcat(search_term, "*");
-									
-									fr = f_findfirst(&dj, &fno, "", search_term);
-									
-									printf("%s", fno.fname + strlen(buffer));
-									
-									strcat(buffer, fno.fname + strlen(buffer));
-									
-									len = strlen(buffer);
-									insertPos = strlen(buffer);
-									
-									free(search_term);									
-									
+									searchTermStart = lastSpace ? lastSpace + 1 : buffer;
+									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
 								}
+
+								if (search_term == NULL) {
+									printf("Memory allocation failed.\n");
+									free(path);
+									return 1;
+								}
+
+								strcpy(search_term, lastSpace && lastSlash > lastSpace ? lastSlash + 1 : lastSpace ? lastSpace + 1 : buffer);
+								strcat(search_term, "*");
 								
+								//printf("Path:\"%s\" Pattern:\"%s\"\r\n", path, search_term);
+								fr = f_findfirst(&dj, &fno, path, search_term);
+
+								if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
+								else printf("%s", fno.fname + strlen(search_term) - 1);
+
+								strcat(buffer, fno.fname + strlen(search_term) - 1);
+								if (fno.fattrib & AM_DIR) strcat(buffer, "/");
+
+								len = strlen(buffer);
+								insertPos = strlen(buffer);
+
+								// Free the allocated memory
+								free(search_term);
+								free(path);
 
 							} break;
 							
