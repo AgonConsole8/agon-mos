@@ -366,6 +366,7 @@ int mos_cmdKEY(char *ptr) {
 			else printf("F12: N/A\r\n");
 				
 		printf("\r\n");
+		return 0;
 			
 	}
 
