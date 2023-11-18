@@ -55,6 +55,7 @@
 #include "strings.h"
 
 char  	cmd[256];				// Array for the command line handler
+char	cmd_shadow[256];		// Will hold preserved edit line
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -99,6 +100,7 @@ static t_mosCommand mosCommands[] = {
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
+	{ "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY,	NULL },
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -328,6 +330,47 @@ BOOL mos_parseString(char * ptr, char ** p_Value) {
 	return 1;
 }
 
+int mos_cmdKEY(char *ptr) {
+
+	UINT24 fn_number = 0;
+	char *hotkey_string;
+	char *hotkey_string_token;
+
+	mos_parseNumber(NULL, &fn_number);
+
+	if (fn_number < 1 || fn_number > 12) {
+		printf("Invalid FN-key number.\r\n");
+		return 0;
+	}
+
+	if (!mos_parseString(NULL, &hotkey_string)) {
+
+		if (hotkey_strings[fn_number - 1] != NULL) {
+			free(hotkey_strings[fn_number - 1]);
+			hotkey_strings[fn_number - 1] = NULL;
+			printf("F%u cleared.\r\n", fn_number);
+		} else printf("No string hotkey provided.\r\n");
+
+		return 0;
+
+	}
+
+	//"key x " = 6 chars
+	//"key xx " = 7 chars
+
+	if (fn_number < 10)	{
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key x ") + 1) * sizeof(char));
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key x "), strlen(cmd_shadow) - strlen("key x "));
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key x ")] = '\0';
+	} else {
+		hotkey_strings[fn_number - 1] = malloc((strlen(cmd_shadow) - strlen("key xx ") + 1) * sizeof(char));
+		strncpy(hotkey_strings[fn_number - 1], cmd_shadow + strlen("key xx "), strlen(cmd_shadow) - strlen("key xx "));
+		hotkey_strings[fn_number - 1][strlen(cmd_shadow) - strlen("key xx ")] = '\0';
+	}
+
+	return 0;
+}
+
 // Execute a MOS command
 // Parameters:
 // - buffer: Pointer to a zero terminated string that contains the MOS command with arguments
@@ -342,6 +385,9 @@ int mos_exec(char * buffer) {
 	UINT8	mode;
 
 	ptr = mos_trim(buffer);
+	
+	strcpy (cmd_shadow, ptr);
+	
 	ptr = mos_strtok(ptr, " ");
 	if(ptr != NULL) {
 		func = mos_getCommand(ptr);
@@ -1175,7 +1221,6 @@ UINT24 mos_COPY(char * srcPath, char * dstPath) {
 
         fr = f_findfirst(&dir, &fno, srcDir, pattern);
         while (fr == FR_OK && fno.fname[0] != 0) {
-            printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
 			
 			sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
 
@@ -1186,6 +1231,8 @@ UINT24 mos_COPY(char * srcPath, char * dstPath) {
                 sprintf(fullDstPath, "%s/%s", dstPath, fno.fname);
             }
 
+			printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
+			
             // File copy operation
             fr = f_open(&fsrc, fullSrcPath, FA_READ);
             if (fr != FR_OK) break;
