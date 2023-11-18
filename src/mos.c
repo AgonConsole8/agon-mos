@@ -913,6 +913,7 @@ UINT24	mos_CD(char *path) {
 UINT24 mos_DIR(char * inputPath) {
     FRESULT fr;
     DIR dir;
+	TCHAR cwd[256];
     static FILINFO fno;
     char dirPath[256], pattern[32] = {0};
     BOOL usePattern = FALSE;
@@ -937,6 +938,7 @@ UINT24 mos_DIR(char * inputPath) {
         usePattern = TRUE;
     } else if (strcmp(inputPath, ".") == 0) {
         strcpy(dirPath, ".");
+		
     } else {
         char *lastSeparator = strrchr(inputPath, '/');
         if (lastSeparator != NULL && *(lastSeparator + 1) != '\0') {
@@ -948,7 +950,12 @@ UINT24 mos_DIR(char * inputPath) {
             strcpy(dirPath, inputPath);
         }
     }
-
+	
+	if (strcmp(dirPath, ".") == 0) {
+		fr = f_getcwd(cwd, sizeof(cwd));
+		printf("Directory: %s\r\n\r\n", cwd);
+	} else printf("Directory: %s\r\n\r\n", dirPath);
+	
     fr = f_opendir(&dir, dirPath);
     if (fr == FR_OK) {
         if (usePattern) {
@@ -988,10 +995,51 @@ UINT24 mos_DIR(char * inputPath) {
 // - FatFS return code
 // 
 UINT24 mos_DEL(char * filename) {
-	FRESULT	fr;	
-	
-	fr = f_unlink(filename);
-	return fr;
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char dirPath[256] = ".";  // Default to current directory
+    char pattern[32] = {0};
+    BOOL usePattern = FALSE;
+
+    // Check if the filename includes a wildcard
+    char *lastSeparator = strrchr(filename, '/');
+    if (strchr(filename, '*') != NULL) {
+        usePattern = TRUE;
+        if (lastSeparator != NULL) {
+            strncpy(dirPath, filename, lastSeparator - filename);
+            dirPath[lastSeparator - filename] = '\0';  // Don't include '/'
+            strcpy(pattern, lastSeparator + 1);
+        } else {
+            strcpy(pattern, filename);  // Use the entire filename as pattern
+        }
+    } else {
+        strcpy(dirPath, filename);
+    }
+
+    if (usePattern) {
+        // Delete each file matching the pattern
+        fr = f_opendir(&dir, dirPath);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, dirPath, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            char fullPath[260];
+            sprintf(fullPath, "%s/%s", dirPath, fno.fname);  // Construct full path
+
+            fr = f_unlink(fullPath);  // Delete the file
+            if (fr != FR_OK) break;
+
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+        // Delete a single file
+        fr = f_unlink(filename);
+    }
+
+    return fr;
 }
 
 // Rename file
@@ -1001,52 +1049,191 @@ UINT24 mos_DEL(char * filename) {
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_REN(char * filename1, char * filename2) {
-	FRESULT fr;
-	
-	fr = f_rename(filename1, filename2);
-	return fr;
+
+UINT24 mos_REN(char * srcPath, char * dstPath) {
+    FRESULT fr;
+    DIR dir;
+    static FILINFO fno;
+    char srcDir[256], pattern[32] = {0}, fullSrcPath[260], fullDstPath[260];
+	char *asteriskPos;
+    BOOL usePattern = FALSE;
+	UINT8 dstPathLen;
+
+    
+    asteriskPos = strchr(srcPath, '*');
+    if (asteriskPos != NULL) {
+        
+        char *lastSeparator = strrchr(srcPath, '/');
+        if (lastSeparator != NULL) {
+            strncpy(srcDir, srcPath, lastSeparator - srcPath + 1); // Include '/'
+            srcDir[lastSeparator - srcPath + 1] = '\0';
+            strcpy(pattern, asteriskPos);
+        } else {
+            strcpy(srcDir, ""); // Change "." to "" for later use as a desination path...
+            strcpy(pattern, srcPath);
+        }
+        usePattern = TRUE;
+    } else {
+
+        strcpy(srcDir, srcPath);
+        usePattern = FALSE;
+    }
+
+    if (usePattern) {
+        fr = f_opendir(&dir, srcDir);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, srcDir, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            
+            sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
+
+            dstPathLen = strlen(dstPath);
+            if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+                sprintf(fullDstPath, "%s%s", dstPath, fno.fname); // No additional '/' needed
+            } else {
+                sprintf(fullDstPath, "%s/%s", dstPath, fno.fname); // Append '/' before filename
+            }
+
+            // Perform move/rename
+            fr = f_rename(fullSrcPath, fullDstPath);
+            if (fr != FR_OK) break;
+
+            // Find the next file
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+
+        size_t dstPathLen = strlen(dstPath);
+        if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+            char *srcFilename = strrchr(srcPath, '/');
+            srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
+            sprintf(fullDstPath, "%s%s", dstPath, srcFilename);
+            dstPath = fullDstPath;
+        }
+
+        fr = f_rename(srcPath, dstPath);
+    }
+
+    return fr;
 }
 
 // Copy file
 // Parameters:
-// - filename1: Path of file to rename
+// - filename1: Path of file to copy
 // - filename2: New filename
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_COPY(char * filename1, char * filename2) {
-	FRESULT fr;
-	FIL		fsrc, fdst;
-	BYTE	buffer[1024];
-	UINT	br, bw;
+UINT24 mos_COPY(char * srcPath, char * dstPath) {
+    FRESULT fr;
+    FIL fsrc, fdst;
+    DIR dir;
+    static FILINFO fno;
+    BYTE buffer[1024];
+    UINT br, bw;
+    char srcDir[256], pattern[32] = {0}, fullSrcPath[260], fullDstPath[260];
+    BOOL usePattern = FALSE;
+    char *srcFilename, *lastSeparator, *asteriskPos;
+    size_t dstPathLen;
 
-	// Open the file to copy
-	//
-	fr = f_open(&fsrc, filename1, FA_READ);
-	if(fr) {
-		return fr;
-	}
-	// Open the destination file
-	//
-	fr = f_open(&fdst, filename2, FA_WRITE | FA_CREATE_NEW);
-	if(fr) {
-		return fr;
-	}
-	// Copy the file
-	//
-	while(1) {
-        fr = f_read(&fsrc, buffer, sizeof buffer, &br);	// Read a chunk of data from the source file
-        if (br == 0) break;								// Error or EOF
-        fr = f_write(&fdst, buffer, br, &bw);			// Write it to the destination file
-        if (bw < br) break; 							// Error or Disk Full
-	}
-    f_close(&fsrc);										// Close both files
-    f_close(&fdst);
+    if (strchr(dstPath, '*') != NULL) {
+        return FR_INVALID_PARAMETER; // Wildcards are not allowed in destination path
+    }
 
-	return fr;
+    asteriskPos = strchr(srcPath, '*');
+    lastSeparator = strrchr(srcPath, '/');
+    if (asteriskPos != NULL) {
+        usePattern = TRUE;
+        if (lastSeparator != NULL) {
+            strncpy(srcDir, srcPath, lastSeparator - srcPath + 1);
+            srcDir[lastSeparator - srcPath + 1] = '\0';
+            strcpy(pattern, asteriskPos);
+        } else {
+            strcpy(srcDir, "");
+            strcpy(pattern, srcPath);
+        }
+    } else {
+        strcpy(srcDir, srcPath);
+    }
+
+    if (usePattern) {
+        fr = f_opendir(&dir, srcDir);
+        if (fr != FR_OK) return fr;
+
+        fr = f_findfirst(&dir, &fno, srcDir, pattern);
+        while (fr == FR_OK && fno.fname[0] != 0) {
+            printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
+			
+			sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
+
+            dstPathLen = strlen(dstPath);
+            if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+                sprintf(fullDstPath, "%s%s", dstPath, fno.fname);
+            } else {
+                sprintf(fullDstPath, "%s/%s", dstPath, fno.fname);
+            }
+
+            // File copy operation
+            fr = f_open(&fsrc, fullSrcPath, FA_READ);
+            if (fr != FR_OK) break;
+            fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
+            if (fr != FR_OK) {
+                f_close(&fsrc);
+                break;
+            }
+
+            while (1) {
+                fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+                if (br == 0 || fr != FR_OK) break;
+                fr = f_write(&fdst, buffer, br, &bw);
+                if (bw < br || fr != FR_OK) break;
+            }
+
+            f_close(&fsrc);
+            f_close(&fdst);
+
+            if (fr != FR_OK) break;
+
+            fr = f_findnext(&dir, &fno);
+        }
+
+        f_closedir(&dir);
+    } else {
+        // Single file copy
+        srcFilename = (lastSeparator != NULL) ? lastSeparator + 1 : srcPath;
+        dstPathLen = strlen(dstPath);
+        if (dstPathLen > 0 && dstPath[dstPathLen - 1] == '/') {
+            sprintf(fullDstPath, "%s%s", dstPath, srcFilename);
+        } else {
+            strcpy(fullDstPath, dstPath);
+        }
+
+        fr = f_open(&fsrc, srcPath, FA_READ);
+        if (fr != FR_OK) return fr;
+        fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
+        if (fr != FR_OK) {
+            f_close(&fsrc);
+            return fr;
+        }
+
+        while (1) {
+            fr = f_read(&fsrc, buffer, sizeof buffer, &br);
+            if (br == 0) break; // EOF
+            fr = f_write(&fdst, buffer, br, &bw);
+            if (bw < br) break; // Error
+
+            if (fr != FR_OK) break;
+        }
+
+        f_close(&fsrc);
+        f_close(&fdst);
+    }
+
+    return fr;
 }
-
 
 // Make a directory
 // Parameters:
