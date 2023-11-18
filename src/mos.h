@@ -37,6 +37,7 @@
 #include "ff.h"
 
 extern char  	cmd[256];				// Array for the command line handler
+extern TCHAR	cwd[256];
 
 typedef struct {
 	char * name;
@@ -70,6 +71,7 @@ BOOL	mos_parseString(char * ptr, char ** p_Value);
 
 int		mos_cmdDIR(char * ptr);
 int		mos_cmdLOAD(char * ptr);
+int		mos_cmdCHAIN(char *ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdDEL(char * ptr);
 int		mos_cmdJMP(char * ptr);

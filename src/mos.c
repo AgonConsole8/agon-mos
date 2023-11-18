@@ -66,6 +66,7 @@ extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
+TCHAR cwd[256];						// Hold current working directory.
 static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 extern volatile BYTE history_no;
@@ -163,7 +164,7 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	putch(MOS_prompt);
+	printf("%s%c", cwd, MOS_prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	return retval;
@@ -562,6 +563,7 @@ int mos_cmdCD(char * ptr) {
 		return 19; // Bad Parameter
 	}
 	fr = f_chdir(path);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
 	return fr;
 }
 
@@ -772,6 +774,7 @@ int	mos_cmdMOUNT(char *ptr) {
 	fr = mos_mount();
 	if (fr != FR_OK)
 		mos_error(fr);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
 	return 0;
 }
 
@@ -904,6 +907,8 @@ UINT24	mos_CD(char *path) {
 	FRESULT	fr;
 
 	fr = f_chdir(path);
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	
 	return fr;
 }
 
@@ -914,7 +919,6 @@ UINT24	mos_CD(char *path) {
 UINT24 mos_DIR(char * inputPath) {
     FRESULT fr;
     DIR dir;
-	TCHAR cwd[256];
     static FILINFO fno;
     char dirPath[256], pattern[32] = {0};
     BOOL usePattern = FALSE;
@@ -925,13 +929,6 @@ UINT24 mos_DIR(char * inputPath) {
     if (fr != 0) {
         return fr;
     }
-    printf("Volume: ");
-    if (strlen(str) > 0) {
-        printf("%s", str);
-    } else {
-        printf("<No Volume Label>");
-    }
-    printf("\n\r\n\r");
 
     if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
         strcpy(dirPath, ".");
@@ -952,13 +949,23 @@ UINT24 mos_DIR(char * inputPath) {
         }
     }
 	
+    fr = f_opendir(&dir, dirPath);
+	
+    if (fr == FR_OK) {
+		
+    printf("Volume: ");
+    if (strlen(str) > 0) {
+        printf("%s", str);
+    } else {
+        printf("<No Volume Label>");
+    }
+    printf("\n\r\n\r");		
+		
 	if (strcmp(dirPath, ".") == 0) {
-		fr = f_getcwd(cwd, sizeof(cwd));
+		f_getcwd(cwd, sizeof(cwd));
 		printf("Directory: %s\r\n\r\n", cwd);
 	} else printf("Directory: %s\r\n\r\n", dirPath);
-	
-    fr = f_opendir(&dir, dirPath);
-    if (fr == FR_OK) {
+		
         if (usePattern) {
             fr = f_findfirst(&dir, &fno, dirPath, pattern);
         } else {
@@ -983,6 +990,8 @@ UINT24 mos_DIR(char * inputPath) {
 
             if (!usePattern && fno.fname[0] == 0) break;
         }
+		
+		printf("\r\n");
     }
 
     f_closedir(&dir);
@@ -1555,6 +1564,9 @@ UINT8 fat_EOF(FIL * fp) {
 // - fatfs error code
 //
 int mos_mount(void) {
-	return f_mount(&fs, "", 1);			// Mount the SD card
+	FRESULT fr;
+	fr = f_mount(&fs, "", 1);	// Mount the SD card
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	return fr;
 }
 

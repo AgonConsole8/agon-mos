@@ -341,7 +341,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								
 
 								if (lastSlash != NULL) {
-									int pathLength;
+									int pathLength = 1;
 																		
 									if (lastSpace != NULL && lastSlash > lastSpace) {
 										lastSpace++;
