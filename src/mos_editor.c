@@ -416,8 +416,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 
 									path = (char*) malloc(pathLength + 1); // +1 for null terminator
 									if (path == NULL) {
-										printf("Memory allocation failed.\n");
-										return 1;
+										break;
 									}
 									strncpy(path, lastSpace, pathLength); // Start after the last space
 									path[pathLength] = '\0'; // Null-terminate the string
@@ -432,7 +431,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									
 									path = (char*) malloc(1);
 									if (path == NULL) {
-										printf("Memory allocation for no path failed.\n");
 										break;
 									}
 									path[0] = '\0'; // Path is empty (current dir, essentially).
@@ -442,9 +440,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								}
 
 								if (search_term == NULL) {
-									printf("Memory allocation failed.\n");
 									free(path);
-									return 1;
+									break;
 								}
 
 								strcpy(search_term, lastSpace && lastSlash > lastSpace ? lastSlash + 1 : lastSpace ? lastSpace + 1 : buffer);
