@@ -1031,45 +1031,45 @@ UINT24 mos_DIR(char * inputPath) {
 	
     if (fr == FR_OK) {
 		
-    printf("Volume: ");
-    if (strlen(str) > 0) {
-        printf("%s", str);
-    } else {
-        printf("<No Volume Label>");
-    }
-    printf("\n\r\n\r");		
-		
-	if (strcmp(dirPath, ".") == 0) {
-		f_getcwd(cwd, sizeof(cwd));
-		printf("Directory: %s\r\n\r\n", cwd);
-	} else printf("Directory: %s\r\n\r\n", dirPath);
-		
-        if (usePattern) {
-            fr = f_findfirst(&dir, &fno, dirPath, pattern);
-        } else {
-            fr = f_readdir(&dir, &fno);
-        }
+		printf("Volume: ");
+		if (strlen(str) > 0) {
+			printf("%s", str);
+		} else {
+			printf("<No Volume Label>");
+		}
+		printf("\n\r\n\r");		
+			
+		if (strcmp(dirPath, ".") == 0) {
+			f_getcwd(cwd, sizeof(cwd));
+			printf("Directory: %s\r\n\r\n", cwd);
+		} else printf("Directory: %s\r\n\r\n", dirPath);
+			
+			if (usePattern) {
+				fr = f_findfirst(&dir, &fno, dirPath, pattern);
+			} else {
+				fr = f_readdir(&dir, &fno);
+			}
 
-        while (fr == FR_OK && fno.fname[0]) {
+			while (fr == FR_OK && fno.fname[0]) {
 
-            yr = (fno.fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
-            mo = (fno.fdate & 0x01E0) >> 5;  // Bits  8 to  5
-            da = (fno.fdate & 0x001F);       // Bits  4 to  0
-            hr = (fno.ftime & 0xF800) >> 11; // Bits 15 to 11
-            mi = (fno.ftime & 0x07E0) >> 5;  // Bits 10 to  5
+				yr = (fno.fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
+				mo = (fno.fdate & 0x01E0) >> 5;  // Bits  8 to  5
+				da = (fno.fdate & 0x001F);       // Bits  4 to  0
+				hr = (fno.ftime & 0xF800) >> 11; // Bits 15 to 11
+				mi = (fno.ftime & 0x07E0) >> 5;  // Bits 10 to  5
 
-            printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+				printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
 
-            if (usePattern) {
-                fr = f_findnext(&dir, &fno);
-            } else {
-                fr = f_readdir(&dir, &fno);
-            }
+				if (usePattern) {
+					fr = f_findnext(&dir, &fno);
+				} else {
+					fr = f_readdir(&dir, &fno);
+				}
 
-            if (!usePattern && fno.fname[0] == 0) break;
-        }
-		
-		printf("\r\n");
+				if (!usePattern && fno.fname[0] == 0) break;
+			}
+			
+			printf("\r\n");
     }
 
     f_closedir(&dir);
