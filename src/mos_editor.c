@@ -449,15 +449,19 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								
 								//printf("Path:\"%s\" Pattern:\"%s\"\r\n", path, search_term);
 								fr = f_findfirst(&dj, &fno, path, search_term);
+								
+								if (fr == FR_OK && fno.fname[0]) {
 
-								if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
-								else printf("%s", fno.fname + strlen(search_term) - 1);
+									if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
+									else printf("%s", fno.fname + strlen(search_term) - 1);
 
-								strcat(buffer, fno.fname + strlen(search_term) - 1);
-								if (fno.fattrib & AM_DIR) strcat(buffer, "/");
+									strcat(buffer, fno.fname + strlen(search_term) - 1);
+									if (fno.fattrib & AM_DIR) strcat(buffer, "/");
 
-								len = strlen(buffer);
-								insertPos = strlen(buffer);
+									len = strlen(buffer);
+									insertPos = strlen(buffer);
+									
+								}
 
 								// Free the allocated memory
 								free(search_term);
