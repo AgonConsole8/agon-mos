@@ -670,31 +670,63 @@ int mos_cmdSET(char * ptr) {
 // Returns:
 // - MOS error code
 //
-int	mos_cmdVDU(char *ptr) {
-	char *value_str;
-	UINT24 	value;
-	
-	while (mos_parseString(NULL, &value_str)) {
+int mos_cmdVDU(char *ptr) {
+    char *value_str;
+    UINT24 value = 0;
+    
+    while (mos_parseString(NULL, &value_str)) {
+        UINT8 len, i;
+        UINT24 base = 1;
+        int isLong = 0;
+
+        value = 0;
+        len = strlen(value_str);
+
+        if (value_str[len - 1] == ';') {
 		
-		value = strtol(value_str, NULL, 10);
-		
-		if (value_str[strlen(value_str) - 1] == ';') {
-			
-			putch(value & 0xFF); // write LSB
-			putch(value >> 8);	 // write MSB	
-		
-		} else {
-			
-			if(value > 255) {
-				return 19;	// Bad Parameter
-			}
-			putch(value);
+			isLong = 1;
+			len--;
 			
 		}
+    
+        if (strchr(value_str, 'x') != NULL || strchr(value_str, 'X') != NULL || strchr(value_str, 'h') != NULL || strchr(value_str, '&') != NULL) {
+            
+            if (value_str[0] == '&' || (value_str[0] == '0' && tolower(value_str[1]) == 'x')) {
+                value_str += (value_str[1] == 'x' ? 2 : 1);
+                len -= (value_str[-1] == 'x' ? 2 : 1);
+            }
+
+            if (tolower(value_str[len - 1]) == 'h') {
+                len--;
+            }
+
+            // Credit to SO
+            for (i = len - 1; i != (UINT8)-1; i--) {
+                char c = tolower(value_str[i]);
+                if (c >= '0' && c <= '9') {
+                    value += (c - '0') * base;
+                } else if (c >= 'a' && c <= 'f') {
+                    value += (c - 'a' + 10) * base;
+                } else {
+                    return 0; // Fail to 0 just like strtol
+                }
+                base *= 16;
+            }
+        } else {
+            value = strtol(value_str, NULL, 10);
+        }
 		
-	}
-	
-	return 0;
+		if (value > 255) isLong = 1;
+    
+        if (isLong) {
+            putch(value & 0xFF); // write LSB
+            putch(value >> 8);   // write MSB
+        } else {
+            putch(value);
+        }
+    }
+
+    return 0;
 }
 
 // TIME
