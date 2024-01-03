@@ -340,6 +340,9 @@ int mos_exec(char * buffer) {
 	UINT8	mode;
 
 	ptr = mos_trim(buffer);
+	if (ptr != NULL && *ptr == '#') {
+	    return fr;
+	}
 	ptr = mos_strtok(ptr, " ");
 	if(ptr != NULL) {
 		func = mos_getCommand(ptr);
