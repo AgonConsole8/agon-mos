@@ -87,6 +87,7 @@ int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
+int		mos_cmdVDU(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
