@@ -87,6 +87,7 @@ int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
+int		mos_cmdKEY(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
@@ -202,5 +203,13 @@ UINT8	fat_EOF(FIL * fp);
 							"HELP, JMP, LOAD, MKDIR, MOUNT, RENAME, RUN, \r\n"	\
 							"SAVE, SET, TIME, TYPE, VDU.\r\n"
 #define HELP_HELP_ARGS		"[ <command> | all ]"
+
+#define HELP_KEY			"Store a command in one of 12 hotkey slots assigned to F1-F12\r\n\r\n" \
+							"Optionally, the command string can include \"%s\" as a marker\r\n" \
+							"in which case the hotkey command will be built either side.\r\n\r\n" \
+							"KEY without any arguments will list the currently assigned\r\n" \
+							"command strings.\r\n"
+							
+#define HELP_KEY_ARGS		"<key number> <command string>\r\n"
 
 #endif MOS_H
