@@ -23,8 +23,8 @@ BYTE bdpp_rx_state; // Driver receiver state
 BDPP_PACKET* bdpp_tx_packet; // Points to the packet being transmitted
 BDPP_PACKET* bdpp_rx_packet; // Points to the packet being received
 BDPP_PACKET* bdpp_build_packet; // Points to the packet being built
-WORD bdpp_tx_byte_count; // Number of data bytes transmitted
-WORD bdpp_rx_byte_count; // Number of data bytes received
+WORD bdpp_tx_byte_count; // Number of data bytes left to transmit
+WORD bdpp_rx_byte_count; // Number of data bytes left to receive
 BYTE bdpp_tx_next_pkt_flags; // Flags for the next transmitted packet, possibly
 
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
@@ -315,6 +315,104 @@ void bdpp_flush_drv_tx_packet() {
 	}
 }
 
+// Process the BDPP receiver (RX) state machine
+//
+void bdpp_run_rx_state_machine() {
+	/*
+		UART0_LCTL |= UART_LCTL_DLAB;									// Select DLAB to access baud rate generators
+	UART0_BRG_L = (br & 0xFF);										// Load divisor low
+	UART0_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
+	UART0_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
+	UART0_MCTL = 0x00;												// Bring modem control register to reset value
+	UART0_FCTL = 0x07;												// Enable and clear hardware FIFOs
+	UART0_IER = pUART->interrupts;									// Set interrupts
+
+	*/
+	BYTE incoming_byte;
+	while (UART0_LSR & UART_LSR_DATA_READY) {
+		incoming_byte = IN0(UART0_RBR);
+		switch (bdpp_rx_state) {
+			case BDPP_RX_STATE_AWAIT_START: {
+				if (incoming_byte == BDPP_PACKET_START_MARKER) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_FLAGS;
+				}
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_FLAGS: {
+				if (incoming_byte & BDPP_PKT_FLAG_APP_OWNED) {
+					// Packet should go to the app
+				} else {
+					// Packet should go to MOS
+					if (bdpp_rx_packet = bdpp_init_rx_drv_packet()) {
+						bdpp_rx_packet->flags =
+							(incoming_byte & BDPP_PKT_FLAG_USAGE_BITS) |
+							(BDPP_PKT_FLAG_FOR_RX | BDPP_PKT_FLAG_READY);
+						bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_1;
+					} else {
+						bdpp_rx_state = BDPP_PACKET_START_MARKER;
+					}
+				}
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_SIZE_1: {
+				bdpp_rx_byte_count = (WORD)incoming_byte;
+				bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_2;
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_SIZE_2: {
+				bdpp_rx_byte_count |= (((WORD)incoming_byte) << 8);
+				if (bdpp_rx_byte_count > bdpp_rx_packet->max_size) {
+					bdpp_rx_state = BDPP_PACKET_START_MARKER;
+				} else if (bdpp_rx_byte_count == 0) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
+				} else {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_DATA_ESC;
+				}
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_DATA_ESC: {
+				if (incoming_byte == BDPP_PACKET_ESCAPE) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_DATA;
+				} else {
+					(*(bdpp_rx_packet->data))[bdpp_rx_packet->act_size++] = incoming_byte;
+					if (--bdpp_rx_byte_count == 0) {
+						// All data bytes received
+						bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
+					}
+				}
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_DATA: {
+				(*(bdpp_rx_packet->data))[bdpp_rx_packet->act_size++] = incoming_byte;
+				if (--bdpp_rx_byte_count == 0) {
+					// All data bytes received
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
+				}
+			} break;
+
+			case BDPP_RX_STATE_AWAIT_END: {
+				if (incoming_byte == BDPP_PACKET_END_MARKER) {
+					// Packet is complete
+					bdpp_rx_packet->flags &= ~BDPP_PKT_FLAG_READY;
+					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
+				}
+				bdpp_rx_state = BDPP_PACKET_START_MARKER;
+			} break;
+		}
+	}
+}
+
+// Process the BDPP transmitter (TX) state machine
+//
+void bdpp_run_tx_state_machine() {
+}
+
+#define BDPP_TX_STATE_IDLE				0x20	// Doing nothing (not transmitting)
+#define BDPP_TX_STATE_SENT_START		0x21	// Recently sent the packet start marker
+#define BDPP_TX_STATE_SENT_TYPE			0x22	// Recently sent the packet type
+#define BDPP_TX_STATE_SENT_SIZE			0x23	// Recently sent the packet size
+#define BDPP_TX_STATE_SENT_ESC			0x24	// Recently sent an escape character
+#define BDPP_TX_STATE_SENT_DATA			0x25	// Recently sent a packet data byte
 
 // The real guts of the bidirectional packet protocol!
 // This function processes the TX and RX state machines.
