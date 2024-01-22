@@ -31,8 +31,9 @@
 			XREF	UART0_serial_RX
 			XREF	UART0_serial_TX
 			XREF	mos_api
-			XREF	vdp_protocol			
-			
+			XREF	vdp_protocol
+			XREF	bdp_protocol
+
 			XREF	_i2c_slave_rw
 			XREF	_i2c_error
 			XREF	_i2c_role
@@ -81,14 +82,17 @@ _uart0_handler:		DI
 
 ; AGON UART0 Bidirectional Packet Protocol Interrupt Handler
 ;
-_bdpp_handler: 	DI
+_bdpp_handler:
+		 	DI
 			PUSH	AF
 			PUSH	BC
 			PUSH	DE
 			PUSH	HL
-			CALL	UART0_serial_RX
-			LD		C, A			; Move incoming byte to C
-			CALL	bdpp_protocol	; Go process the protocol state
+			PUSH	IX
+			PUSH	IY
+			CALL	bdp_protocol ; Go process the protocol states
+			POP		IY
+			POP		IX
 			POP		HL
 			POP		DE
 			POP		BC

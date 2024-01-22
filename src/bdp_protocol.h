@@ -1,18 +1,19 @@
-;
+//
 // Title:	AGON MOS - Bidirectional packet protocol (BDPP)
 // Author:	Curtis Whitley
 // Created:	20/01/2024
 // Last Updated:	20/01/2024
-;
+//
 // Modinfo:
 // 20/01/2024:	Created initial version of protocol.
+
+#include <defines.h>
 
 #define BDPP_FLAG_ENABLED				0x01 	// Whether bidirectional protocol is enabled
 
 #define BDPP_SMALL_DATA_SIZE			32		// Maximum payload data length for small packet
 #define BDPP_MAX_DRIVER_PACKETS			4		// Maximum number of driver-owned small packets
 #define BDPP_MAX_APP_PACKETS			4		// Maximum number of app-owned packets
-#define BDPP_MAX_PACKET_HEADERS			8		// Maximum number of queued packets (TX and RX)
 
 #define BDPP_PACKET_START_MARKER		0x8C
 #define BDPP_PACKET_ESCAPE				0x9D
@@ -47,30 +48,41 @@ typedef struct tag_BDPP_PACKET {
 	BYTE			flags;	// Flags describing the packet
 	WORD			size;	// Size of the data portion
 	BYTE*			data;	// Address of the data bytes
-	tag_BDPP_PACKET* next;	// Points to the next packet in the list
+	struct tag_BDPP_PACKET* next; // Points to the next packet in the list
 } BDPP_PACKET;
-
-// Used to control receiving packets in the driver
-//
-typedef struct {
-	BYTE			state;	// Driver transmit state
-	BDPP_PACKET*	packet;	// Points to the packet being transmitted
-} BDPP_DRIVER_RX_CTRL;
-
-// Used to control transmitting packets in the driver
-//
-typedef struct {
-	BYTE			state;	// Driver receive state
-	BDPP_PACKET*	packet;	// Points to the packet being transmitted
-} BDPP_DRIVER_TX_CTRL;
 
 // Initialize the BDPP driver.
 void bdpp_initialize_driver();
 
-// Initialize an outgoing packet, if one is available
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_tx_packet(BYTE flags, WORD size, BYTE* data);
+// Get whether BDPP is enabled
+BOOL bdpp_is_enabled();
 
-// Initialize an incoming packet, if one is available
+// Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_rx_packet(BYTE flags, WORD size, BYTE* data);
+BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size);
+
+// Initialize an incoming driver-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_init_rx_drv_packet(BYTE flags, WORD size);
+
+// Initialize an outgoing app-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_init_tx_app_packet(BYTE flags, WORD size, BYTE* data);
+
+// Initialize an incoming app-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_init_rx_app_packet(BYTE flags, WORD size, BYTE* data);
+
+// Push a packet to the transmit packet list.
+void bdpp_queue_tx_packet(BDPP_PACKET* packet, BOOL fromISR);
+
+// Push a packet to the receive packet list.
+void bdpp_queue_rx_packet(BDPP_PACKET* packet, BOOL fromISR);
+
+// Grab a packet from the transmit packet list.
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_grab_tx_packet(BOOL fromISR);
+
+// Grab a packet from the receive packet list.
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_grab_rx_packet(BOOL fromISR);
