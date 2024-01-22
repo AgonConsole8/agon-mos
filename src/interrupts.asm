@@ -32,7 +32,7 @@
 			XREF	UART0_serial_TX
 			XREF	mos_api
 			XREF	vdp_protocol
-			XREF	bdp_protocol
+			XREF	_bdp_protocol
 
 			XREF	_i2c_slave_rw
 			XREF	_i2c_error
@@ -90,7 +90,7 @@ _bdpp_handler:
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-			CALL	bdp_protocol ; Go process the protocol states
+			CALL	_bdp_protocol ; Go process the protocol states
 			POP		IY
 			POP		IX
 			POP		HL

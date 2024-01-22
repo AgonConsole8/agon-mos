@@ -22,9 +22,9 @@ BYTE bdpp_tx_state; // Driver transmitter state
 BYTE bdpp_rx_state; // Driver receiver state
 BDPP_PACKET* bdpp_tx_packet; // Points to the packet being transmitted
 BDPP_PACKET* bdpp_rx_packet; // Points to the packet being received
+WORD bdpp_tx_byte_count; // Number of data bytes transmitted
+WORD bdpp_rx_byte_count; // Number of data bytes received
 
-BDPP_PACKET* bdpp_free_app_pkt_head; // Points to head of free app packet list
-BDPP_PACKET* bdpp_free_app_pkt_tail; // Points to tail of free app packet list
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
 BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet list
 BDPP_PACKET* bdpp_tx_pkt_head; // Points to head of transmit packet list
@@ -67,6 +67,7 @@ static BDPP_PACKET* pull_from_list(BDPP_PACKET** head, BDPP_PACKET** tail) {
 }
 
 // Initialize the BDPP driver.
+//
 void bdpp_initialize_driver() {
 	int i;
 
@@ -75,8 +76,6 @@ void bdpp_initialize_driver() {
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	bdpp_tx_packet = NULL;
 	bdpp_rx_packet = NULL;
-	bdpp_free_app_pkt_head = NULL;
-	bdpp_free_app_pkt_tail = NULL;
 	bdpp_free_drv_pkt_head = NULL;
 	bdpp_free_drv_pkt_tail = NULL;
 	bdpp_tx_pkt_head = NULL;
@@ -96,21 +95,21 @@ void bdpp_initialize_driver() {
 	
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
-		bdpp_app_pkt_header[i].flags = BDPP_PKT_FLAG_APP_OWNED;
-		push_to_list(&bdpp_free_app_pkt_head, &bdpp_free_app_pkt_tail,
-						&bdpp_app_pkt_header[i]);
+		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 
 	set_vector(UART0_IVECT, bdpp_handler); // 0x18
 }
 
 // Get whether BDPP is enabled
+//
 BOOL bdpp_is_enabled() {
 	return ((bdpp_driver_flags & BDPP_FLAG_ENABLED) != 0);
 }
 
 // Initialize an outgoing driver-owned packet, if one is available
-// Returns NULL if no packet is available
+// Returns NULL if no packet is available.
+//
 BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size) {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
 	if (packet) {
@@ -121,7 +120,8 @@ BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size) {
 }
 
 // Initialize an incoming driver-owned packet, if one is available
-// Returns NULL if no packet is available
+// Returns NULL if no packet is available.
+//
 BDPP_PACKET* bdpp_init_rx_drv_packet(BYTE flags, WORD size) {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
 	if (packet) {
@@ -131,60 +131,79 @@ BDPP_PACKET* bdpp_init_rx_drv_packet(BYTE flags, WORD size) {
 	return packet;
 }
 
-// Initialize an outgoing app-owned packet, if one is available
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_tx_app_packet(BYTE flags, WORD size, BYTE* data) {
-	BDPP_PACKET* packet = pull_from_list(&bdpp_free_app_pkt_head, &bdpp_free_app_pkt_tail);
-	if (packet) {
+// Queue an app-owned packet for transmission
+// This function can fail if the packet is presently involved in a data transfer.
+//
+BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
+			EI();
+			return FALSE;
+		}
+		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
+		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
 		packet->flags = flags;
-		packet->size = size;
-		packet->data = data;
+		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
+		EI();
+		return TRUE;
 	}
-	return packet;
+	return FALSE;
 }
 
-// Initialize an incoming app-owned packet, if one is available
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_rx_app_packet(BYTE flags, WORD size, BYTE* data) {
-	BDPP_PACKET* packet = pull_from_list(&bdpp_free_app_pkt_head, &bdpp_free_app_pkt_tail);
-	if (packet) {
-		packet->flags = flags;
-		packet->size = size;
-		packet->data = data;
+// Prepare an app-owned packet for reception
+// This function can fail if the packet is presently involved in a data transfer.
+// The given size is a maximum, based on app memory allocation, and the
+// actual size of an incoming packet may be smaller, but not larger.
+//
+BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
+			EI();
+			return FALSE;
+		}
+		packet->flags &= ~BDPP_PKT_FLAG_DONE;
+		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX;
+		EI();
+		return TRUE;
 	}
-	return packet;
+	return FALSE;
 }
 
-// Push a packet to the transmit packet list.
-void bdpp_queue_tx_packet(BDPP_PACKET* packet, BOOL fromISR) {
-	if (!fromISR) DI();
-	push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-	if (!fromISR) EI();
+// Check whether an outgoing app-owned packet has been transmitted
+//
+BOOL bdpp_is_tx_app_packet_done(BYTE index) {
+	BOOL rc;
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		rc = (((packet->flags & BDPP_PKT_FLAG_DONE) != 0) &&
+				((packet->flags & BDPP_PKT_FLAG_FOR_RX) == 0));
+		EI();
+		return rc;
+	}
+	return FALSE;
 }
 
-// Push a packet to the receive packet list.
-void bdpp_queue_rx_packet(BDPP_PACKET* packet, BOOL fromISR) {
-	if (!fromISR) DI();
-	push_to_list(&bdpp_rx_pkt_head, &bdpp_rx_pkt_tail, packet);
-	if (!fromISR) EI();
+// Check whether an incoming app-owned packet has been received
+//
+BOOL bdpp_is_rx_app_packet_done(BYTE index) {
+	BOOL rc;
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		rc = ((packet->flags & (BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_DONE)) ==
+				(BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_DONE));
+		EI();
+		return rc;
+	}
+	return FALSE;
 }
 
-// Grab a packet from the transmit packet list.
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_grab_tx_packet(BOOL fromISR) {
-	BDPP_PACKET* packet;
-	if (!fromISR) DI();
-	packet = pull_from_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail);
-	if (!fromISR) EI();
-	return packet;
-}
-
-// Grab a packet from the receive packet list.
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_grab_rx_packet(BOOL fromISR) {
-	BDPP_PACKET* packet;
-	if (!fromISR) DI();
-	packet = pull_from_list(&bdpp_rx_pkt_head, &bdpp_rx_pkt_tail);
-	if (!fromISR) EI();
-	return packet;
+// The main driver that is called by the UART0 interrupt handler.
+//
+void bdp_protocol() {
 }

@@ -46,7 +46,7 @@
 #include "clock.h"
 #include "mos.h"
 #include "i2c.h"
-#include "bdpp_protocol.h"
+#include "bdp_protocol.h"
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -132,7 +132,7 @@ int main(void) {
 	init_interrupts();								// Initialise the interrupt vectors
 	init_rtc();										// Initialise the real time clock
 	init_spi();										// Initialise SPI comms for the SD card interface
-	init_UART0(0);									// Initialise UART0 for the ESP32 interface
+	init_UART0();									// Initialise UART0 for the ESP32 interface
 	init_UART1();									// Initialise UART1
 	EI();											// Enable the interrupts now
 	
@@ -162,6 +162,10 @@ int main(void) {
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
+	
+	if (bdpp_is_enabled()) {
+		printf("Bidirectional packet protocol enabled");
+	}
 
 	mos_mount();									// Mount the SD card
 
