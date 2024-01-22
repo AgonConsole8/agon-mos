@@ -86,8 +86,6 @@ _bdpp_handler: 	DI
 			PUSH	BC
 			PUSH	DE
 			PUSH	HL
-			?? loop while rx buffer not empty ??
-			?? separate tx and rx?
 			CALL	UART0_serial_RX
 			LD		C, A			; Move incoming byte to C
 			CALL	bdpp_protocol	; Go process the protocol state

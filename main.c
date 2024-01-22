@@ -27,6 +27,7 @@
  * 03/08/2023:				RC2	+ Enhanced low-level keyboard functionality
  * 27/09/2023:					+ Updated RTC
  * 11/11/2023:				RC3	+ See Github for full list of changes
+ * 20/01/2024:	    CW Added support for bidirectional packet protocol
  */
 
 #include <eZ80.h>
@@ -45,6 +46,7 @@
 #include "clock.h"
 #include "mos.h"
 #include "i2c.h"
+#include "bdpp_protocol.h"
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -78,16 +80,36 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 
 	open_UART0(pUART);					// Open the UART 
 	init_timer0(10, 16, 0x00);  		// 10ms timer for delay
-	gp = 0;								// Reset the general poll byte	
+	gp = 0;								// Reset the general poll byte
 	for(t = 0; t < 200; t++) {			// A timeout loop (200 x 50ms = 10s)
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
-		putch(1);
+		
+		// There are now 4 possible cases, relative to the
+		// bidirectional packet protocol (BDPP):
+		//
+		// (a) EZ80 does NOT support BDPP, and ESP32 does NOT support BDPP.
+		//     - EZ80 sends 0x01; ESP32 returns 0x01.
+		//
+		// (b) EZ80 does NOT support BDPP, but ESP32 DOES support BDPP.
+		//     - EZ80 sends 0x01, ESP32 returns 0x01.
+		//
+		// (c) EZ80 DOES support BDPP, but ESP32 does NOT support BDPP.
+		//     - EZ80 sends 0x04, ESP32 returns 0x04.
+		//
+		// (d) EZ80 DOES support BDPP, and ESP32 DOES support BDPP.
+		//     - EZ80 sends 0x04, ESP32 returns 0x84.
+		//
+		putch(0x04); // older EZ80 code will send a 0x01 here!
 		for(i = 0; i < 5; i++) {		// Wait 50ms
 			wait_timer0();
 		}
-		if(gp == 1) break;				// If general poll returned, then exit for loop
+
+		// If general poll returned, then exit for loop.
+		// If gp is 0x84, then both CPUs support bidirectional protocol;
+		// If gp is 0x04, then only the EZ80 supports it.
+		if (gp == 0x04 || gp == 0x84) break;
 	}
 	enable_timer0(0);					// Disable the timer
 	return gp;
@@ -110,7 +132,7 @@ int main(void) {
 	init_interrupts();								// Initialise the interrupt vectors
 	init_rtc();										// Initialise the real time clock
 	init_spi();										// Initialise SPI comms for the SD card interface
-	init_UART0();									// Initialise UART0 for the ESP32 interface
+	init_UART0(0);									// Initialise UART0 for the ESP32 interface
 	init_UART1();									// Initialise UART1
 	EI();											// Enable the interrupts now
 	
@@ -118,7 +140,13 @@ int main(void) {
 		if(!wait_ESP32(&pUART0, 384000))	{		// If that fails, then fallback to the lower baud rate
 			gp = 2;									// Flag GP as 2, just in case we need to handle this error later
 		}
-	}	
+	}
+	
+	if (gp == 0x84) {
+		// The ESP32 code supports bidirectional packet protocol.
+		bdpp_initialize_driver();
+	}
+	
 	if(coldBoot == 0) {								// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}

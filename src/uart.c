@@ -69,9 +69,6 @@ BYTE open_UART0(UART * pUART) {
 	UCHAR	pins = PORTPIN_ZERO | PORTPIN_ONE;						// The transmit and receive pins											
 
 	serialFlags &= 0xF0;
-	bdpp_ctrl_flags = 0;
-	bdpp_tx_state = BDPP_TX_STATE_IDLE;
-	bdpp_rx_state = BDPP_RX0_STATE_AWAIT_START;
 	
 	SETREG(PD_DDR, pins);											// Set Port D bits 0, 1 (TX. RX) for alternate function.
 	RESETREG(PD_ALT1, pins);

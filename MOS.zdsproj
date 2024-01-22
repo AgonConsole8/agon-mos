@@ -32,6 +32,9 @@
 <file filter-key="">src\defines.h</file>
 <file filter-key="">src\i2c.c</file>
 <file filter-key="">src\strings.c</file>
+<file filter-key="">src\bdpp_protocol.asm</file>
+<file filter-key="">src\bdpp_protocol.c</file>
+<file filter-key="">src\bdpp_protocol.h</file>
 </files>
 
 <!-- configuration information -->
