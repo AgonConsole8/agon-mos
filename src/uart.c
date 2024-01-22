@@ -11,6 +11,7 @@
  * 23/03/2023:		Fixed maths overflow in init_UART0 to work with bigger baud rates
  * 28/03/2023:		Added support for UART1
  * 08/04/2023:		Interrupts now disabled in close_UART1
+ * 20/01/2024:		CW Added support for bidirectional packet protocol
  *
  * NB:
  * The UART is on Port D
@@ -68,6 +69,9 @@ BYTE open_UART0(UART * pUART) {
 	UCHAR	pins = PORTPIN_ZERO | PORTPIN_ONE;						// The transmit and receive pins											
 
 	serialFlags &= 0xF0;
+	bdpp_ctrl_flags = 0;
+	bdpp_tx_state = BDPP_TX_STATE_IDLE;
+	bdpp_rx_state = BDPP_RX0_STATE_AWAIT_START;
 	
 	SETREG(PD_DDR, pins);											// Set Port D bits 0, 1 (TX. RX) for alternate function.
 	RESETREG(PD_ALT1, pins);

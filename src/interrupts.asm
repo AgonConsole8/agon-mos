@@ -8,6 +8,7 @@
 ; 09/03/2023:	No longer uses timer interrupt 0 for SD card timing
 ; 29/03/2023:	Added support for UART1
 ; 10/11/2023:	Added support for I2C
+; 20/01/2024:	CW Added support for bidirectional packet protocol
 
 			INCLUDE	"macros.inc"
 			INCLUDE	"equs.inc"
@@ -21,6 +22,7 @@
 			
 			XDEF	_vblank_handler
 			XDEF	_uart0_handler
+			XDEF	_bdpp_handler
 			XDEF	_i2c_handler
 
 			XREF	_clock
@@ -58,7 +60,7 @@ _vblank_handler:	DI
 			POP		AF
 			EI	
 			RETI.L
-			
+
 ; AGON UART0 Interrupt Handler
 ;
 _uart0_handler:		DI
@@ -70,6 +72,25 @@ _uart0_handler:		DI
 			LD		C, A		
 			LD		HL, _vdp_protocol_data
 			CALL		vdp_protocol
+			POP		HL
+			POP		DE
+			POP		BC
+			POP		AF
+			EI
+			RETI.L	
+
+; AGON UART0 Bidirectional Packet Protocol Interrupt Handler
+;
+_bdpp_handler: 	DI
+			PUSH	AF
+			PUSH	BC
+			PUSH	DE
+			PUSH	HL
+			?? loop while rx buffer not empty ??
+			?? separate tx and rx?
+			CALL	UART0_serial_RX
+			LD		C, A			; Move incoming byte to C
+			CALL	bdpp_protocol	; Go process the protocol state
 			POP		HL
 			POP		DE
 			POP		BC

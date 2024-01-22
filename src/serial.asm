@@ -10,6 +10,7 @@
 ; 22/03/2023:	Added serial_PUTCH, moved putch and getch from uart.c
 ; 23/03/2023:	Renamed serial_RX_WAIT to seral_GETCH
 ; 29/03/2023:	Added support for UART1
+; 20/01/2024:	CW Added support for bidirectional packet protocol
 
 			INCLUDE	"macros.inc"
 			INCLUDE	"equs.inc"
