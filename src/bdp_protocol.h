@@ -42,17 +42,21 @@
 #define BDPP_PKT_FLAG_FIRST				0x04	// Indicates packet is first part of a message
 #define BDPP_PKT_FLAG_MIDDLE			0x00	// Indicates packet is middle part of a message
 #define BDPP_PKT_FLAG_LAST				0x08	// Indicates packet is last part of a message
-#define BDPP_PKT_FLAG_DRIVER_OWNED		0x00	// Indicates packet is owned by the driver
 #define BDPP_PKT_FLAG_READY				0x10	// Indicates packet is ready for transmission or reception
 #define BDPP_PKT_FLAG_DONE				0x20	// Indicates packet is was transmitted or received
 #define BDPP_PKT_FLAG_FOR_RX			0x40	// Indicates packet is for reception, not transmission
+#define BDPP_PKT_FLAG_DRIVER_OWNED		0x00	// Indicates packet is owned by the driver
 #define BDPP_PKT_FLAG_APP_OWNED			0x80	// Indicates packet is owned by the application
+#define BDPP_PKT_FLAG_USAGE_BITS		0x0F	// Flag bits that describe packet usage
+#define BDPP_PKT_FLAG_PROCESS_BITS		0xF0	// Flag bits that affect packet processing
 
 // Defines one packet in the transmit or receive list
 //
 typedef struct tag_BDPP_PACKET {
 	BYTE			flags;	// Flags describing the packet
-	WORD			size;	// Size of the data portion
+	BYTE			index;	// Index of the packet
+	WORD			max_size; // Maximum size of the data portion
+	WORD			act_size; // Actual size of the data portion
 	BYTE*			data;	// Address of the data bytes
 	struct tag_BDPP_PACKET* next; // Points to the next packet in the list
 } BDPP_PACKET;
@@ -65,11 +69,11 @@ BOOL bdpp_is_enabled();
 
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size);
+BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags);
 
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_rx_drv_packet(BYTE flags, WORD size);
+BDPP_PACKET* bdpp_init_rx_drv_packet();
 
 // Queue an app-owned packet for transmission
 // This function can fail if the packet is presently involved in a data transfer.
@@ -86,3 +90,32 @@ BOOL bdpp_is_tx_app_packet_done(BYTE index);
 
 // Check whether an incoming app-owned packet has been received
 BOOL bdpp_is_rx_app_packet_done(BYTE index);
+
+// Free the driver from using an app-owned packet
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_stop_using_app_packet(BYTE index);
+
+// Start building a driver-owned, outgoing packet.
+// If there is an existing packet being built, it will be flushed first.
+// This returns NULL if there is no packet available.
+BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags);
+
+// Append a data byte to a driver-owned, outgoing packet.
+// This is a blocking call, and might wait for room for data.
+void bdpp_write_byte_to_drv_tx_packet(BYTE data);
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a blocking call, and might wait for room for data.
+void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count);
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a blocking call, and might wait for room for data.
+// If necessary this function initializes and uses additional packets. It
+// decides whether to use "print" data (versus "non-print" data) based on
+// the first byte in the data. To guarantee that the packet usage flags are
+// set correctly, be sure to flush the packet before switching from "print"
+// to "non-print", or vice versa.
+void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count);
+
+// Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+void bdpp_flush_drv_tx_packet();

@@ -22,8 +22,10 @@ BYTE bdpp_tx_state; // Driver transmitter state
 BYTE bdpp_rx_state; // Driver receiver state
 BDPP_PACKET* bdpp_tx_packet; // Points to the packet being transmitted
 BDPP_PACKET* bdpp_rx_packet; // Points to the packet being received
+BDPP_PACKET* bdpp_build_packet; // Points to the packet being built
 WORD bdpp_tx_byte_count; // Number of data bytes transmitted
 WORD bdpp_rx_byte_count; // Number of data bytes received
+BYTE bdpp_tx_next_pkt_flags; // Flags for the next transmitted packet, possibly
 
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
 BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet list
@@ -76,18 +78,21 @@ void bdpp_initialize_driver() {
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	bdpp_tx_packet = NULL;
 	bdpp_rx_packet = NULL;
+	bdpp_build_packet = NULL;
 	bdpp_free_drv_pkt_head = NULL;
 	bdpp_free_drv_pkt_tail = NULL;
 	bdpp_tx_pkt_head = NULL;
 	bdpp_tx_pkt_tail = NULL;
 	bdpp_rx_pkt_head = NULL;
 	bdpp_rx_pkt_tail = NULL;
+	bdpp_tx_next_pkt_flags = 0;
 	memset(bdpp_drv_pkt_header, 0, sizeof(bdpp_drv_pkt_header));
 	memset(bdpp_app_pkt_header, 0, sizeof(bdpp_app_pkt_header));
 	memset(bdpp_drv_pkt_data, 0, sizeof(bdpp_drv_pkt_data));
 	
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
+		bdpp_drv_pkt_header[i].index = (BYTE)i;
 		bdpp_drv_pkt_header[i].data = &bdpp_drv_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
 						&bdpp_drv_pkt_header[i]);
@@ -95,6 +100,7 @@ void bdpp_initialize_driver() {
 	
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
+		bdpp_app_pkt_header[i].index = (BYTE)i;
 		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 
@@ -110,11 +116,12 @@ BOOL bdpp_is_enabled() {
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available.
 //
-BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size) {
+BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags) {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
 	if (packet) {
-		packet->flags = flags;
-		packet->size = size;
+		packet->flags = flags & BDPP_PKT_FLAG_USAGE_BITS;
+		packet->max_size = BDPP_SMALL_DATA_SIZE;
+		packet->act_size = 0;
 	}
 	return packet;
 }
@@ -122,11 +129,12 @@ BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, WORD size) {
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available.
 //
-BDPP_PACKET* bdpp_init_rx_drv_packet(BYTE flags, WORD size) {
+BDPP_PACKET* bdpp_init_rx_drv_packet() {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
 	if (packet) {
-		packet->flags = flags;
-		packet->size = size;
+		packet->flags = 0;
+		packet->max_size = BDPP_SMALL_DATA_SIZE;
+		packet->act_size = 0;
 	}
 	return packet;
 }
@@ -145,6 +153,9 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
 		packet->flags = flags;
+		packet->max_size = size;
+		packet->act_size = size;
+		packet->data = data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
 		EI();
 		return TRUE;
@@ -167,6 +178,8 @@ BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
 		}
 		packet->flags &= ~BDPP_PKT_FLAG_DONE;
 		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX;
+		packet->max_size = size;
+		packet->act_size = 0;
 		EI();
 		return TRUE;
 	}
@@ -203,7 +216,110 @@ BOOL bdpp_is_rx_app_packet_done(BYTE index) {
 	return FALSE;
 }
 
-// The main driver that is called by the UART0 interrupt handler.
+// Free the driver from using an app-owned packet
+// This function can fail if the packet is presently involved in a data transfer.
+//
+BOOL bdpp_stop_using_app_packet(BYTE index) {
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
+			EI();
+			return FALSE;
+		}
+		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX);
+		EI();
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// Start building a device-owned, outgoing packet.
+// If there is an existing packet being built, it will be flushed first.
+// This returns NULL if there is no packet available.
+//
+BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags) {
+	BDPP_PACKET* packet;
+	bdpp_flush_drv_tx_packet();
+	packet = bdpp_init_tx_drv_packet(flags);
+	return packet;
+}
+
+// Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+//
+static void bdpp_internal_flush_drv_tx_packet() {
+	if (bdpp_build_packet) {
+		DI();
+			bdpp_build_packet->flags |= BDPP_PKT_FLAG_READY;
+			bdpp_build_packet = NULL;
+		EI();
+	}
+}
+
+// Append a data byte to a driver-owned, outgoing packet.
+// This is a blocking call, and might wait for room for data.
+void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
+	while (TRUE) {
+		if (bdpp_build_packet) {
+			BYTE* pdata = bdpp_build_packet->data;
+			pdata[bdpp_build_packet->act_size++] = data;
+			if (bdpp_build_packet->act_size >= bdpp_build_packet->max_size) {
+				if (bdpp_build_packet->flags & BDPP_PKT_FLAG_LAST) {
+					bdpp_tx_next_pkt_flags = 0;
+				} else {
+					bdpp_tx_next_pkt_flags = bdpp_build_packet->flags & ~BDPP_PKT_FLAG_FIRST;
+				}
+				bdpp_internal_flush_drv_tx_packet();
+			}
+			break;
+		} else {
+			bdpp_build_packet = bdpp_init_tx_drv_packet(bdpp_tx_next_pkt_flags);
+		}
+	}
+}
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a blocking call, and might wait for room for data.
+void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count) {
+	while (count > 0) {
+		bdpp_write_byte_to_drv_tx_packet(*data++);
+		count--;
+	}
+}
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a blocking call, and might wait for room for data.
+// If necessary this function initializes and uses additional packets. It
+// decides whether to use "print" data (versus "non-print" data) based on
+// the first byte in the data. To guarantee that the packet usage flags are
+// set correctly, be sure to flush the packet before switching from "print"
+// to "non-print", or vice versa.
+void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count) {
+	if (!bdpp_build_packet) {
+		if (*data >= 0x20 && *data <= 0x7E) {
+			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+		} else {
+			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+		}
+	}
+	bdpp_write_bytes_to_drv_tx_packet(data, count);
+}
+
+// Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+//
+void bdpp_flush_drv_tx_packet() {
+	if (bdpp_build_packet) {
+		bdpp_build_packet->flags |= BDPP_PKT_FLAG_LAST;
+		bdpp_internal_flush_drv_tx_packet();
+		bdpp_tx_next_pkt_flags = 0;
+	}
+}
+
+
+// The real guts of the bidirectional packet protocol!
+// This function processes the TX and RX state machines.
+// It is called by the UART0 interrupt handler, so it assumes
+// that interrupts are always turned off during this function.
 //
 void bdp_protocol() {
 }

@@ -15,6 +15,7 @@
 ; 17/03/2023:	Added RST_18 code
 ; 22/03/2023:	Moved putch to serial.asm, renamed serial_PUTCH
 ; 29/03/2023:	Added support for UART1
+; 20/01/2024:	CW Added support for bidirectional packet protocol (RST_20)
 
 			INCLUDE	"../src/macros.inc"
 			INCLUDE	"../src/equs.inc"
@@ -37,6 +38,7 @@
 			XREF	mos_api
 			XREF	UART0_serial_PUTCH 
 			XREF	SET_AHL24
+			XREF	_bdpp_handle
 
 NVECTORS 		EQU 48			; Number of interrupt vectors
 
@@ -75,8 +77,8 @@ _rst10:			JP.LIL	_rst_10_handler
 _rst18:			JP.LIL	_rst_18_handler
 			DS	3
 		
-_rst20:			RET
-			DS	7
+_rst20:			JP.LIL	_rst_20_handler
+			DS	3
 		
 _rst28:			RET
 			DS	7
@@ -152,6 +154,13 @@ _rst_18_handler_1:	LD 	A, (HL)			; Fetch the character
 			CALL	UART0_serial_PUTCH	; Output
 			INC 	HL 			; Increment the buffer pointer
 			JR 	_rst_18_handler_1	; Loop
+
+; Perform an operation related to the BDPP
+; Parameters:
+; TBD
+;
+_rst_20_handler:
+			RET.L
 
 ; Default Non-Maskable Interrupt handler
 ;
