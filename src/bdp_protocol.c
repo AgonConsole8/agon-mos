@@ -107,9 +107,9 @@ BYTE UART0_read_rbr() {
 }
 
 BYTE UART0_read_isr() {
-	BYTE data = uart_ier & UART_LSR_THREMPTY;
+	BYTE data = uart_ier & UART_IER_TRANSMITINT;
 	if (any_more_incoming()) {
-		data |= UART_LSR_DATA_READY;
+		data |= UART_IER_RECEIVEINT;
 	}
 	printf("UART0_read_isr() -> %02hX\n", data);
 	return data;
@@ -399,7 +399,9 @@ static void bdpp_internal_flush_drv_tx_packet() {
 #endif
 		DI();
 			bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
+			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_tx_build_packet);
 			bdpp_tx_build_packet = NULL;
+			UART0_enable_interrupt(UART_IER_TRANSMITINT);
 		EI();
 	}
 }
@@ -431,7 +433,7 @@ void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
-void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count) {
+void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_write_bytes_to_drv_tx_packet(%p, %04hX)\n", data, count);
 #endif
@@ -448,7 +450,7 @@ void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count) {
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
-void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count) {
+void bdpp_write_drv_tx_data_with_usage(const BYTE* data, WORD count) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_write_drv_tx_data_with_usage(%p, %04hX) [%02hX]\n", data, count, *data);
 #endif
@@ -640,6 +642,7 @@ void bdpp_run_tx_state_machine() {
 
 			case BDPP_TX_STATE_SENT_ESC: {
 				outgoing_byte = (bdpp_tx_packet->data)[bdpp_tx_byte_count];
+				UART0_write_thr(outgoing_byte);
 				if (++bdpp_tx_byte_count >= bdpp_tx_packet->act_size) {
 					bdpp_tx_state = BDPP_TX_STATE_SENT_ALL_DATA;
 				} else {
@@ -673,7 +676,7 @@ void bdpp_run_tx_state_machine() {
 				bdpp_tx_state = BDPP_TX_STATE_IDLE;
 			} break;
 		}
-	break;}
+	}
 }
 
 // The real guts of the bidirectional packet protocol!
@@ -691,12 +694,19 @@ void bdp_protocol() {
 
 #if DEBUG_STATE_MACHINE
 
+const BYTE outgoing[] = { 'G','o',0x8C,' ',0x9D,'A','g','o','n',0xAE,'!' };
+
 int main() {
 	bdpp_initialize_driver();
 	for (int i = 0; i < 5; i++) {
 		printf("\nloop %i\n", i);
 		if (UART0_read_isr()) {
 			bdp_protocol();
+		}
+
+		if (i == 1) {
+			bdpp_write_drv_tx_data_with_usage(outgoing, sizeof(outgoing));
+			bdpp_flush_drv_tx_packet();
 		}
 	}
 	return 0;

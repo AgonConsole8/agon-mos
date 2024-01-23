@@ -121,7 +121,7 @@ void bdpp_write_byte_to_drv_tx_packet(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
-void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count);
+void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
@@ -130,7 +130,7 @@ void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count);
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
-void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count);
+void bdpp_write_drv_tx_data_with_usage(const BYTE* data, WORD count);
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 void bdpp_flush_drv_tx_packet();
