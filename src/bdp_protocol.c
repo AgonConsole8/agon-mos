@@ -15,7 +15,9 @@
 
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
-extern void UART0_send_now(BYTE data);
+extern void UART0_write_thr(BYTE data);
+extern BYTE UART0_read_lsr();
+extern BYTE UART0_read_rbr();
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -167,6 +169,7 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
 		packet->act_size = size;
 		packet->data = data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
+		UART0_IER |= UART_LSR_THREMPTY;
 		EI();
 		return TRUE;
 	}
@@ -434,7 +437,7 @@ void bdpp_run_tx_state_machine() {
 		switch (bdpp_tx_state) {
 			case BDPP_TX_STATE_IDLE: {
 				if (bdpp_tx_packet = pull_from_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail)) {
-					UART0_send_now(BDPP_PACKET_START_MARKER);
+					UART0_write_thr(BDPP_PACKET_START_MARKER);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START;
 				} else {
 					UART0_IER &= ~UART_LSR_THREMPTY;
@@ -442,27 +445,27 @@ void bdpp_run_tx_state_machine() {
 			} break;
 
 			case BDPP_TX_STATE_SENT_START: {
-				UART0_send_now(bdpp_tx_packet->flags);
+				UART0_write_thr(bdpp_tx_packet->flags);
 				bdpp_tx_state = BDPP_TX_STATE_SENT_FLAGS;
 			} break;
 
 			case BDPP_TX_STATE_SENT_FLAGS: {
 				if (bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) {
-					UART0_send_now(bdpp_tx_packet->index);
+					UART0_write_thr(bdpp_tx_packet->index);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_INDEX;
 				} else {
-					UART0_send_now((BYTE)bdpp_tx_packet->act_size);
+					UART0_write_thr((BYTE)bdpp_tx_packet->act_size);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_1;
 				}
 			} break;
 
 			case BDPP_TX_STATE_SENT_INDEX: {
-				UART0_send_now((BYTE)(bdpp_tx_packet->act_size));
+				UART0_write_thr((BYTE)(bdpp_tx_packet->act_size));
 				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_1;
 			} break;
 
 			case BDPP_TX_STATE_SENT_SIZE_1: {
-				UART0_send_now((BYTE)(bdpp_tx_packet->act_size >> 8));
+				UART0_write_thr((BYTE)(bdpp_tx_packet->act_size >> 8));
 				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_2;
 			} break;
 
@@ -489,10 +492,10 @@ void bdpp_run_tx_state_machine() {
 				if (outgoing_byte == BDPP_PACKET_START_MARKER ||
 					outgoing_byte == BDPP_PACKET_ESCAPE ||
 					outgoing_byte == BDPP_PACKET_END_MARKER) {
-					UART0_send_now(BDPP_PACKET_ESCAPE);
+					UART0_write_thr(BDPP_PACKET_ESCAPE);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC;
 				} else {
-					UART0_send_now(outgoing_byte);
+					UART0_write_thr(outgoing_byte);
 					if (++bdpp_tx_byte_count >= bdpp_tx_packet->act_size) {
 						bdpp_tx_state = BDPP_TX_STATE_SENT_ALL_DATA;
 					}
@@ -500,7 +503,7 @@ void bdpp_run_tx_state_machine() {
 			} break;
 			
 			case BDPP_TX_STATE_SENT_ALL_DATA: {
-				UART0_send_now(BDPP_PACKET_END_MARKER);
+				UART0_write_thr(BDPP_PACKET_END_MARKER);
 				bdpp_tx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 				bdpp_tx_packet->flags |= BDPP_PKT_FLAG_DONE;
 				if ((bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
