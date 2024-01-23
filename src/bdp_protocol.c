@@ -9,15 +9,31 @@
 
 #include "bdp_protocol.h"
 #include <string.h>
-#include "uart.h"
 
+#define DEBUG_STATE_MACHINE 1
+#if DEBUG_STATE_MACHINE
+#include <stdio.h>
+#define DI disable_interrupts
+#define EI enable_interrupts
+#define UART_LSR_DATA_READY ((BYTE)0x01)
+#define UART_LSR_THREMPTY	((BYTE)0x20)
+#define UART_IER_RECEIVEINT ((BYTE)0x01)
+#define UART_IER_TRANSMITINT ((BYTE)0x02)
+#endif
+
+#if !DEBUG_STATE_MACHINE
+#include "uart.h"
 #define NULL 0
+#endif
 
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void UART0_write_thr(BYTE data);
 extern BYTE UART0_read_lsr();
 extern BYTE UART0_read_rbr();
+extern BYTE UART0_read_isr();
+extern void UART0_enable_interrupt(BYTE flag);
+extern void UART0_disable_interrupt(BYTE flag);
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -52,8 +68,80 @@ BDPP_PACKET bdpp_app_pkt_header[BDPP_MAX_APP_PACKETS];
 
 //--------------------------------------------------
 
+#if DEBUG_STATE_MACHINE
+
+BYTE uart_lsr = UART_LSR_THREMPTY;
+BYTE uart_thr = 0;
+BYTE uart_ier = UART_IER_RECEIVEINT|UART_IER_TRANSMITINT;
+
+const BYTE incoming[] = { 0x8C, 0x0D, 6, 0, 'a', 'b', 'c', 'd', 0x9D, 'E', 'f', 0xAE };
+const BYTE* uart_rbr = incoming;
+
+void UART0_write_thr(BYTE data) {
+	printf("UART0_write_thr(%02hX)\n", data);
+	uart_thr = data;
+}
+
+BOOL any_more_incoming() {
+	return uart_rbr - incoming < sizeof(incoming);
+}
+
+BYTE UART0_read_lsr() {
+	BYTE data;
+	if (any_more_incoming()) {
+		data = uart_lsr | UART_LSR_DATA_READY;
+	} else {
+		data = uart_lsr;
+	}
+	printf("UART0_read_lsr() -> %02hX\n", data);
+	return data;
+}
+
+BYTE UART0_read_rbr() {
+	BYTE data = *uart_rbr++;
+	printf("UART0_read_rbr() -> %02hX\n", data);
+	if (!any_more_incoming()) {
+		uart_lsr &= ~UART_LSR_DATA_READY;
+	}
+	return data;
+}
+
+BYTE UART0_read_isr() {
+	BYTE data = uart_ier & UART_LSR_THREMPTY;
+	if (any_more_incoming()) {
+		data |= UART_LSR_DATA_READY;
+	}
+	printf("UART0_read_isr() -> %02hX\n", data);
+	return data;
+}
+
+void UART0_enable_interrupt(BYTE flag) {
+	printf("UART0_enable_interrupt(%02hX)\n", flag);
+	uart_ier |= flag;
+}
+
+void UART0_disable_interrupt(BYTE flag) {
+	printf("UART0_disable_interrupt(%02hX)\n", flag);
+	uart_ier &= ~flag;
+}
+
+void disable_interrupts() {
+	printf("disable_interrupts\n");
+}
+
+void enable_interrupts() {
+	printf("enable_interrupts\n");
+}
+
+#endif
+
+//--------------------------------------------------
+
 // Push (append) a packet to a list of packets
 static void push_to_list(BDPP_PACKET** head, BDPP_PACKET** tail, BDPP_PACKET* packet) {
+#if DEBUG_STATE_MACHINE
+	printf("push_to_list(%p,%p,%p)\n", head, tail, packet);
+#endif
 	if (*tail) {
 		(*tail)->next = packet;
 	} else {
@@ -72,11 +160,17 @@ static BDPP_PACKET* pull_from_list(BDPP_PACKET** head, BDPP_PACKET** tail) {
 		}
 		packet->next = NULL;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("pull_from_list(%p,%p) -> %p\n", head, tail, packet);
+#endif
 	return packet;
 }
 
 // Reset the receiver state
 static void reset_receiver() {
+#if DEBUG_STATE_MACHINE
+	printf("reset_receiver()\n");
+#endif
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	bdpp_rx_packet = NULL;
 }
@@ -84,6 +178,9 @@ static void reset_receiver() {
 // Initialize the BDPP driver.
 //
 void bdpp_initialize_driver() {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_initialize_driver()\n");
+#endif
 	int i;
 
 	reset_receiver();
@@ -105,7 +202,7 @@ void bdpp_initialize_driver() {
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
 		bdpp_drv_pkt_header[i].index = (BYTE)i;
-		bdpp_drv_pkt_header[i].data = &bdpp_drv_pkt_data[i];
+		bdpp_drv_pkt_header[i].data = bdpp_drv_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
 						&bdpp_drv_pkt_header[i]);
 	}
@@ -116,7 +213,9 @@ void bdpp_initialize_driver() {
 		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 
+#if !DEBUG_STATE_MACHINE
 	set_vector(UART0_IVECT, bdpp_handler); // 0x18
+#endif
 }
 
 // Get whether BDPP is enabled
@@ -135,6 +234,9 @@ BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags) {
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
 		packet->act_size = 0;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_init_tx_drv_packet() -> %p\n", packet);
+#endif
 	return packet;
 }
 
@@ -148,6 +250,9 @@ BDPP_PACKET* bdpp_init_rx_drv_packet() {
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
 		packet->act_size = 0;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_init_rx_drv_packet() -> %p\n", packet);
+#endif
 	return packet;
 }
 
@@ -155,6 +260,9 @@ BDPP_PACKET* bdpp_init_rx_drv_packet() {
 // This function can fail if the packet is presently involved in a data transfer.
 //
 BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%04hX,%p)\n", index, flags, size, data);
+#endif
 	if (index < BDPP_MAX_APP_PACKETS) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
@@ -169,7 +277,7 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
 		packet->act_size = size;
 		packet->data = data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-		UART0_IER |= UART_LSR_THREMPTY;
+		UART0_enable_interrupt(UART_IER_TRANSMITINT);
 		EI();
 		return TRUE;
 	}
@@ -182,6 +290,9 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
 // actual size of an incoming packet may be smaller, but not larger.
 //
 BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_prepare_rx_app_packet(%02hX,%04hX,%p)\n", index, size, data);
+#endif
 	if (index < BDPP_MAX_APP_PACKETS) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
@@ -209,8 +320,14 @@ BOOL bdpp_is_tx_app_packet_done(BYTE index) {
 		rc = (((packet->flags & BDPP_PKT_FLAG_DONE) != 0) &&
 				((packet->flags & BDPP_PKT_FLAG_FOR_RX) == 0));
 		EI();
+#if DEBUG_STATE_MACHINE
+		printf("bdpp_is_tx_app_packet_done(%02hX) -> %hX\n", index, rc);
+#endif
 		return rc;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_is_tx_app_packet_done(%02hX) -> %hX\n", index, FALSE);
+#endif
 	return FALSE;
 }
 
@@ -224,8 +341,14 @@ BOOL bdpp_is_rx_app_packet_done(BYTE index) {
 		rc = ((packet->flags & (BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_DONE)) ==
 				(BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_DONE));
 		EI();
+#if DEBUG_STATE_MACHINE
+		printf("bdpp_is_rx_app_packet_done(%02hX) -> %hX\n", index, rc);
+#endif
 		return rc;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_is_rx_app_packet_done(%02hX) -> %hX\n", index, FALSE);
+#endif
 	return FALSE;
 }
 
@@ -242,8 +365,14 @@ BOOL bdpp_stop_using_app_packet(BYTE index) {
 		}
 		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX);
 		EI();
+#if DEBUG_STATE_MACHINE
+		printf("bdpp_stop_using_app_packet(%02hX) -> %hX\n", index, TRUE);
+#endif
 		return TRUE;
 	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_stop_using_app_packet(%02hX) -> %hX\n", index, FALSE);
+#endif
 	return FALSE;
 }
 
@@ -255,6 +384,9 @@ BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags) {
 	BDPP_PACKET* packet;
 	bdpp_flush_drv_tx_packet();
 	packet = bdpp_init_tx_drv_packet(flags);
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_start_drv_tx_packet(%02hX) -> %p\n", flags, packet);
+#endif
 	return packet;
 }
 
@@ -262,6 +394,9 @@ BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags) {
 //
 static void bdpp_internal_flush_drv_tx_packet() {
 	if (bdpp_tx_build_packet) {
+#if DEBUG_STATE_MACHINE
+		printf("bdpp_internal_flush_drv_tx_packet() flushing %p\n", bdpp_tx_build_packet);
+#endif
 		DI();
 			bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			bdpp_tx_build_packet = NULL;
@@ -272,6 +407,9 @@ static void bdpp_internal_flush_drv_tx_packet() {
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
 void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_write_byte_to_drv_tx_packet(%02hX)\n", data);
+#endif
 	while (TRUE) {
 		if (bdpp_tx_build_packet) {
 			BYTE* pdata = bdpp_tx_build_packet->data;
@@ -294,6 +432,9 @@ void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
 void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_write_bytes_to_drv_tx_packet(%p, %04hX)\n", data, count);
+#endif
 	while (count > 0) {
 		bdpp_write_byte_to_drv_tx_packet(*data++);
 		count--;
@@ -308,6 +449,9 @@ void bdpp_write_bytes_to_drv_tx_packet(BYTE* data, WORD count) {
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
 void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_write_drv_tx_data_with_usage(%p, %04hX) [%02hX]\n", data, count, *data);
+#endif
 	if (!bdpp_tx_build_packet) {
 		if (*data >= 0x20 && *data <= 0x7E) {
 			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
@@ -322,6 +466,9 @@ void bdpp_write_drv_tx_data_with_usage(BYTE* data, WORD count) {
 //
 void bdpp_flush_drv_tx_packet() {
 	if (bdpp_tx_build_packet) {
+#if DEBUG_STATE_MACHINE
+		printf("bdpp_flush_drv_tx_packet(%p)\n", bdpp_tx_build_packet);
+#endif
 		bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
 		bdpp_internal_flush_drv_tx_packet();
 		bdpp_tx_next_pkt_flags = 0;
@@ -333,9 +480,15 @@ void bdpp_flush_drv_tx_packet() {
 void bdpp_run_rx_state_machine() {
 	BYTE incoming_byte;
 	BDPP_PACKET* packet;
+#if DEBUG_STATE_MACHINE
+	printf("\nbdpp_run_rx_state_machine() state:[%02hX]\n", bdpp_rx_state);
+#endif
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
 		incoming_byte = UART0_read_rbr();
+#if DEBUG_STATE_MACHINE
+		printf(" RX state:[%02hX], incoming:[%02hX]\n", bdpp_rx_state, incoming_byte);
+#endif
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
 				if (incoming_byte == BDPP_PACKET_START_MARKER) {
@@ -432,15 +585,22 @@ void bdpp_run_rx_state_machine() {
 //
 void bdpp_run_tx_state_machine() {
 	BYTE outgoing_byte;
+#if DEBUG_STATE_MACHINE
+	printf("\nbdpp_run_tx_state_machine() state:[%02hX]\n", bdpp_tx_state);
+#endif
 	
 	while (UART0_read_lsr() & UART_LSR_THREMPTY) {
+#if DEBUG_STATE_MACHINE
+		printf(" TX state:[%02hX]\n", bdpp_tx_state);
+#endif
 		switch (bdpp_tx_state) {
 			case BDPP_TX_STATE_IDLE: {
 				if (bdpp_tx_packet = pull_from_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail)) {
 					UART0_write_thr(BDPP_PACKET_START_MARKER);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START;
 				} else {
-					UART0_IER &= ~UART_LSR_THREMPTY;
+					UART0_disable_interrupt(UART_IER_TRANSMITINT);
+					return;
 				}
 			} break;
 
@@ -513,7 +673,7 @@ void bdpp_run_tx_state_machine() {
 				bdpp_tx_state = BDPP_TX_STATE_IDLE;
 			} break;
 		}
-	}
+	break;}
 }
 
 // The real guts of the bidirectional packet protocol!
@@ -522,6 +682,24 @@ void bdpp_run_tx_state_machine() {
 // that interrupts are always turned off during this function.
 //
 void bdp_protocol() {
+#if DEBUG_STATE_MACHINE
+	printf("bdp_protocol()\n");
+#endif
 	bdpp_run_rx_state_machine();
 	bdpp_run_tx_state_machine();
 }
+
+#if DEBUG_STATE_MACHINE
+
+int main() {
+	bdpp_initialize_driver();
+	for (int i = 0; i < 5; i++) {
+		printf("\nloop %i\n", i);
+		if (UART0_read_isr()) {
+			bdp_protocol();
+		}
+	}
+	return 0;
+}
+
+#endif

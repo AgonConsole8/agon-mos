@@ -7,10 +7,20 @@
 // Modinfo:
 // 20/01/2024:	Created initial version of protocol.
 
-#include <defines.h>
-
 #define FALSE 0
 #define TRUE  1
+
+#ifndef BOOL
+typedef unsigned char BOOL;
+#endif
+
+#ifndef BYTE
+typedef unsigned char BYTE;
+#endif
+
+#ifndef WORD
+typedef unsigned short WORD;
+#endif
 
 #define BDPP_FLAG_ENABLED				0x01 	// Whether bidirectional protocol is enabled
 
