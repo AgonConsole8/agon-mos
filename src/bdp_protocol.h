@@ -24,19 +24,22 @@
 
 #define BDPP_RX_STATE_AWAIT_START		0x01	// Waiting for the packet start marker
 #define BDPP_RX_STATE_AWAIT_FLAGS		0x02	// Waiting for the packet flags
-#define BDPP_RX_STATE_AWAIT_SIZE_1		0x03	// Waiting for the packet size, part 1
-#define BDPP_RX_STATE_AWAIT_SIZE_2		0x04	// Waiting for the packet size, part 2
-#define BDPP_RX_STATE_AWAIT_DATA_ESC	0x05	// Waiting for a packet data byte or escape
-#define BDPP_RX_STATE_AWAIT_DATA		0x06	// Waiting for a packet data byte only
-#define BDPP_RX_STATE_AWAIT_END			0x07	// Waiting for the packet end marker
+#define BDPP_RX_STATE_AWAIT_INDEX		0x03	// Waiting for the packet index
+#define BDPP_RX_STATE_AWAIT_SIZE_1		0x04	// Waiting for the packet size, part 1
+#define BDPP_RX_STATE_AWAIT_SIZE_2		0x05	// Waiting for the packet size, part 2
+#define BDPP_RX_STATE_AWAIT_DATA_ESC	0x06	// Waiting for a packet data byte or escape
+#define BDPP_RX_STATE_AWAIT_DATA		0x07	// Waiting for a packet data byte only
+#define BDPP_RX_STATE_AWAIT_END			0x08	// Waiting for the packet end marker
 
 #define BDPP_TX_STATE_IDLE				0x20	// Doing nothing (not transmitting)
 #define BDPP_TX_STATE_SENT_START		0x21	// Recently sent the packet start marker
-#define BDPP_TX_STATE_SENT_TYPE			0x22	// Recently sent the packet type
-#define BDPP_TX_STATE_SENT_SIZE_1		0x23	// Recently sent the packet size, part 1
-#define BDPP_TX_STATE_SENT_SIZE_2		0x24	// Recently sent the packet size, part 2
-#define BDPP_TX_STATE_SENT_ESC			0x25	// Recently sent an escape character
-#define BDPP_TX_STATE_SENT_DATA			0x26	// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_FLAGS		0x22	// Recently sent the packet flags
+#define BDPP_TX_STATE_SENT_INDEX		0x23	// Recently sent the packet index
+#define BDPP_TX_STATE_SENT_SIZE_1		0x24	// Recently sent the packet size, part 1
+#define BDPP_TX_STATE_SENT_SIZE_2		0x25	// Recently sent the packet size, part 2
+#define BDPP_TX_STATE_SENT_ESC			0x26	// Recently sent an escape character
+#define BDPP_TX_STATE_SENT_DATA			0x27	// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_ALL_DATA		0x28	// Recently sent the last packet data byte
 
 #define BDPP_PKT_FLAG_PRINT				0x00	// Indicates packet contains printable data
 #define BDPP_PKT_FLAG_COMMAND			0x01	// Indicates packet contains a command or request
