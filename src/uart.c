@@ -145,26 +145,38 @@ void close_UART1() {
 	serialFlags &= 0x0F;
 }
 
+// Write to UART0 transmitter holding register
+//
 void UART0_write_thr(BYTE data) {
 	UART0_THR = data;
 }
 
+// Read from UART0 line status register
+//
 BYTE UART0_read_lsr() {
 	return UART0_LSR;
 }
 
+// Read from UART0 receiver buffer register
+//
 BYTE UART0_read_rbr() {
 	return UART0_RBR;
 }
 
+// Read from UART0 interrupt identification register
+//
 BYTE UART0_read_iir() {
 	return UART0_IIR;
 }
 
+// Enable interrupt on UART0
+//
 void UART0_enable_interrupt(BYTE flag) {
 	UART0_IER |= flag;
 }
 
+// Disable interrupt on UART0
+//
 void UART0_disable_interrupt(BYTE flag) {
 	UART0_IER &= ~flag;
 }
