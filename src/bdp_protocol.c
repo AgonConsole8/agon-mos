@@ -10,7 +10,8 @@
 #include "bdp_protocol.h"
 #include <string.h>
 
-#define DEBUG_STATE_MACHINE 1
+#define DEBUG_STATE_MACHINE 0
+
 #if DEBUG_STATE_MACHINE
 #include <stdio.h>
 #define DI disable_interrupts
@@ -23,17 +24,13 @@
 
 #if !DEBUG_STATE_MACHINE
 #include "uart.h"
-#define NULL 0
+#define NULL  0
+#define FALSE 0
+#define TRUE  1
 #endif
 
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
-extern void UART0_write_thr(BYTE data);
-extern BYTE UART0_read_lsr();
-extern BYTE UART0_read_rbr();
-extern BYTE UART0_read_isr();
-extern void UART0_enable_interrupt(BYTE flag);
-extern void UART0_disable_interrupt(BYTE flag);
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -110,12 +107,12 @@ BYTE UART0_read_rbr() {
 	return data;
 }
 
-BYTE UART0_read_isr() {
+BYTE UART0_read_iir() {
 	BYTE data = uart_ier & UART_IER_TRANSMITINT;
 	if (any_more_incoming()) {
 		data |= UART_IER_RECEIVEINT;
 	}
-	printf("UART0_read_isr() -> %02hX\n", data);
+	printf("UART0_read_iir() -> %02hX\n", data);
 	return data;
 }
 
@@ -236,14 +233,16 @@ BOOL bdpp_is_enabled() {
 
 // Enable BDDP mode
 //
-void bdpp_enable() {
+BOOL bdpp_enable() {
 	bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+	return TRUE;
 }
 
 // Disable BDDP mode
 //
-void bdpp_disable() {
+BOOL bdpp_disable() {
 	bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
+	return TRUE;
 }
 
 // Initialize an outgoing driver-owned packet, if one is available
@@ -725,7 +724,7 @@ int main() {
 	bdpp_initialize_driver();
 	for (int i = 0; i < 8; i++) {
 		printf("\nloop %i\n", i);
-		if (UART0_read_isr()) {
+		if (UART0_read_iir()) {
 			bdp_protocol();
 		}
 

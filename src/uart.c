@@ -144,3 +144,27 @@ void close_UART1() {
 	UART1_FCTL = 0x00;												// Bring FIFO control register to reset value.	
 	serialFlags &= 0x0F;
 }
+
+void UART0_write_thr(BYTE data) {
+	UART0_THR = data;
+}
+
+BYTE UART0_read_lsr() {
+	return UART0_LSR;
+}
+
+BYTE UART0_read_rbr() {
+	return UART0_RBR;
+}
+
+BYTE UART0_read_iir() {
+	return UART0_IIR;
+}
+
+void UART0_enable_interrupt(BYTE flag) {
+	UART0_IER |= flag;
+}
+
+void UART0_disable_interrupt(BYTE flag) {
+	UART0_IER &= ~flag;
+}

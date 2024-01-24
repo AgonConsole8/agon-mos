@@ -7,20 +7,9 @@
 // Modinfo:
 // 20/01/2024:	Created initial version of protocol.
 
-#define FALSE 0
-#define TRUE  1
+#include <defines.h>
 
-#ifndef BOOL
-typedef unsigned char BOOL;
-#endif
-
-#ifndef BYTE
-typedef unsigned char BYTE;
-#endif
-
-#ifndef WORD
-typedef unsigned short WORD;
-#endif
+//---------------------------------------------------------------------------
 
 #define EZ80_COMM_PROTOCOL_VERSION		0x04	// Range is 0x04 to 0x0F, for future enhancements
 
