@@ -82,7 +82,7 @@ BOOL wait_VDP(unsigned char mask) {
 	BOOL	retVal = 0;
 
 	for(i = 0; i < 250000; i++) {				// A small delay loop (~1s)
-		if(vpd_protocol_flags & mask) {			// If we get a result then
+		if(vdp_protocol_flags & mask) {			// If we get a result then
 			retVal = 1;							// Set the return value to true
 			break;								// And exit the loop
 		}

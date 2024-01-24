@@ -188,7 +188,7 @@ void bdpp_initialize_driver() {
 	int i;
 
 	reset_receiver();
-	bdpp_driver_flags = BDPP_FLAG_ENABLED;
+	bdpp_driver_flags = BDPP_FLAG_ALLOWED;
 	bdpp_tx_state = BDPP_TX_STATE_IDLE;
 	bdpp_tx_packet = NULL;
 	bdpp_tx_build_packet = NULL;
@@ -222,10 +222,28 @@ void bdpp_initialize_driver() {
 #endif
 }
 
-// Get whether BDPP is enabled
+// Get whether BDPP is allowed (both CPUs have it)
+//
+BOOL bdpp_is_allowed() {
+	return ((bdpp_driver_flags & BDPP_FLAG_ALLOWED) != 0);
+}
+
+// Get whether BDPP is presently enabled
 //
 BOOL bdpp_is_enabled() {
 	return ((bdpp_driver_flags & BDPP_FLAG_ENABLED) != 0);
+}
+
+// Enable BDDP mode
+//
+void bdpp_enable() {
+	bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+}
+
+// Disable BDDP mode
+//
+void bdpp_disable() {
+	bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
 }
 
 // Initialize an outgoing driver-owned packet, if one is available

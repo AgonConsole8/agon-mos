@@ -15,7 +15,7 @@
 #define TIMER_H
 
 extern long 	SysClkFreq;
-extern volatile BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 
 unsigned short  init_timer0(int interval, int clkdiv, unsigned char ctrlbits);
 void            enable_timer0(unsigned char enable);

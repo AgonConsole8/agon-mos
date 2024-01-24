@@ -26,7 +26,7 @@
 #include "timer.h"
 #include "mos_editor.h"
 
-extern volatile BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 extern volatile BYTE keyascii;					// In globals.asm
 extern volatile BYTE keycode;					// In globals.asm
 extern volatile BYTE keydown;					// In globals.asm
@@ -46,7 +46,7 @@ static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
 // Get the current cursor position from the VPD
 //
 void getCursorPos() {
-	vpd_protocol_flags &= 0xFE;					// Clear the semaphore flag
+	vdp_protocol_flags &= 0xFE;					// Clear the semaphore flag
 	putch(23);									// Request the cursor position
 	putch(0);
 	putch(VDP_cursor);
@@ -56,7 +56,7 @@ void getCursorPos() {
 // Get the current screen dimensions from the VDU
 //
 void getModeInformation() {
-	vpd_protocol_flags &= 0xEF;					// Clear the semaphore flag
+	vdp_protocol_flags &= 0xEF;					// Clear the semaphore flag
 	putch(23);
 	putch(0);
 	putch(VDP_mode);

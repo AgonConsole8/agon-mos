@@ -79,7 +79,7 @@
 			XREF	_keydown
 			XREF	_sysvars
 			XREF	_scratchpad
-			XREF	_vpd_protocol_flags
+			XREF	_vdp_protocol_flags
 			XREF	_user_kbvector
 			XREF	_keymap
 

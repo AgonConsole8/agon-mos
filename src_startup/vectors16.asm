@@ -156,9 +156,9 @@ _rst_18_handler_1:	LD 	A, (HL)			; Fetch the character
 			JR 	_rst_18_handler_1	; Loop
 
 ; Perform an operation related to the BDPP
-; Parameters:
-; TBD
+; Stacked parameters vary according to the function code. 
 ;
+
 _rst_20_handler:
 			RET.L
 

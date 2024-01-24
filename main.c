@@ -96,20 +96,37 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 		//     - EZ80 sends 0x01, ESP32 returns 0x01.
 		//
 		// (c) EZ80 DOES support BDPP, but ESP32 does NOT support BDPP.
-		//     - EZ80 sends 0x04, ESP32 returns 0x04.
+		//     - EZ80 sends 0x04..0x0F, ESP32 returns 0x04..0x0F.
 		//
 		// (d) EZ80 DOES support BDPP, and ESP32 DOES support BDPP.
-		//     - EZ80 sends 0x04, ESP32 returns 0x84.
+		//     - EZ80 sends 0x04..0x0F, ESP32 returns 0x84..0x8F.
 		//
-		putch(0x04); // older EZ80 code will send a 0x01 here!
+		// The range of values allows us to enhance the BDPP over time,
+		// if needed, and be able to identify which version of BDDP is
+		// on each side of the communication. This is EZ80 code, so it
+		// obviously knows its own protocol version.
+
+		putch(EZ80_COMM_PROTOCOL_VERSION); // older EZ80 code will send a 0x01 here!
+
 		for(i = 0; i < 5; i++) {		// Wait 50ms
 			wait_timer0();
 		}
 
 		// If general poll returned, then exit for loop.
-		// If gp is 0x84, then both CPUs support bidirectional protocol;
-		// If gp is 0x04, then only the EZ80 supports it.
-		if (gp == 0x04 || gp == 0x84) break;
+		// If gp is 0x84..0x8F, then both CPUs support bidirectional protocol;
+		// If gp is 0x04..0x0F, then only the EZ80 supports it.
+
+		if ((gp & 0x7F) >= 0x04 && (gp & 0x7F) <= 0x0F) {
+			// Pack the 2 protocol versions into a single system variable, for app use.
+			if (gp & 0x80) {
+				// The ESP32 DOES support BDPP.
+				gp = ((gp & 0x0F) << 4) | EZ80_COMM_PROTOCOL_VERSION;
+			} else {
+				// The ESP32 does NOT support BDPP.
+				gp = (0x01 << 4) | EZ80_COMM_PROTOCOL_VERSION;
+			}
+			break;
+		}
 	}
 	enable_timer0(0);					// Disable the timer
 	return gp;
@@ -142,7 +159,7 @@ int main(void) {
 		}
 	}
 	
-	if (gp == 0x84) {
+	if (((BYTE)gp & 0xF0) >= 0x40) {
 		// The ESP32 code supports bidirectional packet protocol.
 		bdpp_initialize_driver();
 	}
@@ -158,15 +175,15 @@ int main(void) {
 	#ifdef VERSION_BUILD
 		printf(" Build %s", VERSION_BUILD);
 	#endif
+
+	printf("Protocol versions: EZ80 (%02hX), ESP32 (%02hX)\n\r",
+			(((BYTE)gp) & 0x0F), (((BYTE)gp) >> 4));
+
 	printf("\n\r\n\r");
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
 	
-	if (bdpp_is_enabled()) {
-		printf("Bidirectional packet protocol enabled");
-	}
-
 	mos_mount();									// Mount the SD card
 
 	putch(7);										// Startup beep

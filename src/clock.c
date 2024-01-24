@@ -22,7 +22,7 @@
 #include "uart.h"
 #include "clock.h"
 
-extern volatile BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 extern volatile BYTE rtc_enable;				// In globals.asm
 
 const char * rtc_days[7][2] = {	
@@ -56,14 +56,14 @@ void rtc_update() {
 	if(!rtc_enable) {
 		return;
 	}
-	vpd_protocol_flags &= 0xDF;	// Reset bit 5
+	vdp_protocol_flags &= 0xDF;	// Reset bit 5
 
 	putch(23);					// Request the time from the ESP32
 	putch(0);
 	putch(VDP_rtc);
 	putch(0);					// 0: Get time
 
-	while((vpd_protocol_flags & 0x20) == 0);	
+	while((vdp_protocol_flags & 0x20) == 0);	
 }
 
 // Unpack a 6-byte RTC packet into time struct

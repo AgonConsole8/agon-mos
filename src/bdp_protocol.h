@@ -22,11 +22,14 @@ typedef unsigned char BYTE;
 typedef unsigned short WORD;
 #endif
 
-#define BDPP_FLAG_ENABLED				0x01 	// Whether bidirectional protocol is enabled
+#define EZ80_COMM_PROTOCOL_VERSION		0x04	// Range is 0x04 to 0x0F, for future enhancements
+
+#define BDPP_FLAG_ALLOWED				0x01 	// Whether bidirectional protocol is allowed (both CPUs have it)
+#define BDPP_FLAG_ENABLED				0x02 	// Whether bidirectional protocol is presently enabled
 
 #define BDPP_SMALL_DATA_SIZE			32		// Maximum payload data length for small packet
 #define BDPP_MAX_DRIVER_PACKETS			4		// Maximum number of driver-owned small packets
-#define BDPP_MAX_APP_PACKETS			4		// Maximum number of app-owned packets
+#define BDPP_MAX_APP_PACKETS			8		// Maximum number of app-owned packets
 
 #define BDPP_PACKET_START_MARKER		0x8C
 #define BDPP_PACKET_ESCAPE				0x9D
@@ -79,8 +82,17 @@ typedef struct tag_BDPP_PACKET {
 // Initialize the BDPP driver.
 void bdpp_initialize_driver();
 
-// Get whether BDPP is enabled
+// Get whether BDPP is allowed (both CPUs have it)
 BOOL bdpp_is_enabled();
+
+// Get whether BDPP is presently enabled
+BOOL bdpp_is_enabled();
+
+// Enable BDDP mode
+BOOL bdpp_enable();
+
+// Disable BDDP mode
+BOOL bdpp_disable();
 
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
