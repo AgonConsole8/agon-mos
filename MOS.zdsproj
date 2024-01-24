@@ -34,6 +34,7 @@
 <file filter-key="">src\strings.c</file>
 <file filter-key="">src\bdp_protocol.c</file>
 <file filter-key="">src\bdp_protocol.h</file>
+<file filter-key="">src\bdpp_api.asm</file>
 </files>
 
 <!-- configuration information -->

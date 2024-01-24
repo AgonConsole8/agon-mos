@@ -72,7 +72,7 @@ typedef struct tag_BDPP_PACKET {
 void bdpp_initialize_driver();
 
 // Get whether BDPP is allowed (both CPUs have it)
-BOOL bdpp_is_enabled();
+BOOL bdpp_is_allowed();
 
 // Get whether BDPP is presently enabled
 BOOL bdpp_is_enabled();
