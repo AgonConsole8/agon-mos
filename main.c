@@ -176,10 +176,9 @@ int main(void) {
 		printf(" Build %s", VERSION_BUILD);
 	#endif
 
-	printf("Protocol versions: EZ80 (%02hX), ESP32 (%02hX)\n\r",
+	printf("\n\rProtocol versions: EZ80 (%02hX), ESP32 (%02hX)\n\r",
 			(((BYTE)gp) & 0x0F), (((BYTE)gp) >> 4));
 
-	printf("\n\r\n\r");
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
