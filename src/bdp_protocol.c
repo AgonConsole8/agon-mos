@@ -259,7 +259,7 @@ BDPP_PACKET* bdpp_init_rx_drv_packet() {
 // Queue an app-owned packet for transmission
 // This function can fail if the packet is presently involved in a data transfer.
 //
-BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
+BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, const BYTE* data) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%04hX,%p)\n", index, flags, size, data);
 #endif
@@ -275,7 +275,7 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, BYTE* data) {
 		packet->flags = flags;
 		packet->max_size = size;
 		packet->act_size = size;
-		packet->data = data;
+		packet->data = (BYTE*)data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
 		UART0_enable_interrupt(UART_IER_TRANSMITINT);
 		EI();
@@ -304,6 +304,7 @@ BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
 		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX;
 		packet->max_size = size;
 		packet->act_size = 0;
+		packet->data = data;
 		EI();
 		return TRUE;
 	}
@@ -694,7 +695,8 @@ void bdp_protocol() {
 
 #if DEBUG_STATE_MACHINE
 
-const BYTE outgoing[] = { 'G','o',0x8C,' ',0x9D,'A','g','o','n',0xAE,'!' };
+const BYTE drv_outgoing[] = { 'G','o',0x8C,' ',0x9D,'A','g','o','n',0xAE,'!' };
+const BYTE app_outgoing[] = { 'A','p',0x8C,'p',0x9D,'M','s','g',0xAE,'.' };
 
 int main() {
 	bdpp_initialize_driver();
@@ -705,8 +707,10 @@ int main() {
 		}
 
 		if (i == 1) {
-			bdpp_write_drv_tx_data_with_usage(outgoing, sizeof(outgoing));
+			bdpp_write_drv_tx_data_with_usage(drv_outgoing, sizeof(drv_outgoing));
 			bdpp_flush_drv_tx_packet();
+		} else if (i == 3) {
+			bdpp_queue_tx_app_packet(3, 0x0D, sizeof(app_outgoing), app_outgoing);
 		}
 	}
 	return 0;
