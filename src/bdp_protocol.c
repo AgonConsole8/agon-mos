@@ -74,8 +74,9 @@ BYTE uart_lsr = UART_LSR_THREMPTY;
 BYTE uart_thr = 0;
 BYTE uart_ier = UART_IER_RECEIVEINT|UART_IER_TRANSMITINT;
 
-const BYTE incoming[] = { 0x8C, 0x0D, 6, 0, 'a', 'b', 'c', 'd', 0x9D, 'E', 'f', 0xAE };
-const BYTE* uart_rbr = incoming;
+const BYTE drv_incoming[] = { 0x8C, 0x0D, 6, 0, 'a', 'b', 'c', 'd', 0x9D, 'E', 'f', 0xAE };
+const BYTE app_incoming[] = { 0x8C, 0x8D, 3, 3, 0, 'R', 's', 'p', 0xAE };
+const BYTE* uart_rbr = drv_incoming;
 
 void UART0_write_thr(BYTE data) {
 	printf("UART0_write_thr(%02hX)\n", data);
@@ -83,7 +84,10 @@ void UART0_write_thr(BYTE data) {
 }
 
 BOOL any_more_incoming() {
-	return uart_rbr - incoming < sizeof(incoming);
+	return ((uart_rbr >= drv_incoming &&
+			uart_rbr - drv_incoming < sizeof(drv_incoming)) ||
+			(uart_rbr >= app_incoming &&
+			uart_rbr - app_incoming < sizeof(app_incoming)));
 }
 
 BYTE UART0_read_lsr() {
@@ -699,8 +703,9 @@ const BYTE drv_outgoing[] = { 'G','o',0x8C,' ',0x9D,'A','g','o','n',0xAE,'!' };
 const BYTE app_outgoing[] = { 'A','p',0x8C,'p',0x9D,'M','s','g',0xAE,'.' };
 
 int main() {
+	BYTE data[10];
 	bdpp_initialize_driver();
-	for (int i = 0; i < 5; i++) {
+	for (int i = 0; i < 8; i++) {
 		printf("\nloop %i\n", i);
 		if (UART0_read_isr()) {
 			bdp_protocol();
@@ -710,7 +715,19 @@ int main() {
 			bdpp_write_drv_tx_data_with_usage(drv_outgoing, sizeof(drv_outgoing));
 			bdpp_flush_drv_tx_packet();
 		} else if (i == 3) {
-			bdpp_queue_tx_app_packet(3, 0x0D, sizeof(app_outgoing), app_outgoing);
+			bdpp_prepare_rx_app_packet(3, 10, data);
+			bdpp_queue_tx_app_packet(2, 0x0D, sizeof(app_outgoing), app_outgoing);
+		}
+
+		if (bdpp_is_tx_app_packet_done(2)) {
+			printf("App packet 2 sent!\n");
+			bdpp_stop_using_app_packet(2);
+			uart_rbr = app_incoming; // cause a response to come in
+		}
+
+		if (bdpp_is_rx_app_packet_done(3)) {
+			printf("App packet 3 received!\n");
+			bdpp_stop_using_app_packet(3);
 		}
 	}
 	return 0;
