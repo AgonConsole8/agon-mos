@@ -107,6 +107,12 @@ BOOL bdpp_is_tx_app_packet_done(BYTE index);
 // Check whether an incoming app-owned packet has been received
 BOOL bdpp_is_rx_app_packet_done(BYTE index);
 
+// Get the flags for a received app-owned packet.
+BYTE bdpp_get_rx_app_packet_flags(BYTE index);
+
+// Get the data size for a received app-owned packet.
+WORD bdpp_get_rx_app_packet_size(BYTE index);
+
 // Free the driver from using an app-owned packet
 // This function can fail if the packet is presently involved in a data transfer.
 BOOL bdpp_stop_using_app_packet(BYTE index);

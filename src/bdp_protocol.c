@@ -374,6 +374,36 @@ BOOL bdpp_is_rx_app_packet_done(BYTE index) {
 	return FALSE;
 }
 
+// Get the flags for a received app-owned packet.
+BYTE bdpp_get_rx_app_packet_flags(BYTE index) {
+	BYTE flags = 0;
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		flags = packet->flags;
+		EI();
+	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_get_rx_app_packet_flags(%02hX) -> %02hX\n", index, flags);
+#endif
+	return flags;
+}
+
+// Get the data size for a received app-owned packet.
+WORD bdpp_get_rx_app_packet_size(BYTE index) {
+	WORD size = 0;
+	if (index < BDPP_MAX_APP_PACKETS) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		size = packet->act_size;
+		EI();
+	}
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_get_rx_app_packet_size(%02hX) -> %04hX\n", index, size);
+#endif
+	return size;
+}
+
 // Free the driver from using an app-owned packet
 // This function can fail if the packet is presently involved in a data transfer.
 //
