@@ -215,10 +215,6 @@ void bdpp_initialize_driver() {
 		bdpp_app_pkt_header[i].index = (BYTE)i;
 		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
-
-#if !DEBUG_STATE_MACHINE
-	set_vector(UART0_IVECT, bdpp_handler); // 0x18
-#endif
 }
 
 // Get whether BDPP is allowed (both CPUs have it)
@@ -237,7 +233,10 @@ BOOL bdpp_is_enabled() {
 //
 BOOL bdpp_enable() {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
-		bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
+			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+			set_vector(UART0_IVECT, bddp_handler);
+		}
 		return TRUE;
 	} else {
 		return FALSE;
@@ -248,7 +247,10 @@ BOOL bdpp_enable() {
 //
 BOOL bdpp_disable() {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
-		bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
+		if (!dpp_driver_flags & BDPP_FLAG_ENABLED) {
+			bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
+			set_vector(UART0_IVECT, uart0_handler);
+		}
 		return TRUE;
 	} else {
 		return FALSE;
