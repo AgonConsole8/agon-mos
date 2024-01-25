@@ -294,7 +294,7 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, const BYTE* dat
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%04hX,%p)\n", index, flags, size, data);
 #endif
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
@@ -324,7 +324,7 @@ BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_prepare_rx_app_packet(%02hX,%04hX,%p)\n", index, size, data);
 #endif
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
@@ -346,7 +346,7 @@ BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
 //
 BOOL bdpp_is_tx_app_packet_done(BYTE index) {
 	BOOL rc;
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		rc = (((packet->flags & BDPP_PKT_FLAG_DONE) != 0) &&
@@ -367,7 +367,7 @@ BOOL bdpp_is_tx_app_packet_done(BYTE index) {
 //
 BOOL bdpp_is_rx_app_packet_done(BYTE index) {
 	BOOL rc;
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		rc = ((packet->flags & (BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_DONE)) ==
@@ -387,7 +387,7 @@ BOOL bdpp_is_rx_app_packet_done(BYTE index) {
 // Get the flags for a received app-owned packet.
 BYTE bdpp_get_rx_app_packet_flags(BYTE index) {
 	BYTE flags = 0;
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		flags = packet->flags;
@@ -402,7 +402,7 @@ BYTE bdpp_get_rx_app_packet_flags(BYTE index) {
 // Get the data size for a received app-owned packet.
 WORD bdpp_get_rx_app_packet_size(BYTE index) {
 	WORD size = 0;
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		size = packet->act_size;
@@ -418,7 +418,7 @@ WORD bdpp_get_rx_app_packet_size(BYTE index) {
 // This function can fail if the packet is presently involved in a data transfer.
 //
 BOOL bdpp_stop_using_app_packet(BYTE index) {
-	if (index < BDPP_MAX_APP_PACKETS) {
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
@@ -470,9 +470,9 @@ static void bdpp_internal_flush_drv_tx_packet() {
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
-void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
+static void bdpp_internal_write_byte_to_drv_tx_packet(BYTE data) {
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_write_byte_to_drv_tx_packet(%02hX)\n", data);
+	printf("bdpp_internal_write_byte_to_drv_tx_packet(%02hX)\n", data);
 #endif
 	while (TRUE) {
 		if (bdpp_tx_build_packet) {
@@ -493,15 +493,28 @@ void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
 	}
 }
 
+// Append a data byte to a driver-owned, outgoing packet.
+// This is a blocking call, and might wait for room for data.
+void bdpp_write_byte_to_drv_tx_packet(BYTE data) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_write_byte_to_drv_tx_packet(%02hX)\n", data);
+#endif
+	if (bdpp_is_allowed()) {
+		bdpp_internal_write_byte_to_drv_tx_packet(data);
+	}
+}
+
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
 void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_write_bytes_to_drv_tx_packet(%p, %04hX)\n", data, count);
 #endif
-	while (count > 0) {
-		bdpp_write_byte_to_drv_tx_packet(*data++);
-		count--;
+	if (bdpp_is_allowed()) {
+		while (count > 0) {
+			bdpp_internal_write_byte_to_drv_tx_packet(*data++);
+			count--;
+		}
 	}
 }
 
@@ -516,14 +529,16 @@ void bdpp_write_drv_tx_byte_with_usage(BYTE data) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_write_drv_tx_byte_with_usage(%02hX)\n", data);
 #endif
-	if (!bdpp_tx_build_packet) {
-		if (data >= 0x20 && data <= 0x7E) {
-			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
-		} else {
-			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+	if (bdpp_is_allowed()) {
+		if (!bdpp_tx_build_packet) {
+			if (data >= 0x20 && data <= 0x7E) {
+				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+			} else {
+				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+			}
 		}
+		bdpp_internal_write_byte_to_drv_tx_packet(data);
 	}
-	bdpp_write_byte_to_drv_tx_packet(data);
 }
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
@@ -537,14 +552,16 @@ void bdpp_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 #if DEBUG_STATE_MACHINE
 	printf("bdpp_write_drv_tx_bytes_with_usage(%p, %04hX) [%02hX]\n", data, count, *data);
 #endif
-	if (!bdpp_tx_build_packet) {
-		if (*data >= 0x20 && *data <= 0x7E) {
-			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
-		} else {
-			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+	if (bdpp_is_allowed()) {
+		if (!bdpp_tx_build_packet) {
+			if (*data >= 0x20 && *data <= 0x7E) {
+				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+			} else {
+				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+			}
 		}
+		bdpp_write_bytes_to_drv_tx_packet(data, count);
 	}
-	bdpp_write_bytes_to_drv_tx_packet(data, count);
 }
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
