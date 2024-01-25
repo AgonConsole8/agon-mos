@@ -29,6 +29,7 @@
 #define TRUE  1
 #endif
 
+extern void uart0_handler(void);
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 
@@ -235,7 +236,7 @@ BOOL bdpp_enable() {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
-			set_vector(UART0_IVECT, bddp_handler);
+			set_vector(UART0_IVECT, bdpp_handler);
 		}
 		return TRUE;
 	} else {
@@ -247,7 +248,7 @@ BOOL bdpp_enable() {
 //
 BOOL bdpp_disable() {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
-		if (!dpp_driver_flags & BDPP_FLAG_ENABLED) {
+		if (!bdpp_driver_flags & BDPP_FLAG_ENABLED) {
 			bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, uart0_handler);
 		}
