@@ -236,15 +236,23 @@ BOOL bdpp_is_enabled() {
 // Enable BDDP mode
 //
 BOOL bdpp_enable() {
-	bdpp_driver_flags |= BDPP_FLAG_ENABLED;
-	return TRUE;
+	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
+		bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+		return TRUE;
+	} else {
+		return FALSE;
+	}
 }
 
 // Disable BDDP mode
 //
 BOOL bdpp_disable() {
-	bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
-	return TRUE;
+	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
+		bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
+		return TRUE;
+	} else {
+		return FALSE;
+	}
 }
 
 // Initialize an outgoing driver-owned packet, if one is available
