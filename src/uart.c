@@ -29,6 +29,8 @@
 #include <gpio.h>
 
 #include "uart.h"
+
+extern void UART0_wait_CTS();
  
 // Set the Line Control Register for data, stop and parity bits
 //
@@ -148,6 +150,7 @@ void close_UART1() {
 // Write to UART0 transmitter holding register
 //
 void UART0_write_thr(BYTE data) {
+	UART0_wait_CTS();
 	UART0_THR = data;
 }
 

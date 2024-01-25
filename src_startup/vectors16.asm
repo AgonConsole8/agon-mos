@@ -38,7 +38,7 @@
 			XREF	mos_api
 			XREF	UART0_serial_PUTCH 
 			XREF	SET_AHL24
-			XREF	bddp_api
+			XREF	bdpp_api
 
 NVECTORS 		EQU 48			; Number of interrupt vectors
 
@@ -160,7 +160,7 @@ _rst_18_handler_1:	LD 	A, (HL)			; Fetch the character
 ; which is passed to RST 20 in register A.
 ;
 _rst_20_handler:
-			CALL	bddp_api
+			CALL	bdpp_api
 			RET.L
 
 ; Default Non-Maskable Interrupt handler

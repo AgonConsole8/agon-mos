@@ -28,7 +28,9 @@
 			XDEF	UART1_serial_TX
 			XDEF	UART1_serial_RX
 			XDEF	UART1_serial_GETCH
-			XDEF	UART1_serial_PUTCH 
+			XDEF	UART1_serial_PUTCH
+			XDEF	UART0_wait_CTS
+			XDEF	_UART0_wait_CTS
 
 			XDEF	_putch
 			XDEF	_getch 
@@ -37,6 +39,8 @@
 			XDEF	getch 
 
 			XREF	_serialFlags	; In globals.asm
+			XREF	_bdpp_driver_flags
+			XREF	_bdpp_write_drv_tx_byte_with_usage
 				
 UART0_PORT		EQU	%C0		; UART0
 UART1_PORT		EQU	%D0		; UART1
@@ -76,6 +80,7 @@ UART_LSR_RDY		EQU	%01		; Data ready
 
 ; Check whether we're clear to send (UART0 only)
 ;
+_UART0_wait_CTS:
 UART0_wait_CTS:		GET_GPIO	PD_DR, 8		; Check Port D, bit 3 (CTS)
 			JR		NZ, UART0_wait_CTS
 			RET
@@ -194,7 +199,9 @@ $$:			CALL 		UART1_serial_RX
 			JR		NC,$B
 			RET 
 
-; Write a character to UART0 (blocking)
+; Write a character to UART0 (blocking),
+; or to a BDDP packet (possibly blocking)
+;
 ; Parameters:
 ; - A: Character to write out
 ; Returns:
@@ -202,6 +209,15 @@ $$:			CALL 		UART1_serial_RX
 ; - F: NC if UART not enabled
 ;
 UART0_serial_PUTCH:	PUSH	AF
+			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
+			AND	03h						; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
+			CP	A, 03h					; Are we in packet mode?
+			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
+			PUSH AF						; Set parameter for next call
+			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
+			RET
+			
+UART0_serial_PUTCH_1:
 			LD	A, (_serialFlags)		; Get the serial flags
 			TST	01h				; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip

@@ -176,7 +176,7 @@ int main(void) {
 		printf(" Build %s", VERSION_BUILD);
 	#endif
 
-	printf("\n\rProtocol versions: EZ80 (%02hX), ESP32 (%02hX)\n\r",
+	printf("\n\rProtocol versions: MOS(%hu), VDP(%hu)\n\r",
 			(((BYTE)gp) & 0x0F), (((BYTE)gp) >> 4));
 
 	#if	DEBUG > 0

@@ -108,9 +108,11 @@ BYTE UART0_read_rbr() {
 }
 
 BYTE UART0_read_iir() {
-	BYTE data = uart_ier & UART_IER_TRANSMITINT;
+	BYTE data = 0;
 	if (any_more_incoming()) {
-		data |= UART_IER_RECEIVEINT;
+		data = UART_IIR_LINESTATUS;
+	} else if (uart_ier & UART_IER_TRANSMITINT) {
+		data = UART_IIR_TRANSBUFFEREMPTY;
 	}
 	printf("UART0_read_iir() -> %02hX\n", data);
 	return data;
@@ -495,6 +497,27 @@ void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 	}
 }
 
+// Append a single data byte to a driver-owned, outgoing packet.
+// This is a potentially blocking call, and might wait for room for data.
+// If necessary this function initializes and uses a new packet. It
+// decides whether to use "print" data (versus "non-print" data) based on
+// the value of the data. To guarantee that the packet usage flags are
+// set correctly, be sure to flush the packet before switching from "print"
+// to "non-print", or vice versa.
+void bdpp_write_drv_tx_byte_with_usage(BYTE data) {
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_write_drv_tx_byte_with_usage(%02hX)\n", data);
+#endif
+	if (!bdpp_tx_build_packet) {
+		if (data >= 0x20 && data <= 0x7E) {
+			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+		} else {
+			bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+		}
+	}
+	bdpp_write_byte_to_drv_tx_packet(data);
+}
+
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
 // If necessary this function initializes and uses additional packets. It
@@ -502,9 +525,9 @@ void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
-void bdpp_write_drv_tx_data_with_usage(const BYTE* data, WORD count) {
+void bdpp_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_write_drv_tx_data_with_usage(%p, %04hX) [%02hX]\n", data, count, *data);
+	printf("bdpp_write_drv_tx_bytes_with_usage(%p, %04hX) [%02hX]\n", data, count, *data);
 #endif
 	if (!bdpp_tx_build_packet) {
 		if (*data >= 0x20 && *data <= 0x7E) {
@@ -759,7 +782,7 @@ int main() {
 		}
 
 		if (i == 1) {
-			bdpp_write_drv_tx_data_with_usage(drv_outgoing, sizeof(drv_outgoing));
+			bdpp_write_drv_tx_bytes_with_usage(drv_outgoing, sizeof(drv_outgoing));
 			bdpp_flush_drv_tx_packet();
 		} else if (i == 3) {
 			bdpp_prepare_rx_app_packet(3, 10, data);
