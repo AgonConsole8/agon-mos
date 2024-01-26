@@ -7,9 +7,10 @@
 // Modinfo:
 // 20/01/2024:	Created initial version of protocol.
 
-#include <defines.h>
+#ifndef BDP_PROTOCOL_H
+#define BDP_PROTOCOL_H
 
-//---------------------------------------------------------------------------
+#include <defines.h>
 
 #define EZ80_COMM_PROTOCOL_VERSION		0x04	// Range is 0x04 to 0x0F, for future enhancements
 
@@ -150,3 +151,5 @@ void bdpp_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 void bdpp_flush_drv_tx_packet();
+
+#endif // BDP_PROTOCOL_H

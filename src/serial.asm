@@ -213,7 +213,6 @@ UART0_serial_PUTCH:	PUSH	AF
 			AND	03h						; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
 			CP	A, 03h					; Are we in packet mode?
 			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
-			PUSH AF						; Set parameter for next call
 			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
 			RET
 			

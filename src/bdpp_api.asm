@@ -67,7 +67,7 @@ bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 			JR	Z, signature_7	; Go if yes
 			CP	8			; Signature #8?
 			JR	Z, signature_8	; Go if yes
-			JP	end_fcn		; Quit
+			RET				; Quit
 
 bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
 			DW	1, _bdpp_is_enabled						; 0x01 signature 1
@@ -148,5 +148,4 @@ signature_8: ; WORD fcn(BYTE index);
 			POP		BC		; Packet Index
 			RET
 
-end_fcn:	RET
 jmp_fcn:	JP	(HL)		; Jump to the function
