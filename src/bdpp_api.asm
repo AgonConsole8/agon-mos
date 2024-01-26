@@ -17,11 +17,6 @@
 			
 			XDEF	bdpp_api	
 
-			XREF	SWITCH_A		; In misc.asm
-			XREF	SET_AHL24
-			XREF	GET_AHL24
-			XREF	SET_ADE24
-
 			XREF	_bdpp_is_allowed					; 0x00
 			XREF	_bdpp_is_enabled					; 0x01
 			XREF	_bdpp_enable						; 0x02
@@ -48,7 +43,6 @@
 ; - BC: Packet Index
 ; -  A: BDPP function code
 ;
- XREF _bdpp_tx_byte_count
 bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 			SLA	A			; Multiply A by two (equals A*2)
 			SLA	A			; Multiply A by two again (equals A*4)
@@ -56,8 +50,7 @@ bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 			LD	A, (HL)		; Get signature number
 			INC	HL			; Increment table pointer by 2
 			INC	HL			;   to reach function address
-			LD  HL, (HL)	; Get a function address from the table
-
+			LD.S HL, (HL)	; Get a function address from the table
 			CP	1			; Signature #1?
 			JR	Z, signature_1	; Go if yes
 			CP	2			; Signature #2?
