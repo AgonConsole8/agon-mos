@@ -39,8 +39,9 @@
 ;
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes
-; - DE: Packet Flags or Data byte
-; - BC: Packet Index
+; -  D: Data byte
+; -  C: Packet Flags
+; -  B: Packet Index
 ; -  A: BDPP function code
 ;
 bdpp_api:	LD	HL, bdpp_table ; Get address of table below
@@ -88,8 +89,9 @@ bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
 
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes
-; - DE: Packet Flags or Data byte
-; - BC: Packet Index
+; -  D: Data byte
+; -  C: Packet Flags
+; -  B: Packet Index
 ; -  A: BDPP function code
 
 signature_1: ; BOOL fcn();
@@ -97,6 +99,7 @@ signature_1: ; BOOL fcn();
 			RET
 
 signature_2: ; BOOL fcn(BYTE index);
+			LD		C, B	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
@@ -107,6 +110,7 @@ signature_3: ; void fcn();
 			RET
 
 signature_4: ; void fcn(BYTE data);
+			LD		E, D	; Move data to lower byte
 			PUSH	DE		; Data byte
 			CALL	jmp_fcn	; Call the intended function
 			POP		DE		; Data byte
@@ -123,6 +127,7 @@ signature_5: ; void fcn(const BYTE* data, WORD size);
 signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
+			LD		C, B	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
@@ -133,16 +138,18 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 signature_7: ; BOOL fcn(BYTE index, BYTE flags, const BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
-			PUSH	DE		; Packet Flags
+			PUSH	BC		; Packet Flags
+			LD		C, B	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
-			POP		DE		; Packet Flags
+			POP		BC		; Packet Flags
 			POP		IX		; Data address
 			POP		IY		; Buffer size
 			RET
 
 signature_8: ; WORD fcn(BYTE index);
+			LD		C, B	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
