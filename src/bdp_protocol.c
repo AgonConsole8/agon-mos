@@ -791,6 +791,7 @@ void bdp_protocol() {
 #if DEBUG_STATE_MACHINE
 	printf("bdp_protocol()\n");
 #endif
+	BYTE dummy = UART0_read_iir();
 	bdpp_run_rx_state_machine();
 	bdpp_run_tx_state_machine();
 }

@@ -214,6 +214,7 @@ UART0_serial_PUTCH:	PUSH	AF
 			CP	A, 03h					; Are we in packet mode?
 			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
 			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
+			POP	AF						; Remove the parameter from the stack
 			RET
 			
 UART0_serial_PUTCH_1:
