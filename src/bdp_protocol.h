@@ -93,13 +93,13 @@ BDPP_PACKET* bdpp_init_rx_drv_packet();
 
 // Queue an app-owned packet for transmission
 // This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, const BYTE* data);
+BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, const BYTE* data, WORD size);
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the
 // actual size of an incoming packet may be smaller, but not larger.
-BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data);
+BOOL bdpp_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
 
 // Check whether an outgoing app-owned packet has been transmitted
 BOOL bdpp_is_tx_app_packet_done(BYTE index);

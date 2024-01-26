@@ -156,8 +156,13 @@ _rst_18_handler_1:	LD 	A, (HL)			; Fetch the character
 			JR 	_rst_18_handler_1	; Loop
 
 ; Perform an operation related to the BDPP
-; Stacked parameters vary according to the function code,
-; which is passed to RST 20 in register A.
+; Use of parameters varies according to the function code.
+;
+; - HLU: Data address
+; -  DE: Size of buffer or Count of bytes
+; -   C: Packet Flags
+; -   B: Packet Index
+; -   A: BDPP function code
 ;
 _rst_20_handler:
 			CALL	bdpp_api

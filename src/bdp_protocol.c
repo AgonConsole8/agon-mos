@@ -293,9 +293,9 @@ BDPP_PACKET* bdpp_init_rx_drv_packet() {
 // Queue an app-owned packet for transmission
 // This function can fail if the packet is presently involved in a data transfer.
 //
-BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, const BYTE* data) {
+BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, const BYTE* data, WORD size) {
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%04hX,%p)\n", index, flags, size, data);
+	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%p,%04hX)\n", index, flags, data, size);
 #endif
 	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
@@ -323,9 +323,9 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, WORD size, const BYTE* dat
 // The given size is a maximum, based on app memory allocation, and the
 // actual size of an incoming packet may be smaller, but not larger.
 //
-BOOL bdpp_prepare_rx_app_packet(BYTE index, WORD size, BYTE* data) {
+BOOL bdpp_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size) {
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_prepare_rx_app_packet(%02hX,%04hX,%p)\n", index, size, data);
+	printf("bdpp_prepare_rx_app_packet(%02hX,%p,%04hX)\n", index, data, size);
 #endif
 	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
