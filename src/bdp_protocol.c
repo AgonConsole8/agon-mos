@@ -772,10 +772,10 @@ void bdpp_run_tx_state_machine() {
 				UART0_write_thr(BDPP_PACKET_END_MARKER);
 				bdpp_tx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 				bdpp_tx_packet->flags |= BDPP_PKT_FLAG_DONE;
-				if ((bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
+				if (!(bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {
 					push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_tx_packet);
-					bdpp_tx_packet = NULL;
 				}
+				bdpp_tx_packet = NULL;
 				bdpp_tx_state = BDPP_TX_STATE_IDLE;
 			} break;
 		}

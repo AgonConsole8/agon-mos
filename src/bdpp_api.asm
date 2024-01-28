@@ -100,6 +100,7 @@ signature_1: ; BOOL fcn();
 
 signature_2: ; BOOL fcn(BYTE index);
 			LD		C, B	; Move index to lower byte
+			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
@@ -111,6 +112,7 @@ signature_3: ; void fcn();
 
 signature_4: ; void fcn(BYTE data);
 			LD		E, D	; Move data to lower byte
+			LD		D, 0	; Clear other parameter bits
 			PUSH	DE		; Data byte
 			CALL	jmp_fcn	; Call the intended function
 			POP		DE		; Data byte
@@ -128,6 +130,7 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
 			LD		C, B	; Move index to lower byte
+			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
@@ -138,8 +141,10 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 signature_7: ; BOOL fcn(BYTE index, BYTE flags, const BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
+			LD		E, B	; Save Packet Index
+			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Flags
-			LD		C, B	; Move index to lower byte
+			LD		C, E	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index
@@ -150,6 +155,7 @@ signature_7: ; BOOL fcn(BYTE index, BYTE flags, const BYTE* data, WORD size);
 
 signature_8: ; WORD fcn(BYTE index);
 			LD		C, B	; Move index to lower byte
+			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet Index

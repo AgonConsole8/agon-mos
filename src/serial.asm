@@ -208,24 +208,29 @@ $$:			CALL 		UART1_serial_RX
 ; - F: C if written
 ; - F: NC if UART not enabled
 ;
-UART0_serial_PUTCH:	PUSH	AF
+UART0_serial_PUTCH:	LD C, A				; Save character in C (lower 8 bits of parameter)
 			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
-			AND	03h						; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
+			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
 			CP	A, 03h					; Are we in packet mode?
 			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
+			PUSH HL
+			LD B, 0						; Clear upper middle 8 bits of parameter
+			PUSH BC						; Set 24-bit parameter for C call
 			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
-			POP	AF						; Remove the parameter from the stack
+			POP BC						; Unstack the parameter
+			POP HL						; Restore HL for the caller
+			SCF							; Indicate character written
 			RET
 			
 UART0_serial_PUTCH_1:
 			LD	A, (_serialFlags)		; Get the serial flags
-			TST	01h				; Check UART is enabled
+			TST	01h						; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip
-			TST	02h				; If hardware flow control enabled then
-			CALL	NZ, UART0_wait_CTS		; Wait for clear to send signal
-			POP	AF
-$$:			CALL	UART0_serial_TX			; Send the character
-			JR	NC, $B				; Repeat until sent
+			TST	02h						; If hardware flow control enabled then
+			CALL	NZ, UART0_wait_CTS	; Wait for clear to send signal
+			LD	A, C					; Restore character to A
+$$:			CALL	UART0_serial_TX		; Send the character
+			JR	NC, $B					; Repeat until sent
 			RET
 
 ; Write a character to UART1 (blocking)
