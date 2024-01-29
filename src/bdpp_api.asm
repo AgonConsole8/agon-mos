@@ -33,7 +33,23 @@
 			XREF	_bdpp_write_drv_tx_byte_with_usage	; 0x0D
 			XREF	_bdpp_write_drv_tx_bytes_with_usage	; 0x0E
 			XREF	_bdpp_flush_drv_tx_packet			; 0x0F
+			XREF	_bdpp_is_busy						; 0x10
 
+
+ XREF UART0_serial_TX
+dbg:
+	PUSH HL
+	PUSH IX
+	PUSH IY
+	PUSH DE
+	PUSH BC
+	CALL UART0_serial_TX
+	POP BC
+	POP DE
+	POP IY
+	POP IX
+	POP HL
+	RET
 
 ; Call a BDPP API function
 ;
@@ -44,7 +60,11 @@
 ; -  B: Packet Index
 ; -  A: BDPP function code
 ;
-bdpp_api:	LD	HL, bdpp_table ; Get address of table below
+bdpp_api:	PUSH AF
+			ADD A,'a'
+			CALL dbg
+			POP AF
+			LD	HL, bdpp_table ; Get address of table below
 			SLA	A			; Multiply A by two (equals A*2)
 			SLA	A			; Multiply A by two again (equals A*4)
 			ADD8U_HL 		; Add to HL (macro)
@@ -86,6 +106,7 @@ bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
 			DW	4, _bdpp_write_drv_tx_byte_with_usage	; 0x0D signature 4
 			DW	5, _bdpp_write_drv_tx_bytes_with_usage	; 0x0E signature 5
 			DW	3, _bdpp_flush_drv_tx_packet			; 0x0F signature 3
+			DW	1, _bdpp_is_busy						; 0x10 signature 1
 
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes

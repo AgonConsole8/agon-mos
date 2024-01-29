@@ -214,10 +214,16 @@ UART0_serial_PUTCH:	LD C, A				; Save character in C (lower 8 bits of parameter)
 			CP	A, 03h					; Are we in packet mode?
 			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
 			PUSH HL
+			PUSH IX
+			PUSH IY
+			PUSH DE
 			LD B, 0						; Clear upper middle 8 bits of parameter
 			PUSH BC						; Set 24-bit parameter for C call
 			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
 			POP BC						; Unstack the parameter
+			POP DE
+			POP IY
+			POP IX
 			POP HL						; Restore HL for the caller
 			SCF							; Indicate character written
 			RET

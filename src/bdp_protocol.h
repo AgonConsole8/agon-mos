@@ -81,6 +81,9 @@ BOOL bdpp_is_allowed();
 // Get whether BDPP is presently enabled
 BOOL bdpp_is_enabled();
 
+// Get whether BDPP is presently busy (TX or RX)
+BOOL bdpp_is_busy();
+
 // Enable BDDP mode
 BOOL bdpp_enable();
 

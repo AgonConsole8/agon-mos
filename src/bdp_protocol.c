@@ -230,6 +230,21 @@ BOOL bdpp_is_enabled() {
 	return ((bdpp_driver_flags & BDPP_FLAG_ENABLED) != 0);
 }
 
+// Get whether the BDPP driver is busy (TX or RX)
+//
+BOOL bdpp_is_busy() {
+	BOOL rc;
+	DI();
+	rc = (bdpp_tx_state != BDPP_TX_STATE_IDLE ||
+		bdpp_rx_state != BDPP_RX_STATE_AWAIT_START ||
+		bdpp_tx_packet != NULL ||
+		bdpp_rx_packet != NULL ||
+		bdpp_tx_pkt_head != NULL ||
+		bdpp_tx_build_packet != NULL);
+	EI();
+	return rc;
+}
+
 // Enable BDDP mode
 //
 BOOL bdpp_enable() {
@@ -248,7 +263,8 @@ BOOL bdpp_enable() {
 //
 BOOL bdpp_disable() {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
-		if (!bdpp_driver_flags & BDPP_FLAG_ENABLED) {
+		if (bdpp_driver_flags & BDPP_FLAG_ENABLED) {
+			while (bdpp_is_busy()); // wait for BDPP to be fully idle
 			bdpp_driver_flags &= ~BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, uart0_handler);
 		}
