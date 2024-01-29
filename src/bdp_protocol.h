@@ -26,13 +26,16 @@
 #define BDPP_PACKET_END_MARKER			0xAE
 
 #define BDPP_RX_STATE_AWAIT_START		0x01	// Waiting for the packet start marker
-#define BDPP_RX_STATE_AWAIT_FLAGS		0x02	// Waiting for the packet flags
-#define BDPP_RX_STATE_AWAIT_INDEX		0x03	// Waiting for the packet index
-#define BDPP_RX_STATE_AWAIT_SIZE_1		0x04	// Waiting for the packet size, part 1
-#define BDPP_RX_STATE_AWAIT_SIZE_2		0x05	// Waiting for the packet size, part 2
-#define BDPP_RX_STATE_AWAIT_DATA_ESC	0x06	// Waiting for a packet data byte or escape
-#define BDPP_RX_STATE_AWAIT_DATA		0x07	// Waiting for a packet data byte only
-#define BDPP_RX_STATE_AWAIT_END			0x08	// Waiting for the packet end marker
+#define BDPP_RX_STATE_AWAIT_ESC_FLAGS	0x02	// Waiting for the escape or packet flags
+#define BDPP_RX_STATE_AWAIT_FLAGS		0x03	// Waiting for the packet flags
+#define BDPP_RX_STATE_AWAIT_INDEX		0x04	// Waiting for the packet index
+#define BDPP_RX_STATE_AWAIT_ESC_SIZE_1	0x05	// Waiting for the escape or packet size, part 1
+#define BDPP_RX_STATE_AWAIT_SIZE_1		0x06	// Waiting for the packet size, part 1
+#define BDPP_RX_STATE_AWAIT_ESC_SIZE_2	0x07	// Waiting for the escape or packet size, part 2
+#define BDPP_RX_STATE_AWAIT_SIZE_2		0x08	// Waiting for the packet size, part 2
+#define BDPP_RX_STATE_AWAIT_ESC_DATA	0x09	// Waiting for escape or a packet data byte
+#define BDPP_RX_STATE_AWAIT_DATA		0x0A	// Waiting for a packet data byte only
+#define BDPP_RX_STATE_AWAIT_END			0x0B	// Waiting for the packet end marker
 
 #define BDPP_TX_STATE_IDLE				0x20	// Doing nothing (not transmitting)
 #define BDPP_TX_STATE_SENT_START		0x21	// Recently sent the packet start marker

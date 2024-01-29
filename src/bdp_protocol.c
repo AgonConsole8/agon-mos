@@ -617,6 +617,14 @@ void bdpp_run_rx_state_machine() {
 				}
 			} break;
 
+			case BDPP_RX_STATE_AWAIT_ESC_FLAGS: {
+				if (incoming_byte == BDPP_PACKET_ESCAPE) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_FLAGS;
+					break;
+				}
+				// else fall through
+			}
+
 			case BDPP_RX_STATE_AWAIT_FLAGS: {
 				bdpp_rx_hold_pkt_flags =
 					(incoming_byte & BDPP_PKT_FLAG_USAGE_BITS) |
@@ -651,10 +659,26 @@ void bdpp_run_rx_state_machine() {
 				
 			} break;
 
+			case BDPP_RX_STATE_AWAIT_ESC_SIZE_1: {
+				if (incoming_byte == BDPP_PACKET_ESCAPE) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_1;
+					break;
+				}
+				// else fall through
+			}
+
 			case BDPP_RX_STATE_AWAIT_SIZE_1: {
 				bdpp_rx_byte_count = (WORD)incoming_byte;
 				bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_2;
 			} break;
+
+			case BDPP_RX_STATE_AWAIT_ESC_SIZE_2: {
+				if (incoming_byte == BDPP_PACKET_ESCAPE) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_2;
+					break;
+				}
+				// else fall through
+			}
 
 			case BDPP_RX_STATE_AWAIT_SIZE_2: {
 				bdpp_rx_byte_count |= (((WORD)incoming_byte) << 8);
@@ -663,20 +687,16 @@ void bdpp_run_rx_state_machine() {
 				} else if (bdpp_rx_byte_count == 0) {
 					bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
 				} else {
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_DATA_ESC;
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_DATA;
 				}
 			} break;
 
-			case BDPP_RX_STATE_AWAIT_DATA_ESC: {
+			case BDPP_RX_STATE_AWAIT_ESC_DATA: {
 				if (incoming_byte == BDPP_PACKET_ESCAPE) {
 					bdpp_rx_state = BDPP_RX_STATE_AWAIT_DATA;
-				} else {
-					(bdpp_rx_packet->data)[bdpp_rx_packet->act_size++] = incoming_byte;
-					if (--bdpp_rx_byte_count == 0) {
-						// All data bytes received
-						bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
-					}
+					break;
 				}
+				// else fall through
 			} break;
 
 			case BDPP_RX_STATE_AWAIT_DATA: {
