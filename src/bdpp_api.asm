@@ -36,21 +36,6 @@
 			XREF	_bdpp_is_busy						; 0x10
 
 
- XREF UART0_serial_TX
-dbg:
-	PUSH HL
-	PUSH IX
-	PUSH IY
-	PUSH DE
-	PUSH BC
-	CALL UART0_serial_TX
-	POP BC
-	POP DE
-	POP IY
-	POP IX
-	POP HL
-	RET
-
 ; Call a BDPP API function
 ;
 ; - IX: Data address
@@ -60,11 +45,7 @@ dbg:
 ; -  B: Packet Index
 ; -  A: BDPP function code
 ;
-bdpp_api:	PUSH AF
-			ADD A,'a'
-			CALL dbg
-			POP AF
-			LD	HL, bdpp_table ; Get address of table below
+bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 			SLA	A			; Multiply A by two (equals A*2)
 			SLA	A			; Multiply A by two again (equals A*4)
 			ADD8U_HL 		; Add to HL (macro)
