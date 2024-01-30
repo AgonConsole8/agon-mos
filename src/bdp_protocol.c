@@ -342,36 +342,6 @@ BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD s
 	return FALSE;
 }
 
-// Prepare an app-owned packet for transmission
-// The packet is expected to be empty when this function is called.
-// Various BASIC commands (VDU, PRINT, PLOT, etc.) are used to fill it.
-// This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_prepare_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size) {
-	BYTE index;
-#if DEBUG_STATE_MACHINE
-	printf("bdpp_prepare_tx_app_packet(%02hX,%02hX,%p,%04hX)\n", indexes, flags, data, size);
-#endif
-	index = indexes & BDPP_PACKET_INDEX_BITS;
-	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
-		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
-		DI();
-		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
-			EI();
-			return FALSE;
-		}
-		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_READY);
-		flags |= BDPP_PKT_FLAG_APP_OWNED;
-		packet->flags = flags;
-		packet->indexes = indexes;
-		packet->max_size = size;
-		packet->act_size = 0;
-		packet->data = (BYTE*)data;
-		EI();
-		return TRUE;
-	}
-	return FALSE;
-}
-
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the

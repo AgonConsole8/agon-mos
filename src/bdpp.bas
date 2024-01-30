@@ -123,9 +123,8 @@
 50175 LD C,A
 50176 RET
 50178 ]
-50198 REM -- bdppFcn7% --
-50199 REM BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
-50200 REM BOOL bdpp_prepare_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
+50199 REM -- bdppFcn7% --
+50200 REM BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 50201 bdppFcn7%=P%
 50202 [OPT 2
 50203 LD HL,size%: DEFB &ED: DEFB &37

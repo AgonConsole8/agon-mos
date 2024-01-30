@@ -112,12 +112,6 @@ BDPP_PACKET* bdpp_init_rx_drv_packet();
 // This function can fail if the packet is presently involved in a data transfer.
 BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 
-// Prepare an app-owned packet for transmission
-// The packet is expected to be empty when this function is called.
-// Various BASIC commands (VDU, PRINT, PLOT, etc.) are used to fill it.
-// This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_prepare_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
-
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the
