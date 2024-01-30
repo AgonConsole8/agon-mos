@@ -39,21 +39,22 @@ BYTE bdpp_driver_flags;	// Flags controlling the driver
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
 BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet list
 
-BYTE bdpp_tx_state; // Driver transmitter state
-BDPP_PACKET* bdpp_tx_packet; // Points to the packet being transmitted
+BYTE bdpp_tx_state; 			// Driver transmitter state
+BDPP_PACKET* bdpp_tx_packet; 	// Points to the packet being transmitted
 BDPP_PACKET* bdpp_tx_build_packet; // Points to the packet being built
-WORD bdpp_tx_byte_count; // Number of data bytes transmitted
-BYTE bdpp_tx_next_pkt_flags; // Flags for the next transmitted packet, possibly
-BDPP_PACKET* bdpp_tx_pkt_head; // Points to head of transmit packet list
-BDPP_PACKET* bdpp_tx_pkt_tail; // Points to tail of transmit packet list
+WORD bdpp_tx_byte_count; 		// Number of data bytes transmitted
+BYTE bdpp_tx_next_pkt_flags; 	// Flags for the next transmitted packet, possibly
+BYTE bdpp_tx_next_stream;  		// Index of the next stream to use
+BDPP_PACKET* bdpp_tx_pkt_head; 	// Points to head of transmit packet list
+BDPP_PACKET* bdpp_tx_pkt_tail; 	// Points to tail of transmit packet list
 
-BYTE bdpp_rx_state; // Driver receiver state
-BDPP_PACKET* bdpp_rx_packet; // Points to the packet being received
-WORD bdpp_rx_byte_count; // Number of data bytes left to receive
-BYTE bdpp_rx_hold_pkt_flags; // Flags for the received packet
+BYTE bdpp_rx_state; 			// Driver receiver state
+BDPP_PACKET* bdpp_rx_packet; 	// Points to the packet being received
+WORD bdpp_rx_byte_count; 		// Number of data bytes left to receive
+BYTE bdpp_rx_hold_pkt_flags; 	// Flags for the received packet
 
-BDPP_PACKET* bdpp_rx_pkt_head; // Points to head of receive packet list
-BDPP_PACKET* bdpp_rx_pkt_tail; // Points to tail of receive packet list
+BDPP_PACKET* bdpp_rx_pkt_head; 	// Points to head of receive packet list
+BDPP_PACKET* bdpp_rx_pkt_tail; 	// Points to tail of receive packet list
 
 // Header information for driver-owned small packets (TX and RX)
 BDPP_PACKET bdpp_drv_pkt_header[BDPP_MAX_DRIVER_PACKETS];
@@ -205,7 +206,7 @@ void bdpp_initialize_driver() {
 	
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
-		bdpp_drv_pkt_header[i].index = (BYTE)i;
+		bdpp_drv_pkt_header[i].indexes = (BYTE)i;
 		bdpp_drv_pkt_header[i].data = bdpp_drv_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
 						&bdpp_drv_pkt_header[i]);
@@ -213,7 +214,7 @@ void bdpp_initialize_driver() {
 	
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
-		bdpp_app_pkt_header[i].index = (BYTE)i;
+		bdpp_app_pkt_header[i].indexes = (BYTE)i;
 		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 }
@@ -245,10 +246,12 @@ BOOL bdpp_is_busy() {
 	return rc;
 }
 
-// Enable BDDP mode
+// Enable BDDP mode for a specific stream
 //
-BOOL bdpp_enable() {
-	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED) {
+BOOL bdpp_enable(BYTE stream) {
+	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED && stream < BDPP_MAX_STREAMS) {
+		bdpp_flush_drv_tx_packet();
+		bdpp_tx_next_stream = stream;
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, bdpp_handler);
@@ -277,10 +280,11 @@ BOOL bdpp_disable() {
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available.
 //
-BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags) {
+BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
 	if (packet) {
 		packet->flags = flags & BDPP_PKT_FLAG_USAGE_BITS;
+		packet->indexes = (packet->indexes & BDPP_PACKET_INDEX_BITS) | (stream << 4);
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
 		packet->act_size = 0;
 	}
@@ -307,12 +311,15 @@ BDPP_PACKET* bdpp_init_rx_drv_packet() {
 }
 
 // Queue an app-owned packet for transmission
+// The packet is expected to be full when this function is called.
 // This function can fail if the packet is presently involved in a data transfer.
 //
-BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, const BYTE* data, WORD size) {
+BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size) {
+	BYTE index;
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%p,%04hX)\n", index, flags, data, size);
+	printf("bdpp_queue_tx_app_packet(%02hX,%02hX,%p,%04hX)\n", indexes, flags, data, size);
 #endif
+	index = indexes & BDPP_PACKET_INDEX_BITS;
 	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
 		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
 		DI();
@@ -323,11 +330,42 @@ BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, const BYTE* data, WORD siz
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
 		packet->flags = flags;
+		packet->indexes = indexes;
 		packet->max_size = size;
 		packet->act_size = size;
 		packet->data = (BYTE*)data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
 		UART0_enable_interrupt(UART_IER_TRANSMITINT);
+		EI();
+		return TRUE;
+	}
+	return FALSE;
+}
+
+// Prepare an app-owned packet for transmission
+// The packet is expected to be empty when this function is called.
+// Various BASIC commands (VDU, PRINT, PLOT, etc.) are used to fill it.
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_prepare_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size) {
+	BYTE index;
+#if DEBUG_STATE_MACHINE
+	printf("bdpp_prepare_tx_app_packet(%02hX,%02hX,%p,%04hX)\n", indexes, flags, data, size);
+#endif
+	index = indexes & BDPP_PACKET_INDEX_BITS;
+	if (bdpp_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
+		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+		DI();
+		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
+			EI();
+			return FALSE;
+		}
+		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX|BDPP_PKT_FLAG_READY);
+		flags |= BDPP_PKT_FLAG_APP_OWNED;
+		packet->flags = flags;
+		packet->indexes = indexes;
+		packet->max_size = size;
+		packet->act_size = 0;
+		packet->data = (BYTE*)data;
 		EI();
 		return TRUE;
 	}
@@ -461,12 +499,12 @@ BOOL bdpp_stop_using_app_packet(BYTE index) {
 // If there is an existing packet being built, it will be flushed first.
 // This returns NULL if there is no packet available.
 //
-BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags) {
+BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet;
 	bdpp_flush_drv_tx_packet();
-	packet = bdpp_init_tx_drv_packet(flags);
+	packet = bdpp_init_tx_drv_packet(flags, stream);
 #if DEBUG_STATE_MACHINE
-	printf("bdpp_start_drv_tx_packet(%02hX) -> %p\n", flags, packet);
+	printf("bdpp_start_drv_tx_packet(%02hX, %02hX) -> %p\n", flags, stream, packet);
 #endif
 	return packet;
 }
@@ -507,7 +545,7 @@ static void bdpp_internal_write_byte_to_drv_tx_packet(BYTE data) {
 			}
 			break;
 		} else {
-			bdpp_tx_build_packet = bdpp_init_tx_drv_packet(bdpp_tx_next_pkt_flags);
+			bdpp_tx_build_packet = bdpp_init_tx_drv_packet(bdpp_tx_next_pkt_flags, bdpp_tx_next_stream);
 		}
 	}
 }
@@ -591,6 +629,7 @@ void bdpp_flush_drv_tx_packet() {
 		printf("bdpp_flush_drv_tx_packet(%p)\n", bdpp_tx_build_packet);
 #endif
 		bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
+		bdpp_tx_next_stream = (bdpp_tx_build_packet->indexes >> 4);
 		bdpp_internal_flush_drv_tx_packet();
 		bdpp_tx_next_pkt_flags = 0;
 	}
@@ -642,6 +681,14 @@ void bdpp_run_rx_state_machine() {
 					}
 				}
 			} break;
+
+			case BDPP_RX_STATE_AWAIT_ESC_INDEX: {
+				if (incoming_byte == BDPP_PACKET_ESCAPE) {
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_INDEX;
+					break;
+				}
+				// else fall through
+			}
 
 			case BDPP_RX_STATE_AWAIT_INDEX: {
 				if (incoming_byte < BDPP_MAX_APP_PACKETS) {
@@ -765,7 +812,7 @@ void bdpp_run_tx_state_machine() {
 
 			case BDPP_TX_STATE_SENT_FLAGS: {
 				if (bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) {
-					UART0_write_thr(bdpp_tx_packet->index);
+					UART0_write_thr(bdpp_tx_packet->indexes);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_INDEX;
 				} else {
 					UART0_write_thr((BYTE)bdpp_tx_packet->act_size);

@@ -34,6 +34,7 @@
 			XREF	_bdpp_write_drv_tx_bytes_with_usage	; 0x0E
 			XREF	_bdpp_flush_drv_tx_packet			; 0x0F
 			XREF	_bdpp_is_busy						; 0x10
+			XREF	_bdpp_prepare_tx_app_packet			; 0x11
 
 
 ; Call a BDPP API function
@@ -73,7 +74,7 @@ bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 
 bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
 			DW	1, _bdpp_is_enabled						; 0x01 signature 1
-			DW	1, _bdpp_enable							; 0x02 signature 1
+			DW	2, _bdpp_enable							; 0x02 signature 2
 			DW	1, _bdpp_disable						; 0x03 signature 1
 			DW	7, _bdpp_queue_tx_app_packet			; 0x04 signature 7
 			DW	6, _bdpp_prepare_rx_app_packet			; 0x05 signature 6
@@ -88,12 +89,13 @@ bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
 			DW	5, _bdpp_write_drv_tx_bytes_with_usage	; 0x0E signature 5
 			DW	3, _bdpp_flush_drv_tx_packet			; 0x0F signature 3
 			DW	1, _bdpp_is_busy						; 0x10 signature 1
+			DW	7, _bdpp_prepare_tx_app_packet			; 0x11 signature 7
 
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes
 ; -  D: Data byte
 ; -  C: Packet Flags
-; -  B: Packet Index
+; -  B: Packet/Stream Index
 ; -  A: BDPP function code
 
 signature_1: ; BOOL fcn();
@@ -105,7 +107,7 @@ signature_2: ; BOOL fcn(BYTE index);
 			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
-			POP		BC		; Packet Index
+			POP		BC		; Packet/Stream Index
 			RET
 
 signature_3: ; void fcn();
@@ -140,7 +142,7 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 			POP		IY		; Buffer size
 			RET
 
-signature_7: ; BOOL fcn(BYTE index, BYTE flags, const BYTE* data, WORD size);
+signature_7: ; BOOL fcn(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
 			LD		E, B	; Save Packet Index
@@ -149,7 +151,7 @@ signature_7: ; BOOL fcn(BYTE index, BYTE flags, const BYTE* data, WORD size);
 			LD		C, E	; Move index to lower byte
 			PUSH	BC		; Packet Index
 			CALL	jmp_fcn	; Call the intended function
-			POP		BC		; Packet Index
+			POP		BC		; Packet/Stream Index
 			POP		BC		; Packet Flags
 			POP		IX		; Data address
 			POP		IY		; Buffer size

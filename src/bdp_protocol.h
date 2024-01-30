@@ -18,37 +18,43 @@
 #define BDPP_FLAG_ENABLED				0x02 	// Whether bidirectional protocol is presently enabled
 
 #define BDPP_SMALL_DATA_SIZE			32		// Maximum payload data length for small packet
-#define BDPP_MAX_DRIVER_PACKETS			4		// Maximum number of driver-owned small packets
-#define BDPP_MAX_APP_PACKETS			8		// Maximum number of app-owned packets
+#define BDPP_MAX_DRIVER_PACKETS			16		// Maximum number of driver-owned small packets
+#define BDPP_MAX_APP_PACKETS			16		// Maximum number of app-owned packets
+#define BDPP_MAX_STREAMS				16		// Maximum number of command/data streams
+
+#define BDPP_STREAM_INDEX_BITS			0xF0	// Upper nibble used for stream index
+#define BDPP_PACKET_INDEX_BITS			0x0F	// Lower nibble used for packet index
 
 #define BDPP_PACKET_START_MARKER		0x8C
 #define BDPP_PACKET_ESCAPE				0x9D
 #define BDPP_PACKET_END_MARKER			0xAE
 
 #define BDPP_RX_STATE_AWAIT_START		0x01	// Waiting for the packet start marker
-#define BDPP_RX_STATE_AWAIT_ESC_FLAGS	0x02	// Waiting for the escape or packet flags
+#define BDPP_RX_STATE_AWAIT_ESC_FLAGS	0x02	// Waiting for escape or the packet flags
 #define BDPP_RX_STATE_AWAIT_FLAGS		0x03	// Waiting for the packet flags
-#define BDPP_RX_STATE_AWAIT_INDEX		0x04	// Waiting for the packet index
-#define BDPP_RX_STATE_AWAIT_ESC_SIZE_1	0x05	// Waiting for the escape or packet size, part 1
-#define BDPP_RX_STATE_AWAIT_SIZE_1		0x06	// Waiting for the packet size, part 1
-#define BDPP_RX_STATE_AWAIT_ESC_SIZE_2	0x07	// Waiting for the escape or packet size, part 2
-#define BDPP_RX_STATE_AWAIT_SIZE_2		0x08	// Waiting for the packet size, part 2
-#define BDPP_RX_STATE_AWAIT_ESC_DATA	0x09	// Waiting for escape or a packet data byte
-#define BDPP_RX_STATE_AWAIT_DATA		0x0A	// Waiting for a packet data byte only
-#define BDPP_RX_STATE_AWAIT_END			0x0B	// Waiting for the packet end marker
+#define BDPP_RX_STATE_AWAIT_ESC_INDEX	0x04	// Waiting for escape or the packet index
+#define BDPP_RX_STATE_AWAIT_INDEX		0x05	// Waiting for the packet index
+#define BDPP_RX_STATE_AWAIT_ESC_SIZE_1	0x06	// Waiting for escape or the packet size, part 1
+#define BDPP_RX_STATE_AWAIT_SIZE_1		0x07	// Waiting for the packet size, part 1
+#define BDPP_RX_STATE_AWAIT_ESC_SIZE_2	0x08	// Waiting for escape or the packet size, part 2
+#define BDPP_RX_STATE_AWAIT_SIZE_2		0x09	// Waiting for the packet size, part 2
+#define BDPP_RX_STATE_AWAIT_ESC_DATA	0x0A	// Waiting for escape or a packet data byte
+#define BDPP_RX_STATE_AWAIT_DATA		0x0B	// Waiting for a packet data byte only
+#define BDPP_RX_STATE_AWAIT_END			0x0C	// Waiting for the packet end marker
 
 #define BDPP_TX_STATE_IDLE				0x20	// Doing nothing (not transmitting)
 #define BDPP_TX_STATE_SENT_START		0x21	// Recently sent the packet start marker
-#define BDPP_TX_STATE_SENT_ESC_FLAGS	0x22	// Recently sent escape for packet flags
+#define BDPP_TX_STATE_SENT_ESC_FLAGS	0x22	// Recently sent escape for the packet flags
 #define BDPP_TX_STATE_SENT_FLAGS		0x23	// Recently sent the packet flags
-#define BDPP_TX_STATE_SENT_INDEX		0x24	// Recently sent the packet index
-#define BDPP_TX_STATE_SENT_ESC_SIZE_1	0x25	// Recently sent escape for packet size, part 1
-#define BDPP_TX_STATE_SENT_SIZE_1		0x26	// Recently sent the packet size, part 1
-#define BDPP_TX_STATE_SENT_ESC_SIZE_2	0x27	// Recently sent escape for packet size, part 2
-#define BDPP_TX_STATE_SENT_SIZE_2		0x28	// Recently sent the packet size, part 2
-#define BDPP_TX_STATE_SENT_ESC_DATA		0x29	// Recently sent escape for data byte
-#define BDPP_TX_STATE_SENT_DATA			0x2A	// Recently sent a packet data byte
-#define BDPP_TX_STATE_SENT_ALL_DATA		0x2B	// Recently sent the last packet data byte
+#define BDPP_TX_STATE_SENT_ESC_INDEX	0x24	// Recently sent escape for the packet index
+#define BDPP_TX_STATE_SENT_INDEX		0x25	// Recently sent the packet index
+#define BDPP_TX_STATE_SENT_ESC_SIZE_1	0x26	// Recently sent escape for the packet size, part 1
+#define BDPP_TX_STATE_SENT_SIZE_1		0x27	// Recently sent the packet size, part 1
+#define BDPP_TX_STATE_SENT_ESC_SIZE_2	0x28	// Recently sent escape for the packet size, part 2
+#define BDPP_TX_STATE_SENT_SIZE_2		0x29	// Recently sent the packet size, part 2
+#define BDPP_TX_STATE_SENT_ESC_DATA		0x2A	// Recently sent escape for a data byte
+#define BDPP_TX_STATE_SENT_DATA			0x2B	// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_ALL_DATA		0x2C	// Recently sent the last packet data byte
 
 #define BDPP_PKT_FLAG_PRINT				0x00	// Indicates packet contains printable data
 #define BDPP_PKT_FLAG_COMMAND			0x01	// Indicates packet contains a command or request
@@ -68,7 +74,7 @@
 //
 typedef struct tag_BDPP_PACKET {
 	BYTE			flags;	// Flags describing the packet
-	BYTE			index;	// Index of the packet
+	BYTE			indexes; // Index of the packet (lower nibble) & stream (upper nibble)
 	WORD			max_size; // Maximum size of the data portion
 	WORD			act_size; // Actual size of the data portion
 	BYTE*			data;	// Address of the data bytes
@@ -87,23 +93,30 @@ BOOL bdpp_is_enabled();
 // Get whether BDPP is presently busy (TX or RX)
 BOOL bdpp_is_busy();
 
-// Enable BDDP mode
-BOOL bdpp_enable();
+// Enable BDDP mode for a specific stream
+BOOL bdpp_enable(BYTE stream);
 
 // Disable BDDP mode
 BOOL bdpp_disable();
 
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags);
+BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, BYTE stream);
 
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available
 BDPP_PACKET* bdpp_init_rx_drv_packet();
 
 // Queue an app-owned packet for transmission
+// The packet is expected to be full when this function is called.
 // This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_queue_tx_app_packet(BYTE index, BYTE flags, const BYTE* data, WORD size);
+BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
+
+// Prepare an app-owned packet for transmission
+// The packet is expected to be empty when this function is called.
+// Various BASIC commands (VDU, PRINT, PLOT, etc.) are used to fill it.
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_prepare_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
@@ -130,7 +143,7 @@ BOOL bdpp_stop_using_app_packet(BYTE index);
 // Start building a driver-owned, outgoing packet.
 // If there is an existing packet being built, it will be flushed first.
 // This returns NULL if there is no packet available.
-BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags);
+BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
