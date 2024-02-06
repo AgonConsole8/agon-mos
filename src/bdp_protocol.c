@@ -622,7 +622,7 @@ void bdpp_run_rx_state_machine() {
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
 				if (incoming_byte == BDPP_PACKET_START_MARKER) {
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_FLAGS;
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_FLAGS;
 				}
 			} break;
 
@@ -638,18 +638,7 @@ void bdpp_run_rx_state_machine() {
 				bdpp_rx_hold_pkt_flags =
 					(incoming_byte & BDPP_PKT_FLAG_USAGE_BITS) |
 					(BDPP_PKT_FLAG_FOR_RX | BDPP_PKT_FLAG_READY);
-				if (incoming_byte & BDPP_PKT_FLAG_APP_OWNED) {
-					// An index will be received for an app-owned packet.
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_INDEX;
-				} else {
-					// No index will be received for a driver-owned packet.
-					if (bdpp_rx_packet = bdpp_init_rx_drv_packet()) {
-						bdpp_rx_packet->flags = bdpp_rx_hold_pkt_flags;
-						bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_1;
-					} else {
-						reset_receiver();
-					}
-				}
+				bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_INDEX;
 			} break;
 
 			case BDPP_RX_STATE_AWAIT_ESC_INDEX: {
