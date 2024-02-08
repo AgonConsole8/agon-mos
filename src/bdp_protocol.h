@@ -25,9 +25,11 @@
 #define BDPP_STREAM_INDEX_BITS			0xF0	// Upper nibble used for stream index
 #define BDPP_PACKET_INDEX_BITS			0x0F	// Lower nibble used for packet index
 
-#define BDPP_PACKET_START_MARKER		0x8C
-#define BDPP_PACKET_ESCAPE				0x9D
-#define BDPP_PACKET_END_MARKER			0xAE
+#define BDPP_PACKET_START_MARKER		0x89	// Marks the beginning of a packet
+#define BDPP_PACKET_ESCAPE				0x8B	// Escapes a special protocol character
+#define BDPP_PACKET_START_SUBSTITUTE	0x8A	// Substitute for the packet start marker
+#define BDPP_PACKET_ESCAPE_SUBSTITUTE	0x8D	// Substitute for the packet escape character
+#define BDPP_PACKET_END_MARKER			0x89	// Marks the end of a packet
 
 #define BDPP_RX_STATE_AWAIT_START		0x01	// Waiting for the packet start marker
 #define BDPP_RX_STATE_AWAIT_ESC_FLAGS	0x02	// Waiting for escape or the packet flags
@@ -43,18 +45,23 @@
 #define BDPP_RX_STATE_AWAIT_END			0x0C	// Waiting for the packet end marker
 
 #define BDPP_TX_STATE_IDLE				0x20	// Doing nothing (not transmitting)
-#define BDPP_TX_STATE_SENT_START		0x21	// Recently sent the packet start marker
-#define BDPP_TX_STATE_SENT_ESC_FLAGS	0x22	// Recently sent escape for the packet flags
-#define BDPP_TX_STATE_SENT_FLAGS		0x23	// Recently sent the packet flags
-#define BDPP_TX_STATE_SENT_ESC_INDEX	0x24	// Recently sent escape for the packet index
-#define BDPP_TX_STATE_SENT_INDEX		0x25	// Recently sent the packet index
-#define BDPP_TX_STATE_SENT_ESC_SIZE_1	0x26	// Recently sent escape for the packet size, part 1
-#define BDPP_TX_STATE_SENT_SIZE_1		0x27	// Recently sent the packet size, part 1
-#define BDPP_TX_STATE_SENT_ESC_SIZE_2	0x28	// Recently sent escape for the packet size, part 2
-#define BDPP_TX_STATE_SENT_SIZE_2		0x29	// Recently sent the packet size, part 2
-#define BDPP_TX_STATE_SENT_ESC_DATA		0x2A	// Recently sent escape for a data byte
-#define BDPP_TX_STATE_SENT_DATA			0x2B	// Recently sent a packet data byte
-#define BDPP_TX_STATE_SENT_ALL_DATA		0x2C	// Recently sent the last packet data byte
+#define BDPP_TX_STATE_SENT_START_1		0x21	// Recently sent the packet start marker
+#define BDPP_TX_STATE_SENT_START_2		0x22	// Recently sent the packet start marker (again)
+#define BDPP_TX_STATE_SENT_ESC_FLAGS_SS	0x23	// Recently sent escape for the flags (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_FLAGS_ES	0x24	// Recently sent escape for the flags (escape substitute)
+#define BDPP_TX_STATE_SENT_FLAGS		0x25	// Recently sent the packet flags
+#define BDPP_TX_STATE_SENT_ESC_INDEX	0x26	// Recently sent escape for the packet index
+#define BDPP_TX_STATE_SENT_INDEX		0x27	// Recently sent the packet index
+#define BDPP_TX_STATE_SENT_ESC_SIZE_1_SS 0x28	// Recently sent escape for the size, part 1 (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_SIZE_1_ES 0x29	// Recently sent escape for the size, part 1 (escape substitute)
+#define BDPP_TX_STATE_SENT_SIZE_1		0x2A	// Recently sent the packet size, part 1
+#define BDPP_TX_STATE_SENT_ESC_SIZE_2_SS 0x2B	// Recently sent escape for the size, part 2 (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_SIZE_2_ES 0x2C	// Recently sent escape for the size, part 2 (escape substitute)
+#define BDPP_TX_STATE_SENT_SIZE_2		0x2D	// Recently sent the packet size, part 2
+#define BDPP_TX_STATE_SENT_ESC_DATA_SS	0x2E	// Recently sent escape for a data byte (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_DATA_ES	0x2F	// Recently sent escape for a data byte (escape substitute)
+#define BDPP_TX_STATE_SENT_DATA			0x30	// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_ALL_DATA		0x31	// Recently sent the last packet data byte
 
 #define BDPP_PKT_FLAG_PRINT				0x00	// Indicates packet contains printable data
 #define BDPP_PKT_FLAG_COMMAND			0x01	// Indicates packet contains a command or request
