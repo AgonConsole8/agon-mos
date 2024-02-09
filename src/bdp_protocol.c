@@ -32,6 +32,7 @@
 extern void uart0_handler(void);
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
+extern void call_vdp_protocol(BYTE data);
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -177,7 +178,11 @@ static void reset_receiver() {
 	printf("reset_receiver()\n");
 #endif
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
-	bdpp_rx_packet = NULL;
+	if (bdpp_rx_packet) {
+		bdpp_rx_packet->flags = 0;
+		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_rx_packet);
+		bdpp_rx_packet = NULL;
+	}
 }
 
 // Initialize the BDPP driver.
@@ -610,6 +615,7 @@ void bdpp_flush_drv_tx_packet() {
 void bdpp_run_rx_state_machine() {
 	BYTE incoming_byte;
 	BDPP_PACKET* packet;
+	WORD i;
 #if DEBUG_STATE_MACHINE
 	printf("\nbdpp_run_rx_state_machine() state:[%02hX]\n", bdpp_rx_state);
 #endif
@@ -772,7 +778,10 @@ void bdpp_run_rx_state_machine() {
 					bdpp_rx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
 					if ((bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
-						push_to_list(&bdpp_rx_pkt_head, &bdpp_rx_pkt_head, bdpp_rx_packet);
+						// This is a driver-owned packet, meaning that MOS must handle it.
+						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
+							call_vdp_protocol(bdpp_rx_packet->data[i]);
+						}
 					}
 				}
 				reset_receiver();

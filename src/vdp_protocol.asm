@@ -29,6 +29,8 @@
 			SEGMENT .STARTUP
 			
 			XDEF	vdp_protocol
+			XDEF	call_vdp_protocol
+			XDEF	_call_vdp_protocol
 
 			XREF	_keyascii
 			XREF	_keycode
@@ -64,7 +66,28 @@
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
-;							
+
+
+; void call_vdp_protocol(BYTE data);
+;
+; Read a character out to the UART - waits for character input
+; Returns:
+; - The character read
+;
+_call_vdp_protocol:
+call_vdp_protocol:
+			PUSH	IY				; Standard C prologue
+			LD	IY, 0
+			ADD	IY, SP	
+
+			LD	C, (IY+6)			; get data byte
+			CALL	vdp_protocol	; handle with legacy packet handler
+
+			LD 	SP, IY				; Standard epilogue
+			POP	IY
+			RET
+
+
 ; The UART protocol handler state machine
 ;
 vdp_protocol:		LD	A, (_vdp_protocol_state)
