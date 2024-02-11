@@ -42,7 +42,7 @@
 ; - IY: Size of buffer or Count of bytes
 ; -  D: Data byte
 ; -  C: Packet Flags
-; -  B: Packet Index
+; -  B: Packet/Stream Index(es)
 ; -  A: BDPP function code
 ;
 bdpp_api:	LD	HL, bdpp_table ; Get address of table below
@@ -103,7 +103,7 @@ signature_1: ; BOOL fcn();
 signature_2: ; BOOL fcn(BYTE index);
 			LD		C, B	; Move index to lower byte
 			LD		B, 0	; Clear other parameter bits
-			PUSH	BC		; Packet Index
+			PUSH	BC		; Packet/Stream Index
 			CALL	jmp_fcn	; Call the intended function
 			POP		BC		; Packet/Stream Index
 			RET
@@ -133,9 +133,9 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 			PUSH	IX		; Data address
 			LD		C, B	; Move index to lower byte
 			LD		B, 0	; Clear other parameter bits
-			PUSH	BC		; Packet Index
+			PUSH	BC		; Packet/Stream Indexes
 			CALL	jmp_fcn	; Call the intended function
-			POP		BC		; Packet Index
+			POP		BC		; Packet/Stream Indexes
 			POP		IX		; Data address
 			POP		IY		; Buffer size
 			RET
@@ -143,13 +143,13 @@ signature_6: ; BOOL fcn(BYTE index, BYTE* data, WORD size);
 signature_7: ; BOOL fcn(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 			PUSH	IY		; Buffer size
 			PUSH	IX		; Data address
-			LD		E, B	; Save Packet Index
+			LD		E, B	; Save Packet/Stream Indexes
 			LD		B, 0	; Clear other parameter bits
 			PUSH	BC		; Packet Flags
-			LD		C, E	; Move index to lower byte
-			PUSH	BC		; Packet Index
+			LD		C, E	; Move indexes to lower byte
+			PUSH	BC		; Packet/Stream Indexes
 			CALL	jmp_fcn	; Call the intended function
-			POP		BC		; Packet/Stream Index
+			POP		BC		; Packet/Stream Indexes
 			POP		BC		; Packet Flags
 			POP		IX		; Data address
 			POP		IY		; Buffer size
