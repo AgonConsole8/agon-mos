@@ -58,6 +58,7 @@
 char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
+extern void UART0_serial_IDLE();
 
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
@@ -770,12 +771,22 @@ int	mos_cmdCLS(char *ptr) {
 // - MOS error code
 //
 int	mos_cmdBDPP(char *ptr) {
-	// try to turn on BDPP for stream #0
-	if (bdpp_fg_enable(0)) {
+	if (bdpp_fg_is_enabled()) {
 		return 0; // OK
-	} else {
-		return 22; // Not allowed
 	}
+	if (bdpp_fg_is_allowed()) {
+		// Tell VDP to enable BDPP.
+		putch(23);
+		putch(0);
+		putch(0xA2);
+		// Wait for the VDU command to go out.
+		UART0_serial_IDLE();
+		// Enable BDPP for MOS (stream #0).
+		if (bdpp_fg_enable(0)) {
+			return 0; // OK
+		}
+	}
+	return 22; // Not allowed
 }
 
 // MOUNT

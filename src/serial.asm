@@ -25,6 +25,7 @@
 			XDEF	UART0_serial_GETCH
 			XDEF	UART0_serial_PUTCH 
 
+			XDEF	_UART0_serial_IDLE
 			XDEF	UART1_serial_TX
 			XDEF	UART1_serial_RX
 			XDEF	UART1_serial_GETCH
@@ -89,6 +90,16 @@ UART1_wait_CTS:		GET_GPIO	PC_DR, 8		; Check Port C, bit 3 (CTS)
 			JR		NZ, UART1_wait_CTS
 			RET
 
+; Wait for transmitter to be idle
+;
+_UART0_serial_IDLE:
+			PUSH	AF
+UART0_serial_IDLE1:	IN0	A,(UART0_REG_LSR)	; Get the line status register
+			AND 	UART_LSR_ETX			; Check for TX empty
+			JR		Z, UART0_serial_IDLE1	; If clear, then TX is not empty
+			POP		AF
+			RET 
+
 ; Write a character to UART0
 ; Parameters:
 ; - A: Data to write
@@ -100,7 +111,7 @@ UART0_serial_TX:	PUSH		BC			; Stack BC
 			PUSH		AF 			; Stack AF
 			LD		BC,TX_WAIT		; Set CB to the transmit timeout
 UART0_serial_TX1:	IN0		A,(UART0_REG_LSR)	; Get the line status register
-			AND 		UART_LSR_ETX		; Check for TX empty
+			AND 		UART_LSR_ETH		; Check for TH empty
 			JR		NZ, UART0_serial_TX2	; If set, then TX is empty, goto transmit
 			DEC		BC
 			LD		A, B
@@ -127,7 +138,7 @@ UART1_serial_TX:	PUSH		BC			; Stack BC
 			PUSH		AF 			; Stack AF
 			LD		BC,TX_WAIT		; Set CB to the transmit timeout
 UART1_serial_TX1:	IN0		A,(UART1_REG_LSR)	; Get the line status register
-			AND 		UART_LSR_ETX		; Check for TX empty
+			AND 		UART_LSR_ETH		; Check for TH empty
 			JR		NZ, UART1_serial_TX2	; If set, then TX is empty, goto transmit
 			DEC		BC
 			LD		A, B
