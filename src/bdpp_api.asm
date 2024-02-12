@@ -35,6 +35,20 @@
 			XREF	_bdpp_fg_flush_drv_tx_packet			; 0x0F
 			XREF	_bdpp_fg_is_busy						; 0x10
 
+			XREF	_bdpp_bg_queue_tx_app_packet			; 0x11
+			XREF	_bdpp_bg_prepare_rx_app_packet			; 0x12
+			XREF	_bdpp_bg_is_tx_app_packet_done			; 0x13
+			XREF	_bdpp_bg_is_rx_app_packet_done			; 0x14
+			XREF	_bdpp_bg_get_rx_app_packet_flags		; 0x15
+			XREF	_bdpp_bg_get_rx_app_packet_size			; 0x16
+			XREF	_bdpp_bg_stop_using_app_packet 			; 0x17
+			XREF	_bdpp_bg_write_byte_to_drv_tx_packet	; 0x18
+			XREF	_bdpp_bg_write_bytes_to_drv_tx_packet	; 0x19
+			XREF	_bdpp_bg_write_drv_tx_byte_with_usage	; 0x1A
+			XREF	_bdpp_bg_write_drv_tx_bytes_with_usage	; 0x1B
+			XREF	_bdpp_bg_flush_drv_tx_packet			; 0x1C
+			XREF	_bdpp_bg_is_busy						; 0x1D
+
 
 ; Call a BDPP API function
 ;
@@ -75,6 +89,7 @@ bdpp_table:	DW	1, _bdpp_fg_is_allowed						; 0x00 signature 1
 			DW	1, _bdpp_fg_is_enabled						; 0x01 signature 1
 			DW	2, _bdpp_fg_enable							; 0x02 signature 2
 			DW	1, _bdpp_fg_disable							; 0x03 signature 1
+
 			DW	7, _bdpp_fg_queue_tx_app_packet				; 0x04 signature 7
 			DW	6, _bdpp_fg_prepare_rx_app_packet			; 0x05 signature 6
 			DW	2, _bdpp_fg_is_tx_app_packet_done			; 0x06 signature 2
@@ -88,6 +103,20 @@ bdpp_table:	DW	1, _bdpp_fg_is_allowed						; 0x00 signature 1
 			DW	5, _bdpp_fg_write_drv_tx_bytes_with_usage	; 0x0E signature 5
 			DW	3, _bdpp_fg_flush_drv_tx_packet				; 0x0F signature 3
 			DW	1, _bdpp_fg_is_busy							; 0x10 signature 1
+
+			DW	7, _bdpp_bg_queue_tx_app_packet				; 0x11 signature 7
+			DW	6, _bdpp_bg_prepare_rx_app_packet			; 0x12 signature 6
+			DW	2, _bdpp_bg_is_tx_app_packet_done			; 0x13 signature 2
+			DW	2, _bdpp_bg_is_rx_app_packet_done			; 0x14 signature 2
+			DW	2, _bdpp_bg_get_rx_app_packet_flags			; 0x15 signature 2
+			DW	8, _bdpp_bg_get_rx_app_packet_size			; 0x16 signature 8
+			DW	2, _bdpp_bg_stop_using_app_packet	 		; 0x17 signature 2
+			DW	4, _bdpp_bg_write_byte_to_drv_tx_packet		; 0x18 signature 4
+			DW	5, _bdpp_bg_write_bytes_to_drv_tx_packet	; 0x19 signature 5
+			DW	4, _bdpp_bg_write_drv_tx_byte_with_usage	; 0x1A signature 4
+			DW	5, _bdpp_bg_write_drv_tx_bytes_with_usage	; 0x1B signature 5
+			DW	3, _bdpp_bg_flush_drv_tx_packet				; 0x1C signature 3
+			DW	1, _bdpp_bg_is_busy							; 0x1D signature 1
 
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes

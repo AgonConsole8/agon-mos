@@ -88,6 +88,7 @@ typedef struct tag_BDPP_PACKET {
 	struct tag_BDPP_PACKET* next; // Points to the next packet in the list
 } BDPP_PACKET;
 
+//----------------------------------------------------------
 //*** OVERALL MANAGEMENT ***
 
 // Initialize the BDPP driver.
@@ -108,7 +109,8 @@ BOOL bdpp_fg_enable(BYTE stream);
 // Disable BDDP mode
 BOOL bdpp_fg_disable();
 
-//*** PACKET RECEPTION (RX) ***
+//----------------------------------------------------------
+//*** PACKET RECEPTION (RX) FROM FOREGROUND (MAIN THREAD) ***
 
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available
@@ -129,6 +131,7 @@ BYTE bdpp_fg_get_rx_app_packet_flags(BYTE index);
 // Get the data size for a received app-owned packet.
 WORD bdpp_fg_get_rx_app_packet_size(BYTE index);
 
+//----------------------------------------------------------
 //*** PACKET TRANSMISSION (TX) FROM FOREGROUND (MAIN THREAD) ***
 
 // Initialize an outgoing driver-owned packet, if one is available
@@ -181,6 +184,29 @@ void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 void bdpp_fg_flush_drv_tx_packet();
 
+//----------------------------------------------------------
+//*** PACKET RECEPTION (RX) FROM BACKGROUND (ISR) ***
+
+// Initialize an incoming driver-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_bg_init_rx_drv_packet();
+
+// Prepare an app-owned packet for reception
+// This function can fail if the packet is presently involved in a data transfer.
+// The given size is a maximum, based on app memory allocation, and the
+// actual size of an incoming packet may be smaller, but not larger.
+BOOL bdpp_bg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
+
+// Check whether an incoming app-owned packet has been received
+BOOL bdpp_bg_is_rx_app_packet_done(BYTE index);
+
+// Get the flags for a received app-owned packet.
+BYTE bdpp_bg_get_rx_app_packet_flags(BYTE index);
+
+// Get the data size for a received app-owned packet.
+WORD bdpp_bg_get_rx_app_packet_size(BYTE index);
+
+//----------------------------------------------------------
 //*** PACKET TRANSMISSION (TX) FROM BACKGROUND (ISR) ***
 
 // Initialize an outgoing driver-owned packet, if one is available
