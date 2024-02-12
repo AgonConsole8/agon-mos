@@ -28,12 +28,13 @@ BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet lis
 
 BYTE bdpp_tx_state; 			// Driver transmitter state
 BDPP_PACKET* bdpp_tx_packet; 	// Points to the packet being transmitted
-BDPP_PACKET* bdpp_tx_build_packet; // Points to the packet being built
 WORD bdpp_tx_byte_count; 		// Number of data bytes transmitted
-BYTE bdpp_tx_next_pkt_flags; 	// Flags for the next transmitted packet, possibly
-BYTE bdpp_tx_next_stream;  		// Index of the next stream to use
 BDPP_PACKET* bdpp_tx_pkt_head; 	// Points to head of transmit packet list
 BDPP_PACKET* bdpp_tx_pkt_tail; 	// Points to tail of transmit packet list
+
+BDPP_PACKET* bdpp_fg_tx_build_packet; // Points to the packet being built
+BYTE bdpp_fg_tx_next_pkt_flags; // Flags for the next transmitted packet, possibly
+BYTE bdpp_fg_tx_next_stream;  	// Index of the next stream to use
 
 BYTE bdpp_rx_state; 			// Driver receiver state
 BDPP_PACKET* bdpp_rx_packet; 	// Points to the packet being received
@@ -99,14 +100,14 @@ void bdpp_fg_initialize_driver() {
 	bdpp_driver_flags = BDPP_FLAG_ALLOWED;
 	bdpp_tx_state = BDPP_TX_STATE_IDLE;
 	bdpp_tx_packet = NULL;
-	bdpp_tx_build_packet = NULL;
+	bdpp_fg_tx_build_packet = NULL;
 	bdpp_free_drv_pkt_head = NULL;
 	bdpp_free_drv_pkt_tail = NULL;
 	bdpp_tx_pkt_head = NULL;
 	bdpp_tx_pkt_tail = NULL;
 	bdpp_rx_pkt_head = NULL;
 	bdpp_rx_pkt_tail = NULL;
-	bdpp_tx_next_pkt_flags = 0;
+	bdpp_fg_tx_next_pkt_flags = 0;
 	memset(bdpp_drv_pkt_header, 0, sizeof(bdpp_drv_pkt_header));
 	memset(bdpp_app_pkt_header, 0, sizeof(bdpp_app_pkt_header));
 	memset(bdpp_drv_pkt_data, 0, sizeof(bdpp_drv_pkt_data));
@@ -148,7 +149,7 @@ BOOL bdpp_fg_is_busy() {
 		bdpp_tx_packet != NULL ||
 		bdpp_rx_packet != NULL ||
 		bdpp_tx_pkt_head != NULL ||
-		bdpp_tx_build_packet != NULL);
+		bdpp_fg_tx_build_packet != NULL);
 	EI();
 	return rc;
 }
@@ -158,7 +159,7 @@ BOOL bdpp_fg_is_busy() {
 BOOL bdpp_fg_enable(BYTE stream) {
 	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED && stream < BDPP_MAX_STREAMS) {
 		bdpp_fg_flush_drv_tx_packet();
-		bdpp_tx_next_stream = stream;
+		bdpp_fg_tx_next_stream = stream;
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, bdpp_handler);
@@ -349,11 +350,11 @@ BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 static void bdpp_fg_internal_flush_drv_tx_packet() {
-	if (bdpp_tx_build_packet) {
+	if (bdpp_fg_tx_build_packet) {
 		DI();
-			bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
-			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_tx_build_packet);
-			bdpp_tx_build_packet = NULL;
+			bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
+			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
+			bdpp_fg_tx_build_packet = NULL;
 			UART0_enable_interrupt(UART_IER_TRANSMITINT);
 		EI();
 	}
@@ -363,20 +364,20 @@ static void bdpp_fg_internal_flush_drv_tx_packet() {
 // This is a blocking call, and might wait for room for data.
 static void bdpp_fg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 	while (TRUE) {
-		if (bdpp_tx_build_packet) {
-			BYTE* pdata = bdpp_tx_build_packet->data;
-			pdata[bdpp_tx_build_packet->act_size++] = data;
-			if (bdpp_tx_build_packet->act_size >= bdpp_tx_build_packet->max_size) {
-				if (bdpp_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
-					bdpp_tx_next_pkt_flags = 0;
+		if (bdpp_fg_tx_build_packet) {
+			BYTE* pdata = bdpp_fg_tx_build_packet->data;
+			pdata[bdpp_fg_tx_build_packet->act_size++] = data;
+			if (bdpp_fg_tx_build_packet->act_size >= bdpp_fg_tx_build_packet->max_size) {
+				if (bdpp_fg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
+					bdpp_fg_tx_next_pkt_flags = 0;
 				} else {
-					bdpp_tx_next_pkt_flags = bdpp_tx_build_packet->flags & ~BDPP_PKT_FLAG_FIRST;
+					bdpp_fg_tx_next_pkt_flags = bdpp_fg_tx_build_packet->flags & ~BDPP_PKT_FLAG_FIRST;
 				}
 				bdpp_fg_internal_flush_drv_tx_packet();
 			}
 			break;
 		} else {
-			bdpp_tx_build_packet = bdpp_fg_init_tx_drv_packet(bdpp_tx_next_pkt_flags, bdpp_tx_next_stream);
+			bdpp_fg_tx_build_packet = bdpp_fg_init_tx_drv_packet(bdpp_fg_tx_next_pkt_flags, bdpp_fg_tx_next_stream);
 		}
 	}
 }
@@ -409,11 +410,11 @@ void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 // to "non-print", or vice versa.
 void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data) {
 	if (bdpp_fg_is_allowed()) {
-		if (!bdpp_tx_build_packet) {
+		if (!bdpp_fg_tx_build_packet) {
 			if (data >= 0x20 && data <= 0x7E) {
-				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
 			} else {
-				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
 			}
 		}
 		bdpp_fg_internal_write_byte_to_drv_tx_packet(data);
@@ -429,11 +430,11 @@ void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data) {
 // to "non-print", or vice versa.
 void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 	if (bdpp_fg_is_allowed()) {
-		if (!bdpp_tx_build_packet) {
+		if (!bdpp_fg_tx_build_packet) {
 			if (*data >= 0x20 && *data <= 0x7E) {
-				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
+				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
 			} else {
-				bdpp_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
+				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_COMMAND;
 			}
 		}
 		bdpp_fg_write_bytes_to_drv_tx_packet(data, count);
@@ -443,11 +444,11 @@ void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 void bdpp_fg_flush_drv_tx_packet() {
-	if (bdpp_tx_build_packet) {
-		bdpp_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
-		bdpp_tx_next_stream = (bdpp_tx_build_packet->indexes >> 4);
+	if (bdpp_fg_tx_build_packet) {
+		bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
+		bdpp_fg_tx_next_stream = (bdpp_fg_tx_build_packet->indexes >> 4);
 		bdpp_fg_internal_flush_drv_tx_packet();
-		bdpp_tx_next_pkt_flags = 0;
+		bdpp_fg_tx_next_pkt_flags = 0;
 	}
 }
 
