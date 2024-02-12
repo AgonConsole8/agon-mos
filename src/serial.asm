@@ -40,7 +40,7 @@
 
 			XREF	_serialFlags	; In globals.asm
 			XREF	_bdpp_driver_flags
-			XREF	_bdpp_write_drv_tx_byte_with_usage
+			XREF	_bdpp_fg_write_drv_tx_byte_with_usage
 				
 UART0_PORT		EQU	%C0		; UART0
 UART1_PORT		EQU	%D0		; UART1
@@ -219,7 +219,7 @@ UART0_serial_PUTCH:	LD C, A				; Save character in C (lower 8 bits of parameter)
 			PUSH DE
 			LD B, 0						; Clear upper middle 8 bits of parameter
 			PUSH BC						; Set 24-bit parameter for C call
-			CALL _bdpp_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
+			CALL _bdpp_fg_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
 			POP BC						; Unstack the parameter
 			POP DE
 			POP IY

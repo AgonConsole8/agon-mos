@@ -771,7 +771,7 @@ int	mos_cmdCLS(char *ptr) {
 //
 int	mos_cmdBDPP(char *ptr) {
 	// try to turn on BDPP for stream #0
-	if (bdpp_enable(0)) {
+	if (bdpp_fg_enable(0)) {
 		return 0; // OK
 	} else {
 		return 22; // Not allowed

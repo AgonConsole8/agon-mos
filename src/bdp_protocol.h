@@ -88,71 +88,77 @@ typedef struct tag_BDPP_PACKET {
 	struct tag_BDPP_PACKET* next; // Points to the next packet in the list
 } BDPP_PACKET;
 
+//*** OVERALL MANAGEMENT ***
+
 // Initialize the BDPP driver.
-void bdpp_initialize_driver();
+void bdpp_fg_initialize_driver();
 
 // Get whether BDPP is allowed (both CPUs have it)
-BOOL bdpp_is_allowed();
+BOOL bdpp_fg_is_allowed();
 
 // Get whether BDPP is presently enabled
-BOOL bdpp_is_enabled();
+BOOL bdpp_fg_is_enabled();
 
 // Get whether BDPP is presently busy (TX or RX)
-BOOL bdpp_is_busy();
+BOOL bdpp_fg_is_busy();
 
 // Enable BDDP mode for a specific stream
-BOOL bdpp_enable(BYTE stream);
+BOOL bdpp_fg_enable(BYTE stream);
 
 // Disable BDDP mode
-BOOL bdpp_disable();
+BOOL bdpp_fg_disable();
 
-// Initialize an outgoing driver-owned packet, if one is available
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_tx_drv_packet(BYTE flags, BYTE stream);
+//*** PACKET RECEPTION (RX) ***
 
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_init_rx_drv_packet();
-
-// Queue an app-owned packet for transmission
-// The packet is expected to be full when this function is called.
-// This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
+BDPP_PACKET* bdpp_fg_init_rx_drv_packet();
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the
 // actual size of an incoming packet may be smaller, but not larger.
-BOOL bdpp_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
-
-// Check whether an outgoing app-owned packet has been transmitted
-BOOL bdpp_is_tx_app_packet_done(BYTE index);
+BOOL bdpp_fg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
 
 // Check whether an incoming app-owned packet has been received
-BOOL bdpp_is_rx_app_packet_done(BYTE index);
+BOOL bdpp_fg_is_rx_app_packet_done(BYTE index);
 
 // Get the flags for a received app-owned packet.
-BYTE bdpp_get_rx_app_packet_flags(BYTE index);
+BYTE bdpp_fg_get_rx_app_packet_flags(BYTE index);
 
 // Get the data size for a received app-owned packet.
-WORD bdpp_get_rx_app_packet_size(BYTE index);
+WORD bdpp_fg_get_rx_app_packet_size(BYTE index);
+
+//*** PACKET TRANSMISSION (TX) FROM FOREGROUND (MAIN THREAD) ***
+
+// Initialize an outgoing driver-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream);
+
+// Queue an app-owned packet for transmission
+// The packet is expected to be full when this function is called.
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
+
+// Check whether an outgoing app-owned packet has been transmitted
+BOOL bdpp_fg_is_tx_app_packet_done(BYTE index);
 
 // Free the driver from using an app-owned packet
 // This function can fail if the packet is presently involved in a data transfer.
-BOOL bdpp_stop_using_app_packet(BYTE index);
+BOOL bdpp_fg_stop_using_app_packet(BYTE index);
 
 // Start building a driver-owned, outgoing packet.
 // If there is an existing packet being built, it will be flushed first.
 // This returns NULL if there is no packet available.
-BDPP_PACKET* bdpp_start_drv_tx_packet(BYTE flags, BYTE stream);
+BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
-void bdpp_write_byte_to_drv_tx_packet(BYTE data);
+void bdpp_fg_write_byte_to_drv_tx_packet(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
-void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
+void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 
 // Append a single data byte to a driver-owned, outgoing packet.
 // This is a potentially blocking call, and might wait for room for data.
@@ -161,7 +167,7 @@ void bdpp_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 // the value of the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
-void bdpp_write_drv_tx_byte_with_usage(BYTE data);
+void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a potentially blocking call, and might wait for room for data.
@@ -170,9 +176,61 @@ void bdpp_write_drv_tx_byte_with_usage(BYTE data);
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
-void bdpp_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
+void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
-void bdpp_flush_drv_tx_packet();
+void bdpp_fg_flush_drv_tx_packet();
+
+//*** PACKET TRANSMISSION (TX) FROM BACKGROUND (ISR) ***
+
+// Initialize an outgoing driver-owned packet, if one is available
+// Returns NULL if no packet is available
+BDPP_PACKET* bdpp_bg_init_tx_drv_packet(BYTE flags, BYTE stream);
+
+// Queue an app-owned packet for transmission
+// The packet is expected to be full when this function is called.
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
+
+// Check whether an outgoing app-owned packet has been transmitted
+BOOL bdpp_bg_is_tx_app_packet_done(BYTE index);
+
+// Free the driver from using an app-owned packet
+// This function can fail if the packet is presently involved in a data transfer.
+BOOL bdpp_bg_stop_using_app_packet(BYTE index);
+
+// Start building a driver-owned, outgoing packet.
+// If there is an existing packet being built, it will be flushed first.
+// This returns NULL if there is no packet available.
+BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream);
+
+// Append a data byte to a driver-owned, outgoing packet.
+// This is a blocking call, and might wait for room for data.
+void bdpp_bg_write_byte_to_drv_tx_packet(BYTE data);
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a blocking call, and might wait for room for data.
+void bdpp_bg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
+
+// Append a single data byte to a driver-owned, outgoing packet.
+// This is a potentially blocking call, and might wait for room for data.
+// If necessary this function initializes and uses a new packet. It
+// decides whether to use "print" data (versus "non-print" data) based on
+// the value of the data. To guarantee that the packet usage flags are
+// set correctly, be sure to flush the packet before switching from "print"
+// to "non-print", or vice versa.
+void bdpp_bg_write_drv_tx_byte_with_usage(BYTE data);
+
+// Append multiple data bytes to one or more driver-owned, outgoing packets.
+// This is a potentially blocking call, and might wait for room for data.
+// If necessary this function initializes and uses additional packets. It
+// decides whether to use "print" data (versus "non-print" data) based on
+// the first byte in the data. To guarantee that the packet usage flags are
+// set correctly, be sure to flush the packet before switching from "print"
+// to "non-print", or vice versa.
+void bdpp_bg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
+
+// Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+void bdpp_bg_flush_drv_tx_packet();
 
 #endif // BDP_PROTOCOL_H

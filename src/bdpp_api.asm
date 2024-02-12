@@ -17,23 +17,23 @@
 			
 			XDEF	bdpp_api	
 
-			XREF	_bdpp_is_allowed					; 0x00
-			XREF	_bdpp_is_enabled					; 0x01
-			XREF	_bdpp_enable						; 0x02
-			XREF	_bdpp_disable						; 0x03
-			XREF	_bdpp_queue_tx_app_packet			; 0x04
-			XREF	_bdpp_prepare_rx_app_packet			; 0x05
-			XREF	_bdpp_is_tx_app_packet_done			; 0x06
-			XREF	_bdpp_is_rx_app_packet_done			; 0x07
-			XREF	_bdpp_get_rx_app_packet_flags		; 0x08
-			XREF	_bdpp_get_rx_app_packet_size		; 0x09
-			XREF	_bdpp_stop_using_app_packet 		; 0x0A
-			XREF	_bdpp_write_byte_to_drv_tx_packet	; 0x0B
-			XREF	_bdpp_write_bytes_to_drv_tx_packet	; 0x0C
-			XREF	_bdpp_write_drv_tx_byte_with_usage	; 0x0D
-			XREF	_bdpp_write_drv_tx_bytes_with_usage	; 0x0E
-			XREF	_bdpp_flush_drv_tx_packet			; 0x0F
-			XREF	_bdpp_is_busy						; 0x10
+			XREF	_bdpp_fg_is_allowed						; 0x00
+			XREF	_bdpp_fg_is_enabled						; 0x01
+			XREF	_bdpp_fg_enable							; 0x02
+			XREF	_bdpp_fg_disable						; 0x03
+			XREF	_bdpp_fg_queue_tx_app_packet			; 0x04
+			XREF	_bdpp_fg_prepare_rx_app_packet			; 0x05
+			XREF	_bdpp_fg_is_tx_app_packet_done			; 0x06
+			XREF	_bdpp_fg_is_rx_app_packet_done			; 0x07
+			XREF	_bdpp_fg_get_rx_app_packet_flags		; 0x08
+			XREF	_bdpp_fg_get_rx_app_packet_size			; 0x09
+			XREF	_bdpp_fg_stop_using_app_packet 			; 0x0A
+			XREF	_bdpp_fg_write_byte_to_drv_tx_packet	; 0x0B
+			XREF	_bdpp_fg_write_bytes_to_drv_tx_packet	; 0x0C
+			XREF	_bdpp_fg_write_drv_tx_byte_with_usage	; 0x0D
+			XREF	_bdpp_fg_write_drv_tx_bytes_with_usage	; 0x0E
+			XREF	_bdpp_fg_flush_drv_tx_packet			; 0x0F
+			XREF	_bdpp_fg_is_busy						; 0x10
 
 
 ; Call a BDPP API function
@@ -71,23 +71,23 @@ bdpp_api:	LD	HL, bdpp_table ; Get address of table below
 			JR	Z, signature_8	; Go if yes
 			RET				; Quit
 
-bdpp_table:	DW	1, _bdpp_is_allowed						; 0x00 signature 1
-			DW	1, _bdpp_is_enabled						; 0x01 signature 1
-			DW	2, _bdpp_enable							; 0x02 signature 2
-			DW	1, _bdpp_disable						; 0x03 signature 1
-			DW	7, _bdpp_queue_tx_app_packet			; 0x04 signature 7
-			DW	6, _bdpp_prepare_rx_app_packet			; 0x05 signature 6
-			DW	2, _bdpp_is_tx_app_packet_done			; 0x06 signature 2
-			DW	2, _bdpp_is_rx_app_packet_done			; 0x07 signature 2
-			DW	2, _bdpp_get_rx_app_packet_flags		; 0x08 signature 2
-			DW	8, _bdpp_get_rx_app_packet_size			; 0x09 signature 8
-			DW	2, _bdpp_stop_using_app_packet	 		; 0x0A signature 2
-			DW	4, _bdpp_write_byte_to_drv_tx_packet	; 0x0B signature 4
-			DW	5, _bdpp_write_bytes_to_drv_tx_packet	; 0x0C signature 5
-			DW	4, _bdpp_write_drv_tx_byte_with_usage	; 0x0D signature 4
-			DW	5, _bdpp_write_drv_tx_bytes_with_usage	; 0x0E signature 5
-			DW	3, _bdpp_flush_drv_tx_packet			; 0x0F signature 3
-			DW	1, _bdpp_is_busy						; 0x10 signature 1
+bdpp_table:	DW	1, _bdpp_fg_is_allowed						; 0x00 signature 1
+			DW	1, _bdpp_fg_is_enabled						; 0x01 signature 1
+			DW	2, _bdpp_fg_enable							; 0x02 signature 2
+			DW	1, _bdpp_fg_disable							; 0x03 signature 1
+			DW	7, _bdpp_fg_queue_tx_app_packet				; 0x04 signature 7
+			DW	6, _bdpp_fg_prepare_rx_app_packet			; 0x05 signature 6
+			DW	2, _bdpp_fg_is_tx_app_packet_done			; 0x06 signature 2
+			DW	2, _bdpp_fg_is_rx_app_packet_done			; 0x07 signature 2
+			DW	2, _bdpp_fg_get_rx_app_packet_flags			; 0x08 signature 2
+			DW	8, _bdpp_fg_get_rx_app_packet_size			; 0x09 signature 8
+			DW	2, _bdpp_fg_stop_using_app_packet	 		; 0x0A signature 2
+			DW	4, _bdpp_fg_write_byte_to_drv_tx_packet		; 0x0B signature 4
+			DW	5, _bdpp_fg_write_bytes_to_drv_tx_packet	; 0x0C signature 5
+			DW	4, _bdpp_fg_write_drv_tx_byte_with_usage	; 0x0D signature 4
+			DW	5, _bdpp_fg_write_drv_tx_bytes_with_usage	; 0x0E signature 5
+			DW	3, _bdpp_fg_flush_drv_tx_packet				; 0x0F signature 3
+			DW	1, _bdpp_fg_is_busy							; 0x10 signature 1
 
 ; - IX: Data address
 ; - IY: Size of buffer or Count of bytes

@@ -161,7 +161,7 @@ int main(void) {
 	
 	if (((BYTE)gp & 0xF0) >= 0x40) {
 		// The ESP32 code supports bidirectional packet protocol.
-		bdpp_initialize_driver();
+		bdpp_fg_initialize_driver();
 	}
 	
 	if(coldBoot == 0) {								// If a warm boot detected then
