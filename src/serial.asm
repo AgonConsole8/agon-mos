@@ -219,7 +219,9 @@ $$:			CALL 		UART1_serial_RX
 ; - F: C if written
 ; - F: NC if UART not enabled
 ;
-UART0_serial_PUTCH:	LD C, A				; Save character in C (lower 8 bits of parameter)
+UART0_serial_PUTCH:
+			PUSH BC
+			LD C, A				; Save character in C (lower 8 bits of parameter)
 			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
 			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
 			CP	A, 03h					; Are we in packet mode?
@@ -235,7 +237,8 @@ UART0_serial_PUTCH:	LD C, A				; Save character in C (lower 8 bits of parameter)
 			POP DE
 			POP IY
 			POP IX
-			POP HL						; Restore HL for the caller
+			POP HL
+			POP BC
 			SCF							; Indicate character written
 			RET
 			
@@ -248,6 +251,7 @@ UART0_serial_PUTCH_1:
 			LD	A, C					; Restore character to A
 $$:			CALL	UART0_serial_TX		; Send the character
 			JR	NC, $B					; Repeat until sent
+			POP BC
 			RET
 
 ; Write a character to UART1 (blocking)
