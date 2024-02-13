@@ -37,6 +37,7 @@
 			
 			XREF	mos_api
 			XREF	UART0_serial_PUTCH 
+			XREF	UART0_serial_PUTBUF
 			XREF	SET_AHL24
 			XREF	bdpp_api
 
@@ -137,13 +138,8 @@ _rst_18_handler:	LD	E, A 			; Preserve the delimiter
 ;
 ; Standard loop mode
 ;
-_rst_18_handler_0:	LD 	A, (HL)			; Fetch the character
-			CALL	UART0_serial_PUTCH	; Output
-			INC 	HL 			; Increment the buffer pointer
-			DEC	BC 			; Decrement the loop counter
-			LD	A, B 			; Is it 0?
-			OR 	C 
-			JR	NZ, _rst_18_handler_0	; No, so loop
+_rst_18_handler_0:
+			CALL	UART0_serial_PUTBUF	; Output
 			RET.L
 ;
 ; Delimited mode
