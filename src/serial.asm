@@ -271,10 +271,13 @@ UART0_serial_PUTBUF:
 			TST	01h						; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip
 
+			TST	02h						; If hardware flow control enabled then
+			CALL NZ, UART0_wait_CTS		; Wait for clear to send signal
+
 			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
 			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
 			CP	A, 03h					; Are we in packet mode?
-			JR  NZ, UART0_serial_PUTBUF_1 ; Go if not (use direct mode)
+			JR  NZ, UART0_serial_PUTBUF_2 ; Go if not (use direct mode)
 
 			PUSH IX
 			PUSH IY
@@ -290,9 +293,6 @@ UART0_serial_PUTBUF:
 			SCF							; Indicate characters written
 			RET
 			
-UART0_serial_PUTBUF_1:
-			TST	02h						; If hardware flow control enabled then
-			CALL	NZ, UART0_wait_CTS	; Wait for clear to send signal
 UART0_serial_PUTBUF_2:
 			LD	A, 	(HL)				; Get a character
 $$:			CALL	UART0_serial_TX		; Send the character
