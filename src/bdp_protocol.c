@@ -18,7 +18,7 @@
 extern void uart0_handler(void);
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
-extern void call_vdp_protocol(BYTE data);
+extern void call_vdp_protocol(BYTE data, BYTE* packet);
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -898,7 +898,7 @@ void bdpp_run_rx_state_machine() {
 					if ((bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
 						// This is a driver-owned packet, meaning that MOS must handle it.
 						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
-							call_vdp_protocol(bdpp_rx_packet->data[i]);
+							call_vdp_protocol(bdpp_rx_packet->data[i], bdpp_rx_packet->data);
 						}
 					}
 				}

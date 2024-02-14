@@ -68,11 +68,9 @@
 			XREF	keyboard_handler	; In keyboard.asm
 
 
-; void call_vdp_protocol(BYTE data);
+; void call_vdp_protocol(BYTE data, BYTE* packet);
 ;
-; Read a character out to the UART - waits for character input
-; Returns:
-; - The character read
+; Call the function that handles incoming VDP protocol packets.
 ;
 _call_vdp_protocol:
 call_vdp_protocol:
@@ -81,6 +79,7 @@ call_vdp_protocol:
 			ADD	IY, SP	
 
 			LD	C, (IY+6)			; get data byte
+			LD	HL, (IY+9)			; get pointer to data buffer
 			CALL	vdp_protocol	; handle with legacy packet handler
 
 			LD 	SP, IY				; Standard epilogue
