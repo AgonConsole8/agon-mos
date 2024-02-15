@@ -59,6 +59,7 @@ char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 extern void UART0_serial_IDLE();
+extern void timer0_delay(WORD ms);
 
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
@@ -170,6 +171,7 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 	putch(MOS_prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
+	bdpp_fg_flush_drv_tx_packet();
 	return retval;
 }
 
@@ -781,6 +783,7 @@ int	mos_cmdBDPP(char *ptr) {
 		putch(0xA2);
 		// Wait for the VDU command to go out.
 		UART0_serial_IDLE();
+		timer0_delay(20);
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
 			return 0; // OK

@@ -156,6 +156,8 @@ UART1_serial_TX2:	POP		AF			; Good to send at this point, so
 			SCF					; Set the carry flag
 			RET 
 
+ XREF _capture_count
+ XREF _capture_data
 ; Read a character from UART0
 ; Returns:
 ; - A: Data read
@@ -166,6 +168,25 @@ UART0_serial_RX:	IN0		A,(UART0_REG_LSR)	; Get the line status register
 			AND 		UART_LSR_RDY		; Check for characters in buffer
 			RET		Z			; Just ret (with carry clear) if no characters
 			IN0		A,(UART0_REG_RBR)	; Read the character from the UART receive buffer
+
+			push bc
+			push af
+			ld c,a
+			ld a,(_capture_count)
+			cp a,254
+			jr z,isfull
+			push hl
+			ld hl,_capture_data
+			ADD8U_HL
+			ld (hl),c
+			ld a,(_capture_count)
+			inc a
+			ld (_capture_count),a
+			pop hl
+isfull:
+			pop af
+			pop bc
+
 			SCF 					; Set the carry flag
 			RET
 
@@ -228,14 +249,17 @@ UART0_serial_PUTCH:
 			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
 			CP	A, 03h					; Are we in packet mode?
 			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
+
 			PUSH HL
 			PUSH IX
 			PUSH IY
 			PUSH DE
+
 			LD B, 0						; Clear upper middle 8 bits of parameter
 			PUSH BC						; Set 24-bit parameter for C call
 			CALL _bdpp_fg_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
 			POP BC						; Unstack the parameter
+
 			POP DE
 			POP IY
 			POP IX

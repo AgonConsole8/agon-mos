@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS line editor
  * Author:			Dean Belfield
  * Created:			18/09/2022
- * Last Updated:	31/03/2023
+ * Last Updated:	15/02/2024
  * 
  * Modinfo:
  * 28/09/2022:		Added clear parameter to mos_EDITLINE
@@ -12,6 +12,7 @@
  * 21/03/2023:		Improved backspace, and editing of long lines, after scroll, at bottom of screen
  * 22/03/2023:		Added a single-entry command line history
  * 31/03/2023:		Added timeout for VDP protocol
+ * 15/02/2024:		CW Integrate BDPP
  */
 
 #include <eZ80.h>
@@ -25,6 +26,8 @@
 #include "uart.h"
 #include "timer.h"
 #include "mos_editor.h"
+
+extern void bdpp_fg_flush_drv_tx_packet();
 
 extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 extern volatile BYTE keyascii;					// In globals.asm
@@ -50,6 +53,7 @@ void getCursorPos() {
 	putch(23);									// Request the cursor position
 	putch(0);
 	putch(VDP_cursor);
+	bdpp_fg_flush_drv_tx_packet();
 	wait_VDP(0x01);								// Wait until the semaphore has been set, or a timeout happens
 }
 
@@ -60,6 +64,7 @@ void getModeInformation() {
 	putch(23);
 	putch(0);
 	putch(VDP_mode);
+	bdpp_fg_flush_drv_tx_packet();
 	wait_VDP(0x10);								// Wait until the semaphore has been set, or a timeout happens
 }
 
@@ -226,6 +231,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	// Loop until an exit key is pressed
 	//
 	while (keyr == 0) {
+		bdpp_fg_flush_drv_tx_packet();
 		len = strlen(buffer);
 		waitKey();
 		keya = keyascii;
@@ -345,5 +351,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	}
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
+	bdpp_fg_flush_drv_tx_packet();
 	return keyr;					// Finally return the keycode
 }

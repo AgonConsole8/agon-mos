@@ -18,7 +18,10 @@
 extern void uart0_handler(void);
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
-extern void call_vdp_protocol(BYTE data, BYTE* packet);
+extern void call_vdp_protocol(BYTE data);
+extern BYTE vdp_protocol_data[];
+extern BYTE capture_count;
+extern BYTE capture_data[254];
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -89,8 +92,11 @@ static BDPP_PACKET* pull_from_list(BDPP_PACKET** head, BDPP_PACKET** tail) {
 static void reset_receiver() {
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	if (bdpp_rx_packet) {
-		bdpp_rx_packet->flags = 0;
-		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_rx_packet);
+		bdpp_rx_packet->act_size = 0;
+		// Clear most flags and test for driver-owned (not app-owned)
+		if (!(bdpp_rx_packet->flags &= BDPP_PKT_FLAG_APP_OWNED)) {
+			push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_rx_packet);
+		}
 		bdpp_rx_packet = NULL;
 	}
 }
@@ -738,11 +744,13 @@ void bdpp_bg_flush_drv_tx_packet() {
 //
 void bdpp_run_rx_state_machine() {
 	BYTE incoming_byte;
+	BYTE packet_index;
 	BDPP_PACKET* packet;
 	WORD i;
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
 		incoming_byte = UART0_read_rbr();
+		if (capture_count<254) { capture_data[capture_count++]=bdpp_rx_state; capture_data[capture_count++]=incoming_byte; }
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
 				if (incoming_byte == BDPP_PACKET_START_MARKER) {
@@ -759,7 +767,7 @@ void bdpp_run_rx_state_machine() {
 					// We received the flags
 					have_the_flags:
 					bdpp_rx_hold_pkt_flags =
-						(incoming_byte & BDPP_PKT_FLAG_USAGE_BITS) |
+						(incoming_byte & (BDPP_PKT_FLAG_USAGE_BITS | BDPP_PKT_FLAG_APP_OWNED)) |
 						(BDPP_PKT_FLAG_FOR_RX | BDPP_PKT_FLAG_READY);
 					bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_INDEX;
 				}
@@ -781,19 +789,27 @@ void bdpp_run_rx_state_machine() {
 				if (incoming_byte == BDPP_PACKET_ESCAPE) {
 					bdpp_rx_state = BDPP_RX_STATE_AWAIT_INDEX;
 				} else {
-					// We received the index
+					// We received the index(es)
 					have_the_index:
-					if (incoming_byte < BDPP_MAX_APP_PACKETS) {
-						packet = &bdpp_app_pkt_header[incoming_byte];
+					if (bdpp_rx_hold_pkt_flags & BDPP_PKT_FLAG_APP_OWNED) {
+						packet_index = incoming_byte & 0x0F;
+						packet = &bdpp_app_pkt_header[packet_index];
 						if (packet->flags & BDPP_PKT_FLAG_DONE) {
 							reset_receiver();
 						} else {
 							bdpp_rx_packet = packet;
 							bdpp_rx_packet->flags = bdpp_rx_hold_pkt_flags;
-							bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_1;
+							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE_1;
 						}
 					} else {
-						reset_receiver();
+						packet = bdpp_bg_init_rx_drv_packet();
+						if (packet) {
+							bdpp_rx_packet = packet;
+							bdpp_rx_packet->flags = bdpp_rx_hold_pkt_flags;
+							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE_1;
+						} else {
+							reset_receiver();
+						}
 					}
 				}
 			} break;
@@ -897,8 +913,13 @@ void bdpp_run_rx_state_machine() {
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
 					if ((bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
 						// This is a driver-owned packet, meaning that MOS must handle it.
+						memcpy(vdp_protocol_data, bdpp_rx_packet->data, bdpp_rx_packet->act_size);
+						capture_data[capture_count++] = 0x66;
+						memcpy(&capture_data[capture_count], bdpp_rx_packet->data, bdpp_rx_packet->act_size);
+						capture_count += bdpp_rx_packet->act_size;
+						capture_data[capture_count++] = 0x77;
 						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
-							call_vdp_protocol(bdpp_rx_packet->data[i], bdpp_rx_packet->data);
+							call_vdp_protocol(bdpp_rx_packet->data[i]);
 						}
 					}
 				}

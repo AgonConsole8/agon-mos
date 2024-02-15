@@ -2,7 +2,7 @@
 ; Title:	AGON MOS - API code
 ; Author:	Dean Belfield
 ; Created:	24/07/2022
-; Last Updated:	10/11/2023
+; Last Updated:	15/02/2024
 ;
 ; Modinfo:
 ; 03/08/2022:	Added a handful of MOS API calls and stubbed FatFS calls
@@ -24,6 +24,7 @@
 ; 03/08/2023:	Added mos_api_setkbvector
 ; 10/08/2023:	Added mos_api_getkbmap
 ; 10/11/2023:	Added mos_api_i2c_close, mos_api_i2c_open, mos_api_i2c_read, mos_api_i2c_write
+; 15/02/2024:	CW Integrate BDDP
 
 
 			.ASSUME	ADL = 1
@@ -89,6 +90,8 @@
 			XREF	_f_write
 			XREF	_f_stat 
 			XREF	_f_lseek
+			
+			XREF	_bdpp_fg_flush_drv_tx_packet
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -407,6 +410,11 @@ mos_api_editline:	LD	A, MB		; Check if MBASE is 0
 			PUSH	HL		; char	* buffer
 			CALL	_mos_EDITLINE
 			LD	A, L		; return value, only interested in lowest byte
+			
+			PUSH AF
+			CALL	_bdpp_fg_flush_drv_tx_packet
+			POP AF
+			
 			POP	HL
 			POP	BC
 			POP	DE

@@ -203,6 +203,7 @@ int main(void) {
 	// The main loop
 	//
 	while(1) {
+		bdpp_fg_flush_drv_tx_packet();
 		if(mos_input(&cmd, sizeof(cmd)) == 13) {
 			int err = mos_exec(&cmd);
 			if(err > 0) {
