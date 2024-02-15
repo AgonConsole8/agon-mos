@@ -177,11 +177,6 @@ _i2c_msg_size:		DS	1		; The (remaining) message size
 _history_no:		DS	1
 _history_size:		DS 	1
 
- XDEF _capture_count
- XDEF _capture_data
-_capture_count: DS 1
-_capture_data: DS 64
-
 			SECTION DATA		; This section is copied to RAM in cstartup.asm
 
 			END

@@ -19,9 +19,6 @@ extern void uart0_handler(void);
 extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void call_vdp_protocol(BYTE data);
-extern BYTE vdp_protocol_data[];
-extern BYTE capture_count;
-extern BYTE capture_data[254];
 
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
@@ -750,7 +747,6 @@ void bdpp_run_rx_state_machine() {
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
 		incoming_byte = UART0_read_rbr();
-		if (capture_count<254) { capture_data[capture_count++]=bdpp_rx_state; capture_data[capture_count++]=incoming_byte; }
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
 				if (incoming_byte == BDPP_PACKET_START_MARKER) {
@@ -913,11 +909,6 @@ void bdpp_run_rx_state_machine() {
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
 					if ((bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
 						// This is a driver-owned packet, meaning that MOS must handle it.
-						memcpy(vdp_protocol_data, bdpp_rx_packet->data, bdpp_rx_packet->act_size);
-						capture_data[capture_count++] = 0x66;
-						memcpy(&capture_data[capture_count], bdpp_rx_packet->data, bdpp_rx_packet->act_size);
-						capture_count += bdpp_rx_packet->act_size;
-						capture_data[capture_count++] = 0x77;
 						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
 							call_vdp_protocol(bdpp_rx_packet->data[i]);
 						}

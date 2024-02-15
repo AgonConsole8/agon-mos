@@ -86,31 +86,9 @@ call_vdp_protocol:
 			POP	IY
 			RET
 
- XREF _capture_count
- XREF _capture_data
-
 ; The UART protocol handler state machine
 ;
-vdp_protocol:
-
-			push bc
-			push af
-			ld a,(_capture_count)
-			cp a,254
-			jr z,isfull
-			push hl
-			ld hl,_capture_data
-			ADD8U_HL
-			ld (hl),c
-			ld a,(_capture_count)
-			inc a
-			ld (_capture_count),a
-			pop hl
-isfull:
-			pop af
-			pop bc
-
-			LD	A, (_vdp_protocol_state)
+vdp_protocol: LD A, (_vdp_protocol_state)
 			OR	A
 			JR	Z, vdp_protocol_state0
 			DEC	A
