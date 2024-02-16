@@ -786,6 +786,7 @@ int	mos_cmdBDPP(char *ptr) {
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
 			timer0_delay(20);
+			printf("This is text so that we can see whether it makes any difference at all.\r\n");
 			return 0; // OK
 		}
 	}

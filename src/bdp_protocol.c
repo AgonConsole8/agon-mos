@@ -67,6 +67,7 @@ static void push_to_list(BDPP_PACKET** head, BDPP_PACKET** tail, BDPP_PACKET* pa
 		*head = packet;
 	}
 	*tail = packet;
+	packet->next = NULL;
 }
 
 // Pull (remove) a packet from a list of packets
@@ -105,6 +106,7 @@ static void reset_receiver() {
 //
 void bdpp_fg_initialize_driver() {
 	int i;
+	BDPP_PACKET* packet;
 
 	bdpp_driver_flags = BDPP_FLAG_ALLOWED;
 	bdpp_tx_state = BDPP_TX_STATE_IDLE;
@@ -129,16 +131,18 @@ void bdpp_fg_initialize_driver() {
 
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
-		bdpp_drv_pkt_header[i].indexes = (BYTE)i;
-		bdpp_drv_pkt_header[i].data = bdpp_drv_pkt_data[i];
+		packet = &bdpp_drv_pkt_header[i];
+		packet->indexes = (BYTE)i;
+		packet->data = bdpp_drv_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
-						&bdpp_drv_pkt_header[i]);
+						packet);
 	}
 	
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
-		bdpp_app_pkt_header[i].indexes = (BYTE)i;
-		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
+		packet = &bdpp_app_pkt_header[i];
+		packet->indexes = (BYTE)i;
+		packet->flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 
 	reset_receiver();
@@ -187,7 +191,7 @@ BOOL bdpp_bg_is_busy() {
 // Enable BDDP mode for a specific stream
 //
 BOOL bdpp_fg_enable(BYTE stream) {
-	if (bdpp_driver_flags & BDPP_FLAG_ALLOWED && stream < BDPP_MAX_STREAMS) {
+	if ((bdpp_driver_flags & BDPP_FLAG_ALLOWED) && (stream < BDPP_MAX_STREAMS)) {
 		bdpp_fg_flush_drv_tx_packet();
 		bdpp_fg_tx_next_stream = stream;
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
@@ -345,7 +349,7 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		}
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
-		packet->flags = flags;
+
 		packet->indexes = indexes;
 		packet->max_size = size;
 		packet->act_size = size;
@@ -610,6 +614,7 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->max_size = size;
 		packet->act_size = size;
 		packet->data = (BYTE*)data;
+		packet->next = NULL;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
 		UART0_enable_interrupt(UART_IER_TRANSMITINT);
 		return TRUE;
