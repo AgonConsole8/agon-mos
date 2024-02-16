@@ -144,6 +144,7 @@ void init_interrupts(void) {
 //
 int main(void) {
 	UART 	pUART0;
+	int		err;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -193,7 +194,7 @@ int main(void) {
 	//
 	#if enable_config == 1	
 	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
-		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
@@ -205,7 +206,9 @@ int main(void) {
 	while(1) {
 		bdpp_fg_flush_drv_tx_packet();
 		if(mos_input(&cmd, sizeof(cmd)) == 13) {
-			int err = mos_exec(&cmd);
+			bdpp_fg_flush_drv_tx_packet();
+			err = mos_exec(&cmd);
+			bdpp_fg_flush_drv_tx_packet();
 			if(err > 0) {
 				mos_error(err);
 			}

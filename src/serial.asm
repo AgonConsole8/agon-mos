@@ -222,6 +222,7 @@ $$:			CALL 		UART1_serial_RX
 ; - F: NC if UART not enabled
 ;
 UART0_serial_PUTCH:
+			PUSH AF
 			PUSH BC
 			LD C, A				; Save character in C (lower 8 bits of parameter)
 			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
@@ -244,10 +245,12 @@ UART0_serial_PUTCH:
 			POP IX
 			POP HL
 			POP BC
+			POP AF
 			SCF							; Indicate character written
 			RET
 			
 UART0_serial_PUTCH_1:
+			POP AF
 			LD	A, (_serialFlags)		; Get the serial flags
 			TST	01h						; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip
