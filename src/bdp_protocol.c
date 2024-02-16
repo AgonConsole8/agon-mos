@@ -106,7 +106,6 @@ static void reset_receiver() {
 void bdpp_fg_initialize_driver() {
 	int i;
 
-	reset_receiver();
 	bdpp_driver_flags = BDPP_FLAG_ALLOWED;
 	bdpp_tx_state = BDPP_TX_STATE_IDLE;
 	bdpp_tx_packet = NULL;
@@ -141,6 +140,8 @@ void bdpp_fg_initialize_driver() {
 		bdpp_app_pkt_header[i].indexes = (BYTE)i;
 		bdpp_app_pkt_header[i].flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
+
+	reset_receiver();
 }
 
 // Get whether BDPP is allowed (both CPUs have it)
