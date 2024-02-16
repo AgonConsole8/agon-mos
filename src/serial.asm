@@ -235,7 +235,7 @@ UART0_serial_PUTCH:
 			PUSH IY
 			PUSH DE
 
-			LD B, 0						; Clear upper middle 8 bits of parameter
+			LD B, 0						; Clear middle 8 bits of parameter
 			PUSH BC						; Set 24-bit parameter for C call
 			CALL _bdpp_fg_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
 			POP BC						; Unstack the parameter
