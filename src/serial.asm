@@ -25,14 +25,14 @@
 			XDEF	UART0_serial_GETCH
 			XDEF	UART0_serial_PUTCH
 			XDEF	UART0_serial_PUTBUF
-
+			XDEF	UART0_wait_CTS
+			XDEF	_UART0_wait_CTS
 			XDEF	_UART0_serial_IDLE
-			XDEF	UART1_serial_TX
+
+XDEF	UART1_serial_TX
 			XDEF	UART1_serial_RX
 			XDEF	UART1_serial_GETCH
 			XDEF	UART1_serial_PUTCH
-			XDEF	UART0_wait_CTS
-			XDEF	_UART0_wait_CTS
 
 			XDEF	_putch
 			XDEF	_getch 
@@ -250,7 +250,6 @@ UART0_serial_PUTCH:
 			RET
 			
 UART0_serial_PUTCH_1:
-			POP AF
 			LD	A, (_serialFlags)		; Get the serial flags
 			TST	01h						; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip
@@ -260,6 +259,7 @@ UART0_serial_PUTCH_1:
 $$:			CALL	UART0_serial_TX		; Send the character
 			JR	NC, $B					; Repeat until sent
 			POP BC
+			POP AF
 			RET
 
 ; Write multiple characters to UART0 (blocking),
