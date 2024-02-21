@@ -74,14 +74,17 @@ void doLeftCursor() {
 	getCursorPos();
 	if(cursorX > 0) {
 		putch(0x08);
+		bdpp_fg_flush_drv_tx_packet();
 	}
 	else {
 		while(cursorX < (scrcols - 1)) {
 			putch(0x09);
+			bdpp_fg_flush_drv_tx_packet();
 			cursorX++;
 		}
 		putch(0x0B);
 	}
+	bdpp_fg_flush_drv_tx_packet();
 }
 
 // Move Cursor Right
@@ -90,14 +93,17 @@ void doRightCursor() {
 	getCursorPos();
 	if(cursorX < (scrcols - 1)) {
 		putch(0x09);
+		bdpp_fg_flush_drv_tx_packet();
 	}
 	else {
 		while(cursorX > 0) {
 			putch(0x08);
+			bdpp_fg_flush_drv_tx_packet();
 			cursorX--;
 		}
 		putch(0x0A);
 	}
+	bdpp_fg_flush_drv_tx_packet();
 }
 
 // Insert a character in the input string
@@ -123,6 +129,7 @@ BOOL insertCharacter(char *buffer, char c, int insertPos, int len, int limit) {
 		for(i = insertPos + 1; i <= len; i++, count++) {
 			putch(buffer[i]);
 		}
+		bdpp_fg_flush_drv_tx_packet();
 		for(i = 0; i < count; i++) {
 			doLeftCursor();
 		}
@@ -149,6 +156,7 @@ BOOL deleteCharacter(char *buffer, int insertPos, int len) {
 			buffer[i] = b;
 			putch(b ? b : ' ');
 		}
+		bdpp_fg_flush_drv_tx_packet();
 		for(i = 0; i < count; i++) {
 			doLeftCursor();
 		}
@@ -351,6 +359,9 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	}
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
+	if (keyr == 0x1B) {
+		printf("---HIT ESCAPE---///hit escape///+++hit escape+++");
+	}
 	bdpp_fg_flush_drv_tx_packet();
 	return keyr;					// Finally return the keycode
 }

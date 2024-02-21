@@ -9,9 +9,9 @@
 
 #include "bdp_protocol.h"
 #include <string.h>
-
+#include <stdio.h>
 #include "uart.h"
-#define NULL  0
+
 #define FALSE 0
 #define TRUE  1
 
@@ -20,6 +20,31 @@ extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void call_vdp_protocol(BYTE data);
 
+BYTE code_path[256];
+BYTE code_path2[256];
+BYTE cp_len;
+void mark_code_path(BYTE ch) {
+	if(cp_len<255) {
+		code_path[cp_len++]=ch;
+		code_path[cp_len]=0;
+	}
+}
+void get_code_path() {
+	DI();
+	strcpy(code_path2,code_path);
+	code_path[0]=0;
+	cp_len=0;
+	EI();
+}
+void show_code_path() {
+	return;
+	get_code_path();
+	if (code_path2[0]) {
+		//printf("--------------------------------\r\n");
+		printf("CP:[%s]\r\n",code_path2);
+		printf("--01--02--03--04--05--06--07--08--09--10--11--12--13--14--15--16\r\n");
+	}
+}
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
 
@@ -88,6 +113,7 @@ static BDPP_PACKET* pull_from_list(BDPP_PACKET** head, BDPP_PACKET** tail) {
 
 // Reset the receiver state
 static void reset_receiver() {
+	mark_code_path('a');
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	if (bdpp_rx_packet) {
 		bdpp_rx_packet->act_size = 0;
@@ -192,10 +218,12 @@ BOOL bdpp_bg_is_busy() {
 //
 BOOL bdpp_fg_enable(BYTE stream) {
 	if ((bdpp_driver_flags & BDPP_FLAG_ALLOWED) && (stream < BDPP_MAX_STREAMS)) {
+	mark_code_path('b');
 		bdpp_fg_flush_drv_tx_packet();
 		bdpp_fg_tx_next_stream = stream;
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+	mark_code_path('c');
 			set_vector(UART0_IVECT, bdpp_handler);
 		}
 		return TRUE;
@@ -226,8 +254,13 @@ BOOL bdpp_fg_disable() {
 // Returns NULL if no packet is available.
 //
 BDPP_PACKET* bdpp_fg_init_rx_drv_packet() {
-	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
+	BDPP_PACKET* packet;
+	DI();
+	packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
+	EI();
+	mark_code_path('d');
 	if (packet) {
+	mark_code_path('e');
 		packet->flags = 0;
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
 		packet->act_size = 0;
@@ -324,8 +357,13 @@ BOOL bdpp_fg_stop_using_app_packet(BYTE index) {
 // Returns NULL if no packet is available.
 //
 BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream) {
-	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
+	BDPP_PACKET* packet;
+	DI();
+	packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
+	EI();
+	mark_code_path('f');
 	if (packet) {
+	mark_code_path('g');
 		packet->flags = flags & BDPP_PKT_FLAG_USAGE_BITS;
 		packet->indexes = (packet->indexes & BDPP_PACKET_INDEX_BITS) | (stream << 4);
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
@@ -339,11 +377,15 @@ BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream) {
 // This function can fail if the packet is presently involved in a data transfer.
 //
 BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size) {
+	BDPP_PACKET* packet;
 	BYTE index = indexes & BDPP_PACKET_INDEX_BITS;
+	mark_code_path('h');
 	if (bdpp_fg_is_allowed() && (index < BDPP_MAX_APP_PACKETS)) {
-		BDPP_PACKET* packet = &bdpp_app_pkt_header[index];
+	mark_code_path('i');
+		packet = &bdpp_app_pkt_header[index];
 		DI();
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
+	mark_code_path('j');
 			EI();
 			return FALSE;
 		}
@@ -356,6 +398,7 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->data = (BYTE*)data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
 		UART0_enable_interrupt(UART_IER_TRANSMITINT);
+	mark_code_path('k');
 		EI();
 		return TRUE;
 	}
@@ -383,6 +426,7 @@ BOOL bdpp_fg_is_tx_app_packet_done(BYTE index) {
 //
 BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet;
+	mark_code_path('l');
 	bdpp_fg_flush_drv_tx_packet();
 	packet = bdpp_fg_init_tx_drv_packet(flags, stream);
 	return packet;
@@ -391,8 +435,10 @@ BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 static void bdpp_fg_internal_flush_drv_tx_packet() {
+	mark_code_path('m');
 	if (bdpp_fg_tx_build_packet) {
 		DI();
+	mark_code_path('n');
 			bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 			bdpp_fg_tx_build_packet = NULL;
@@ -407,8 +453,10 @@ static void bdpp_fg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 	while (TRUE) {
 		if (bdpp_fg_tx_build_packet) {
 			BYTE* pdata = bdpp_fg_tx_build_packet->data;
+	mark_code_path('o');
 			pdata[bdpp_fg_tx_build_packet->act_size++] = data;
 			if (bdpp_fg_tx_build_packet->act_size >= bdpp_fg_tx_build_packet->max_size) {
+	mark_code_path('p');
 				if (bdpp_fg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
 					bdpp_fg_tx_next_pkt_flags = 0;
 				} else {
@@ -418,6 +466,7 @@ static void bdpp_fg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 			}
 			break;
 		} else {
+	mark_code_path('q');
 			bdpp_fg_tx_build_packet = bdpp_fg_init_tx_drv_packet(bdpp_fg_tx_next_pkt_flags, bdpp_fg_tx_next_stream);
 		}
 	}
@@ -427,6 +476,7 @@ static void bdpp_fg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 // This is a blocking call, and might wait for room for data.
 void bdpp_fg_write_byte_to_drv_tx_packet(BYTE data) {
 	if (bdpp_fg_is_allowed()) {
+	mark_code_path('r');
 		bdpp_fg_internal_write_byte_to_drv_tx_packet(data);
 	}
 }
@@ -435,6 +485,7 @@ void bdpp_fg_write_byte_to_drv_tx_packet(BYTE data) {
 // This is a blocking call, and might wait for room for data.
 void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 	if (bdpp_fg_is_allowed()) {
+	mark_code_path('s');
 		while (count > 0) {
 			bdpp_fg_internal_write_byte_to_drv_tx_packet(*data++);
 			count--;
@@ -451,7 +502,10 @@ void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 // to "non-print", or vice versa.
 void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data) {
 	if (bdpp_fg_is_allowed()) {
+	mark_code_path('t');
+		if (data>=0x20 && data<=0x7E) mark_code_path(data);
 		if (!bdpp_fg_tx_build_packet) {
+	mark_code_path('u');
 			if (data >= 0x20 && data <= 0x7E) {
 				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
 			} else {
@@ -471,7 +525,9 @@ void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data) {
 // to "non-print", or vice versa.
 void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 	if (bdpp_fg_is_allowed()) {
+	mark_code_path('v');
 		if (!bdpp_fg_tx_build_packet) {
+	mark_code_path('@');
 			if (*data >= 0x20 && *data <= 0x7E) {
 				bdpp_fg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
 			} else {
@@ -485,7 +541,9 @@ void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 void bdpp_fg_flush_drv_tx_packet() {
+	mark_code_path('#');
 	if (bdpp_fg_tx_build_packet) {
+	mark_code_path('$');
 		bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
 		bdpp_fg_tx_next_stream = (bdpp_fg_tx_build_packet->indexes >> 4);
 		bdpp_fg_internal_flush_drv_tx_packet();
@@ -587,7 +645,9 @@ BOOL bdpp_bg_stop_using_app_packet(BYTE index) {
 //
 BDPP_PACKET* bdpp_bg_init_tx_drv_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
+	mark_code_path('%');
 	if (packet) {
+	mark_code_path('&');
 		packet->flags = flags & BDPP_PKT_FLAG_USAGE_BITS;
 		packet->indexes = (packet->indexes & BDPP_PACKET_INDEX_BITS) | (stream << 4);
 		packet->max_size = BDPP_SMALL_DATA_SIZE;
@@ -641,6 +701,7 @@ BOOL bdpp_bg_is_tx_app_packet_done(BYTE index) {
 //
 BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet;
+	mark_code_path('=');
 	bdpp_bg_flush_drv_tx_packet();
 	packet = bdpp_bg_init_tx_drv_packet(flags, stream);
 	return packet;
@@ -650,6 +711,7 @@ BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 //
 static void bdpp_bg_internal_flush_drv_tx_packet() {
 	if (bdpp_bg_tx_build_packet) {
+	mark_code_path('+');
 			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
@@ -663,6 +725,7 @@ static void bdpp_bg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 	while (TRUE) {
 		if (bdpp_bg_tx_build_packet) {
 			BYTE* pdata = bdpp_bg_tx_build_packet->data;
+	mark_code_path(':');
 			pdata[bdpp_bg_tx_build_packet->act_size++] = data;
 			if (bdpp_bg_tx_build_packet->act_size >= bdpp_bg_tx_build_packet->max_size) {
 				if (bdpp_bg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
@@ -702,6 +765,7 @@ void bdpp_bg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
 void bdpp_bg_write_drv_tx_byte_with_usage(BYTE data) {
+	mark_code_path('<');
 	if (!bdpp_bg_tx_build_packet) {
 		if (data >= 0x20 && data <= 0x7E) {
 			bdpp_bg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
@@ -733,6 +797,7 @@ void bdpp_bg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 void bdpp_bg_flush_drv_tx_packet() {
+	mark_code_path('>');
 	if (bdpp_bg_tx_build_packet) {
 		bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
 		bdpp_bg_tx_next_stream = (bdpp_bg_tx_build_packet->indexes >> 4);
@@ -743,6 +808,10 @@ void bdpp_bg_flush_drv_tx_packet() {
 
 //----------------------------------------------------
 
+BYTE rx_stuck;
+BYTE tx_stuck;
+BYTE isr_stuck;
+
 // Process the BDPP receiver (RX) state machine
 //
 void bdpp_run_rx_state_machine() {
@@ -750,8 +819,11 @@ void bdpp_run_rx_state_machine() {
 	BYTE packet_index;
 	BDPP_PACKET* packet;
 	WORD i;
+	BYTE cnt=0;
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
+		if (++cnt >= 32) { rx_stuck=TRUE; return; }
+		mark_code_path(bdpp_rx_state);
 		incoming_byte = UART0_read_rbr();
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
@@ -930,8 +1002,10 @@ void bdpp_run_rx_state_machine() {
 //
 void bdpp_run_tx_state_machine() {
 	BYTE outgoing_byte;
-	
-	while (UART0_read_lsr() & UART_LSR_THREMPTY) {
+	BYTE cnt=0;
+	while (UART0_read_lsr() & (UART_LSR_THREMPTY|UART_LSR_TEMT)) {
+		if (++cnt >= 32) { tx_stuck=TRUE; return; }
+		mark_code_path(bdpp_tx_state);
 		switch (bdpp_tx_state) {
 			case BDPP_TX_STATE_IDLE: {
 				if (bdpp_tx_packet = pull_from_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail)) {
@@ -1085,7 +1159,15 @@ void bdpp_run_tx_state_machine() {
 // that interrupts are always turned off during this function.
 //
 void bdp_protocol() {
-	BYTE dummy = UART0_read_iir();
-	bdpp_run_rx_state_machine();
-	bdpp_run_tx_state_machine();
+	BYTE dummy, i;
+	BYTE iir = UART0_read_iir() & UART_IIR_ISCMASK;;
+	if (iir == UART_IIR_CHARTIMEOUT) {
+		// Read entire FIFO to clear interrupt
+		for (i = 0; i < 16; i++) {
+			dummy = UART0_read_rbr();
+		}
+	} else {
+		bdpp_run_rx_state_machine();
+		bdpp_run_tx_state_machine();
+	}
 }
