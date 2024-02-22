@@ -240,18 +240,27 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int  len = 0;					// Length of current input
 	
 	if (bdpp_fg_is_enabled()) {
+		for (limit=0; limit < 500000; limit++) {
+			len++;
+		}
 		mark_allowed = 1;
 		for (i = 0; i<20; i++) {
-			for (limit=0; limit < 100000; limit++) {
+			for (limit=0; limit < 50000; limit++) {
 				len++;
 			}
-			printf("%02i.......|.........|.........|..",i);
+			printf("%02i.......|.........|.........|s",i);
 			bdpp_fg_flush_drv_tx_packet();
-			for (limit=0; limit < 100000; limit++) {
+			for (limit=0; limit < 50000; limit++) {
 				len++;
 			}
-			putch(0);
-			bdpp_fg_flush_drv_tx_packet();
+			if (i==19) {
+				//putch(0);
+				//bdpp_fg_flush_drv_tx_packet();
+				UART0_write_thr(0);
+				UART0_write_thr(0);
+				UART0_write_thr(0);
+				UART0_write_thr(0);
+			}
 		}
 		mark_allowed = 0;
 		//show_code_path();

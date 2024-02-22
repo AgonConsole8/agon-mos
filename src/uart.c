@@ -88,7 +88,7 @@ BYTE open_UART0(UART * pUART) {
 	UART0_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
 	UART0_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
 	UART0_MCTL = 0x00;												// Bring modem control register to reset value
-	UART0_FCTL = 0x07;												// Enable and clear hardware FIFOs
+	UART0_FCTL = 0x01;												// Enable (don't clear) hardware FIFOs
 	UART0_IER = pUART->interrupts;									// Set interrupts
 	
 	SETREG_LCR0(pUART->dataBits, pUART->stopBits, pUART->parity);	// Set the line status register
@@ -127,7 +127,7 @@ BYTE open_UART1(UART * pUART) {
 	UART1_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
 	UART1_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
 	UART1_MCTL = 0x00;												// Bring modem control register to reset value
-	UART1_FCTL = 0x07;												// Enable and clear hardware FIFOs
+	UART1_FCTL = 0x01;												// Enable (don't clear) hardware FIFOs
 	UART1_IER = pUART->interrupts;									// Set interrupts
 
 	serialFlags |= 0x10;

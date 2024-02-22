@@ -168,8 +168,10 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
+	if (!bdpp_fg_is_enabled()) {
 	putch(MOS_prompt);
 	bdpp_fg_flush_drv_tx_packet();
+	}
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	bdpp_fg_flush_drv_tx_packet();
