@@ -23,8 +23,9 @@ extern void call_vdp_protocol(BYTE data);
 BYTE code_path[256];
 BYTE code_path2[256];
 BYTE cp_len;
+BYTE mark_allowed;
 void mark_code_path(BYTE ch) {
-	if(cp_len<255) {
+	if(mark_allowed && cp_len<255) {
 		code_path[cp_len++]=ch;
 		code_path[cp_len]=0;
 	}
@@ -37,7 +38,6 @@ void get_code_path() {
 	EI();
 }
 void show_code_path() {
-	return;
 	get_code_path();
 	if (code_path2[0]) {
 		//printf("--------------------------------\r\n");
@@ -74,10 +74,12 @@ BDPP_PACKET* bdpp_rx_pkt_head; 	// Points to head of receive packet list
 BDPP_PACKET* bdpp_rx_pkt_tail; 	// Points to tail of receive packet list
 
 // Header information for driver-owned small packets (TX and RX)
-BDPP_PACKET bdpp_drv_pkt_header[BDPP_MAX_DRIVER_PACKETS];
+BDPP_PACKET bdpp_drv_tx_pkt_header[BDPP_MAX_DRIVER_PACKETS];
+BDPP_PACKET bdpp_drv_rx_pkt_header;
 
 // Data bytes for driver-owned small packets
-BYTE bdpp_drv_pkt_data[BDPP_MAX_DRIVER_PACKETS][BDPP_SMALL_DATA_SIZE];
+BYTE bdpp_drv_tx_pkt_data[BDPP_MAX_DRIVER_PACKETS][BDPP_SMALL_DATA_SIZE];
+BYTE bdpp_drv_rx_pkt_data[BDPP_SMALL_DATA_SIZE];
 
 // Header information for app-owned packets (TX and RX)
 BDPP_PACKET bdpp_app_pkt_header[BDPP_MAX_APP_PACKETS];
@@ -117,10 +119,8 @@ static void reset_receiver() {
 	bdpp_rx_state = BDPP_RX_STATE_AWAIT_START;
 	if (bdpp_rx_packet) {
 		bdpp_rx_packet->act_size = 0;
-		// Clear most flags and test for driver-owned (not app-owned)
-		if (!(bdpp_rx_packet->flags &= BDPP_PKT_FLAG_APP_OWNED)) {
-			push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_rx_packet);
-		}
+		// Clear most flags (all except app-owned)
+		bdpp_rx_packet->flags &= BDPP_PKT_FLAG_APP_OWNED;
 		bdpp_rx_packet = NULL;
 	}
 }
@@ -143,9 +143,11 @@ void bdpp_fg_initialize_driver() {
 	bdpp_tx_pkt_tail = NULL;
 	bdpp_rx_pkt_head = NULL;
 	bdpp_rx_pkt_tail = NULL;
-	memset(bdpp_drv_pkt_header, 0, sizeof(bdpp_drv_pkt_header));
+	memset(bdpp_drv_tx_pkt_header, 0, sizeof(bdpp_drv_tx_pkt_header));
+	memset(&bdpp_drv_rx_pkt_header, 0, sizeof(bdpp_drv_rx_pkt_header));
 	memset(bdpp_app_pkt_header, 0, sizeof(bdpp_app_pkt_header));
-	memset(bdpp_drv_pkt_data, 0, sizeof(bdpp_drv_pkt_data));
+	memset(bdpp_drv_tx_pkt_data, 0, sizeof(bdpp_drv_tx_pkt_data));
+	memset(bdpp_drv_rx_pkt_data, 0, sizeof(bdpp_drv_rx_pkt_data));
 
 	bdpp_fg_tx_build_packet = NULL;
 	bdpp_fg_tx_next_pkt_flags = 0;
@@ -157,12 +159,13 @@ void bdpp_fg_initialize_driver() {
 
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
-		packet = &bdpp_drv_pkt_header[i];
+		packet = &bdpp_drv_tx_pkt_header[i];
 		packet->indexes = (BYTE)i;
-		packet->data = bdpp_drv_pkt_data[i];
+		packet->data = bdpp_drv_tx_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
 						packet);
 	}
+	bdpp_drv_rx_pkt_header.data = bdpp_drv_rx_pkt_data;
 	
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
@@ -249,24 +252,6 @@ BOOL bdpp_fg_disable() {
 
 //----------------------------------------------------------
 //*** PACKET RECEPTION (RX) FROM FOREGROUND (MAIN THREAD) ***
-
-// Initialize an incoming driver-owned packet, if one is available
-// Returns NULL if no packet is available.
-//
-BDPP_PACKET* bdpp_fg_init_rx_drv_packet() {
-	BDPP_PACKET* packet;
-	DI();
-	packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
-	EI();
-	mark_code_path('d');
-	if (packet) {
-	mark_code_path('e');
-		packet->flags = 0;
-		packet->max_size = BDPP_SMALL_DATA_SIZE;
-		packet->act_size = 0;
-	}
-	return packet;
-}
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
@@ -397,7 +382,7 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->act_size = size;
 		packet->data = (BYTE*)data;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-		UART0_enable_interrupt(UART_IER_TRANSMITINT);
+		UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 	mark_code_path('k');
 		EI();
 		return TRUE;
@@ -442,7 +427,7 @@ static void bdpp_fg_internal_flush_drv_tx_packet() {
 			bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 			bdpp_fg_tx_build_packet = NULL;
-			UART0_enable_interrupt(UART_IER_TRANSMITINT);
+			UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 		EI();
 	}
 }
@@ -525,7 +510,7 @@ void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data) {
 // to "non-print", or vice versa.
 void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 	if (bdpp_fg_is_allowed()) {
-	mark_code_path('v');
+	mark_code_path('-');
 		if (!bdpp_fg_tx_build_packet) {
 	mark_code_path('@');
 			if (*data >= 0x20 && *data <= 0x7E) {
@@ -676,7 +661,7 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->data = (BYTE*)data;
 		packet->next = NULL;
 		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-		UART0_enable_interrupt(UART_IER_TRANSMITINT);
+		UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 		return TRUE;
 	}
 	return FALSE;
@@ -715,7 +700,7 @@ static void bdpp_bg_internal_flush_drv_tx_packet() {
 			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
-			UART0_enable_interrupt(UART_IER_TRANSMITINT);
+			UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 	}
 }
 
@@ -808,10 +793,6 @@ void bdpp_bg_flush_drv_tx_packet() {
 
 //----------------------------------------------------
 
-BYTE rx_stuck;
-BYTE tx_stuck;
-BYTE isr_stuck;
-
 // Process the BDPP receiver (RX) state machine
 //
 void bdpp_run_rx_state_machine() {
@@ -819,10 +800,8 @@ void bdpp_run_rx_state_machine() {
 	BYTE packet_index;
 	BDPP_PACKET* packet;
 	WORD i;
-	BYTE cnt=0;
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
-		if (++cnt >= 32) { rx_stuck=TRUE; return; }
 		mark_code_path(bdpp_rx_state);
 		incoming_byte = UART0_read_rbr();
 		switch (bdpp_rx_state) {
@@ -985,7 +964,7 @@ void bdpp_run_rx_state_machine() {
 					// Packet is complete
 					bdpp_rx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
-					if ((bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) == 0) {
+					if (!(bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {
 						// This is a driver-owned packet, meaning that MOS must handle it.
 						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
 							call_vdp_protocol(bdpp_rx_packet->data[i]);
@@ -1002,9 +981,7 @@ void bdpp_run_rx_state_machine() {
 //
 void bdpp_run_tx_state_machine() {
 	BYTE outgoing_byte;
-	BYTE cnt=0;
 	while (UART0_read_lsr() & (UART_LSR_THREMPTY|UART_LSR_TEMT)) {
-		if (++cnt >= 32) { tx_stuck=TRUE; return; }
 		mark_code_path(bdpp_tx_state);
 		switch (bdpp_tx_state) {
 			case BDPP_TX_STATE_IDLE: {
@@ -1012,7 +989,7 @@ void bdpp_run_tx_state_machine() {
 					UART0_write_thr(BDPP_PACKET_START_MARKER);
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START_1;
 				} else {
-					UART0_disable_interrupt(UART_IER_TRANSMITINT);
+					UART0_disable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 					return;
 				}
 			} break;
@@ -1141,6 +1118,11 @@ void bdpp_run_tx_state_machine() {
 			
 			case BDPP_TX_STATE_SENT_ALL_DATA: {
 				UART0_write_thr(BDPP_PACKET_END_MARKER);
+				bdpp_tx_state = BDPP_TX_STATE_SENT_END_1;
+			} break;
+			
+			case BDPP_TX_STATE_SENT_END_1: {
+				UART0_write_thr(BDPP_PACKET_END_MARKER); // tell the UHCI to end the packet
 				bdpp_tx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 				bdpp_tx_packet->flags |= BDPP_PKT_FLAG_DONE;
 				if (!(bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {

@@ -158,7 +158,6 @@ BYTE mos_getkey() {
 	keyascii = 0;			// Reset keycode to debounce the key
 	return ch;
 }
-extern void show_code_path();
 
 // Call the line editor from MOS
 // Parameters:
@@ -171,7 +170,6 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
 	putch(MOS_prompt);
 	bdpp_fg_flush_drv_tx_packet();
-	show_code_path();
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	bdpp_fg_flush_drv_tx_packet();

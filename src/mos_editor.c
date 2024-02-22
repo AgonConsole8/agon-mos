@@ -209,6 +209,16 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 	gotoEditLineStart(len);
 }
 
+#include "bdp_protocol.h"
+extern BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
+extern BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet list
+extern BYTE bdpp_tx_state; 			// Driver transmitter state
+extern BDPP_PACKET* bdpp_tx_packet; 	// Points to the packet being transmitted
+extern WORD bdpp_tx_byte_count; 		// Number of data bytes transmitted
+extern BDPP_PACKET* bdpp_tx_pkt_head; 	// Points to head of transmit packet list
+extern BDPP_PACKET* bdpp_tx_pkt_tail; 	// Points to tail of transmit packet list
+extern BDPP_PACKET* bdpp_fg_tx_build_packet; // Points to the packet being built
+
 // The main line edit function
 // Parameters:
 // - buffer: Pointer to the line edit buffer
@@ -217,7 +227,10 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
+extern BYTE mark_allowed;
+extern void show_code_path();
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
+	int i;
 	BYTE keya = 0;					// The ASCII key	
 	BYTE keyc = 0;					// The FabGL keycode
 	BYTE keyr = 0;					// The ASCII key to return back to the calling program
@@ -226,6 +239,26 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
 	
+	if (bdpp_fg_is_enabled()) {
+		mark_allowed = 1;
+		for (i = 0; i<1; i++) {
+			for (limit=0; limit < 100000; limit++) {
+				len++;
+			}
+			printf("%02i.......|.........|.........|..",i);
+			bdpp_fg_flush_drv_tx_packet();
+			for (limit=0; limit < 100000; limit++) {
+				len++;
+			}
+			putch(0);
+			bdpp_fg_flush_drv_tx_packet();
+		}
+		mark_allowed = 0;
+		//show_code_path();
+		//bdpp_fg_flush_drv_tx_packet();
+		while(1);
+		
+	}
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required

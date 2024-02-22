@@ -58,10 +58,11 @@
 #define BDPP_TX_STATE_SENT_ESC_SIZE_2_SS 'X'	// Recently sent escape for the size, part 2 (start substitute)
 #define BDPP_TX_STATE_SENT_ESC_SIZE_2_ES 'Y'	// Recently sent escape for the size, part 2 (escape substitute)
 #define BDPP_TX_STATE_SENT_SIZE_2		'Z'		// Recently sent the packet size, part 2
-#define BDPP_TX_STATE_SENT_ESC_DATA_SS	'w'		// Recently sent escape for a data byte (start substitute)
-#define BDPP_TX_STATE_SENT_ESC_DATA_ES	'x'		// Recently sent escape for a data byte (escape substitute)
-#define BDPP_TX_STATE_SENT_DATA			'y'		// Recently sent a packet data byte
-#define BDPP_TX_STATE_SENT_ALL_DATA		'z'		// Recently sent the last packet data byte
+#define BDPP_TX_STATE_SENT_ESC_DATA_SS	'v'		// Recently sent escape for a data byte (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_DATA_ES	'w'		// Recently sent escape for a data byte (escape substitute)
+#define BDPP_TX_STATE_SENT_DATA			'x'		// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_ALL_DATA		'y'		// Recently sent the last packet data byte
+#define BDPP_TX_STATE_SENT_END_1		'z'		// Recently sent the trailing separator
 
 #define BDPP_PKT_FLAG_PRINT				0x00	// Indicates packet contains printable data
 #define BDPP_PKT_FLAG_COMMAND			0x01	// Indicates packet contains a command or request
@@ -111,10 +112,6 @@ BOOL bdpp_fg_disable();
 
 //----------------------------------------------------------
 //*** PACKET RECEPTION (RX) FROM FOREGROUND (MAIN THREAD) ***
-
-// Initialize an incoming driver-owned packet, if one is available
-// Returns NULL if no packet is available
-BDPP_PACKET* bdpp_fg_init_rx_drv_packet();
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
