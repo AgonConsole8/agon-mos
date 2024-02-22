@@ -243,28 +243,14 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 		for (limit=0; limit < 500000; limit++) {
 			len++;
 		}
-		mark_allowed = 1;
 		for (i = 0; i<20; i++) {
-			for (limit=0; limit < 50000; limit++) {
-				len++;
-			}
 			printf("%02i.......|.........|.........|s",i);
 			bdpp_fg_flush_drv_tx_packet();
-			for (limit=0; limit < 50000; limit++) {
-				len++;
-			}
-			if (i==19) {
-				//putch(0);
-				//bdpp_fg_flush_drv_tx_packet();
-				UART0_write_thr(0);
-				UART0_write_thr(0);
-				UART0_write_thr(0);
-				UART0_write_thr(0);
-			}
 		}
-		mark_allowed = 0;
-		//show_code_path();
-		//bdpp_fg_flush_drv_tx_packet();
+		for (limit=0; limit<400; limit++) {
+			len++;
+		}
+		UART0_write_thr(0);
 		while(1);
 		
 	}
