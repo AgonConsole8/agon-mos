@@ -241,7 +241,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	
 	if (bdpp_fg_is_enabled()) {
 		mark_allowed = 1;
-		for (i = 0; i<1; i++) {
+		for (i = 0; i<20; i++) {
 			for (limit=0; limit < 100000; limit++) {
 				len++;
 			}
