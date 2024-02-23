@@ -20,30 +20,11 @@ extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void call_vdp_protocol(BYTE data);
 
-BYTE code_path[256];
-BYTE code_path2[256];
-BYTE cp_len;
-BYTE mark_allowed;
 void mark_code_path(BYTE ch) {
-	if(mark_allowed && cp_len<255) {
-		code_path[cp_len++]=ch;
-		code_path[cp_len]=0;
-	}
 }
 void get_code_path() {
-	DI();
-	strcpy(code_path2,code_path);
-	code_path[0]=0;
-	cp_len=0;
-	EI();
 }
 void show_code_path() {
-	get_code_path();
-	if (code_path2[0]) {
-		//printf("--------------------------------\r\n");
-		printf("CP:[%s]\r\n",code_path2);
-		printf("--01--02--03--04--05--06--07--08--09--10--11--12--13--14--15--16\r\n");
-	}
 }
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
