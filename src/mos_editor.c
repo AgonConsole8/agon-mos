@@ -227,8 +227,6 @@ extern BDPP_PACKET* bdpp_fg_tx_build_packet; // Points to the packet being built
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
-extern BYTE mark_allowed;
-extern void show_code_path();
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int i;
 	BYTE keya = 0;					// The ASCII key	

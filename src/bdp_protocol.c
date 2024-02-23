@@ -22,10 +22,6 @@ extern void call_vdp_protocol(BYTE data);
 
 void mark_code_path(BYTE ch) {
 }
-void get_code_path() {
-}
-void show_code_path() {
-}
 
 BYTE bdpp_driver_flags;	// Flags controlling the driver
 
@@ -667,7 +663,6 @@ BOOL bdpp_bg_is_tx_app_packet_done(BYTE index) {
 //
 BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 	BDPP_PACKET* packet;
-	mark_code_path('=');
 	bdpp_bg_flush_drv_tx_packet();
 	packet = bdpp_bg_init_tx_drv_packet(flags, stream);
 	return packet;
@@ -677,7 +672,6 @@ BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 //
 static void bdpp_bg_internal_flush_drv_tx_packet() {
 	if (bdpp_bg_tx_build_packet) {
-	mark_code_path('+');
 			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
@@ -691,7 +685,6 @@ static void bdpp_bg_internal_write_byte_to_drv_tx_packet(BYTE data) {
 	while (TRUE) {
 		if (bdpp_bg_tx_build_packet) {
 			BYTE* pdata = bdpp_bg_tx_build_packet->data;
-	mark_code_path(':');
 			pdata[bdpp_bg_tx_build_packet->act_size++] = data;
 			if (bdpp_bg_tx_build_packet->act_size >= bdpp_bg_tx_build_packet->max_size) {
 				if (bdpp_bg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
@@ -731,7 +724,6 @@ void bdpp_bg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count) {
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
 void bdpp_bg_write_drv_tx_byte_with_usage(BYTE data) {
-	mark_code_path('<');
 	if (!bdpp_bg_tx_build_packet) {
 		if (data >= 0x20 && data <= 0x7E) {
 			bdpp_bg_tx_next_pkt_flags = BDPP_PKT_FLAG_FIRST|BDPP_PKT_FLAG_PRINT;
@@ -763,7 +755,6 @@ void bdpp_bg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 void bdpp_bg_flush_drv_tx_packet() {
-	mark_code_path('>');
 	if (bdpp_bg_tx_build_packet) {
 		bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_LAST;
 		bdpp_bg_tx_next_stream = (bdpp_bg_tx_build_packet->indexes >> 4);
@@ -783,7 +774,6 @@ void bdpp_run_rx_state_machine() {
 	WORD i;
 
 	while (UART0_read_lsr() & UART_LSR_DATA_READY) {
-		mark_code_path(bdpp_rx_state);
 		incoming_byte = UART0_read_rbr();
 		switch (bdpp_rx_state) {
 			case BDPP_RX_STATE_AWAIT_START: {
@@ -963,7 +953,6 @@ void bdpp_run_rx_state_machine() {
 void bdpp_run_tx_state_machine() {
 	BYTE outgoing_byte;
 	while (UART0_read_lsr() & (UART_LSR_THREMPTY|UART_LSR_TEMT)) {
-		mark_code_path(bdpp_tx_state);
 		switch (bdpp_tx_state) {
 			case BDPP_TX_STATE_IDLE: {
 				if (bdpp_tx_packet = pull_from_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail)) {
