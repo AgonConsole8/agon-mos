@@ -2,13 +2,14 @@
  * Title:			AGON MOS - Real Time Clock
  * Author:			Dean Belfield
  * Created:			09/03/2023
- * Last Updated:	26/09/2023
+ * Last Updated:	23/02/2024
  * 
  * Modinfo:
  * 15/03/2023:		Added rtc_getDateString, rtc_update
  * 21/03/2023:		Uses VDP values from defines.h
  * 05/06/2023:		Added RTC enable flag
  * 26/09/2023:		Timestamps now packed into 6 bytes
+ * 23/02/2024:		Integrate BDPP
  */
 
 #include <ez80.h>
@@ -21,6 +22,7 @@
 #include "defines.h"
 #include "uart.h"
 #include "clock.h"
+#include "bdp_protocol.h"
 
 extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 extern volatile BYTE rtc_enable;				// In globals.asm
@@ -62,7 +64,8 @@ void rtc_update() {
 	putch(0);
 	putch(VDP_rtc);
 	putch(0);					// 0: Get time
-
+	bdpp_fg_flush_drv_tx_packet();
+	
 	while((vdp_protocol_flags & 0x20) == 0);	
 }
 

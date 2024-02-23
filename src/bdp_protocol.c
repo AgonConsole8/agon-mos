@@ -20,6 +20,8 @@ extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void call_vdp_protocol(BYTE data);
 
+WORD pushed_index_bits;
+
 BYTE bdpp_driver_flags;	// Flags controlling the driver
 
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
@@ -58,10 +60,13 @@ BYTE bdpp_drv_rx_pkt_data[BDPP_SMALL_DATA_SIZE];
 // Header information for app-owned packets (TX and RX)
 BDPP_PACKET bdpp_app_pkt_header[BDPP_MAX_APP_PACKETS];
 
+void bdpp_run_tx_state_machine();
+
 //--------------------------------------------------
 
 // Push (append) a packet to a list of packets
-static void push_to_list(BDPP_PACKET** head, BDPP_PACKET** tail, BDPP_PACKET* packet) {
+static BDPP_PACKET* push_to_list(BDPP_PACKET** head, BDPP_PACKET** tail, BDPP_PACKET* packet) {
+	BDPP_PACKET* old_head = *head;
 	if (*tail) {
 		(*tail)->next = packet;
 	} else {
@@ -69,6 +74,7 @@ static void push_to_list(BDPP_PACKET** head, BDPP_PACKET** tail, BDPP_PACKET* pa
 	}
 	*tail = packet;
 	packet->next = NULL;
+	return old_head;
 }
 
 // Pull (remove) a packet from a list of packets
@@ -98,6 +104,19 @@ static void reset_receiver() {
 	}
 }
 
+// Turn on TX interrupt
+//
+// Intended to be called with interrupts disabled!
+//
+void bdpp_enable_tx_interrupt(BDPP_PACKET* old_head) {
+	UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+	if (!bdpp_tx_packet && !old_head) {
+		// Not currently transmitting; clear any pending interrupt.
+		//UART0_write_thr(0);
+		//bdpp_run_tx_state_machine();
+	}
+}
+
 //----------------------------------------------------------
 //*** OVERALL MANAGEMENT ***
 
@@ -105,8 +124,10 @@ static void reset_receiver() {
 //
 void bdpp_fg_initialize_driver() {
 	int i;
+	int len=0;//KLUDGE
 	BDPP_PACKET* packet;
 
+	DI();
 	bdpp_driver_flags = BDPP_FLAG_ALLOWED;
 	bdpp_tx_state = BDPP_TX_STATE_IDLE;
 	bdpp_tx_packet = NULL;
@@ -148,6 +169,11 @@ void bdpp_fg_initialize_driver() {
 	}
 
 	reset_receiver();
+	EI();
+	// *** KLUDGE
+	for (i=0; i<500000; i++) {
+		len++;
+	}
 }
 
 // Get whether BDPP is allowed (both CPUs have it)
@@ -200,6 +226,10 @@ BOOL bdpp_fg_enable(BYTE stream) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, bdpp_handler);
 		}
+		printf("(%02hX %02hX %02hX)",
+				bdpp_drv_tx_pkt_header[0].indexes,
+				bdpp_drv_tx_pkt_header[1].indexes,
+				bdpp_drv_tx_pkt_header[2].indexes);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -347,8 +377,8 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->max_size = size;
 		packet->act_size = size;
 		packet->data = (BYTE*)data;
-		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-		UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+		packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
+		bdpp_enable_tx_interrupt(packet);
 		EI();
 		return TRUE;
 	}
@@ -384,12 +414,14 @@ BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 static void bdpp_fg_internal_flush_drv_tx_packet() {
+	BDPP_PACKET* packet;
 	if (bdpp_fg_tx_build_packet) {
 		DI();
+			pushed_index_bits |= (((WORD)1) << (bdpp_fg_tx_build_packet->indexes & BDPP_PACKET_INDEX_BITS));
 			bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
-			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
+			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 			bdpp_fg_tx_build_packet = NULL;
-			UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+			bdpp_enable_tx_interrupt(packet);
 		EI();
 	}
 }
@@ -608,8 +640,8 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		packet->act_size = size;
 		packet->data = (BYTE*)data;
 		packet->next = NULL;
-		push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
-		UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+		packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, packet);
+		bdpp_enable_tx_interrupt(packet);
 		return TRUE;
 	}
 	return FALSE;
@@ -642,32 +674,31 @@ BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
 //
 static void bdpp_bg_internal_flush_drv_tx_packet() {
+	BDPP_PACKET* packet;
 	if (bdpp_bg_tx_build_packet) {
 			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
-			push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
+			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
-			UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+			bdpp_enable_tx_interrupt(packet);
 	}
 }
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
 static void bdpp_bg_internal_write_byte_to_drv_tx_packet(BYTE data) {
-	while (TRUE) {
-		if (bdpp_bg_tx_build_packet) {
-			BYTE* pdata = bdpp_bg_tx_build_packet->data;
-			pdata[bdpp_bg_tx_build_packet->act_size++] = data;
-			if (bdpp_bg_tx_build_packet->act_size >= bdpp_bg_tx_build_packet->max_size) {
-				if (bdpp_bg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
-					bdpp_bg_tx_next_pkt_flags = 0;
-				} else {
-					bdpp_bg_tx_next_pkt_flags = bdpp_bg_tx_build_packet->flags & ~BDPP_PKT_FLAG_FIRST;
-				}
-				bdpp_bg_internal_flush_drv_tx_packet();
+	if (!bdpp_bg_tx_build_packet) {
+		bdpp_bg_tx_build_packet = bdpp_bg_init_tx_drv_packet(bdpp_bg_tx_next_pkt_flags, bdpp_bg_tx_next_stream);
+	}
+	if (bdpp_bg_tx_build_packet) {
+		BYTE* pdata = bdpp_bg_tx_build_packet->data;
+		pdata[bdpp_bg_tx_build_packet->act_size++] = data;
+		if (bdpp_bg_tx_build_packet->act_size >= bdpp_bg_tx_build_packet->max_size) {
+			if (bdpp_bg_tx_build_packet->flags & BDPP_PKT_FLAG_LAST) {
+				bdpp_bg_tx_next_pkt_flags = 0;
+			} else {
+				bdpp_bg_tx_next_pkt_flags = bdpp_bg_tx_build_packet->flags & ~BDPP_PKT_FLAG_FIRST;
 			}
-			break;
-		} else {
-			bdpp_bg_tx_build_packet = bdpp_bg_init_tx_drv_packet(bdpp_bg_tx_next_pkt_flags, bdpp_bg_tx_next_stream);
+			bdpp_bg_internal_flush_drv_tx_packet();
 		}
 	}
 }

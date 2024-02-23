@@ -168,10 +168,8 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	if (!bdpp_fg_is_enabled()) {
 	putch(MOS_prompt);
 	bdpp_fg_flush_drv_tx_packet();
-	}
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	bdpp_fg_flush_drv_tx_packet();
@@ -775,6 +773,16 @@ int	mos_cmdCLS(char *ptr) {
 // Returns:
 // - MOS error code
 //
+
+extern WORD pushed_index_bits;
+extern BDPP_PACKET* bdpp_free_drv_pkt_head;
+void print_head() {
+	if (bdpp_free_drv_pkt_head) {
+		putch('m'+(bdpp_free_drv_pkt_head->indexes&0xf));
+	} else {
+		putch('?');
+	}
+}
 int	mos_cmdBDPP(char *ptr) {
 	if (bdpp_fg_is_enabled()) {
 		return 0; // OK
@@ -788,8 +796,32 @@ int	mos_cmdBDPP(char *ptr) {
 		UART0_serial_IDLE();
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
-			timer0_delay(20);
-			//printf("This is text so that we can see whether it makes any difference at all.\r\n");
+			print_head();
+			printf("%%garbage%%");
+			print_head();
+			printf("A123456789A123456789A123456789A123456789A123456789A123456789A123456789A123456789");
+			printf("b123456789b123456789b123456789b123456789b123456789b123456789b123456789b123456789");
+			printf("C123456789C123456789C123456789C123456789C123456789C123456789C123456789C123456789");
+			printf("d123456789d123456789d123456789d123456789d123456789d123456789d123456789d123456789");
+			print_head();
+			printf("+A123456789A123456789A123456789A123456789A123456789A123456789A123456789A1234567-");
+			printf("+b123456789b123456789b123456789b123456789b123456789b123456789b123456789b1234567-");
+			printf("+C123456789C123456789C123456789C123456789C123456789C123456789C123456789C1234567-");
+			printf("+d123456789d123456789d123456789d123456789d123456789d123456789d123456789d1234567-");
+			print_head();
+			printf("/A123456789A123456789A123456789A123456789A123456789A123456789A123456789A1234567/");
+			printf("/b123456789b123456789b123456789b123456789b123456789b123456789b123456789b1234567/");
+			printf("/C123456789C123456789C123456789C123456789C123456789C123456789C123456789C1234567/");
+			printf("/d123456789d123456789d123456789d123456789d123456789d123456789d123456789d1234567/");
+			print_head();
+			printf(".A123456789A123456789A123456789A123456789A123456789A123456789A123456789A1234567.");
+			printf(".b123456789b123456789b123456789b123456789b123456789b123456789b123456789b1234567.");
+			printf(".C123456789C123456789C123456789C123456789C123456789C123456789C123456789C1234567.");
+			printf(".d123456789d123456789d123456789d123456789d123456789d123456789d123456789d1234567.");
+			print_head();
+			bdpp_fg_flush_drv_tx_packet();
+			printf("<%hX>",pushed_index_bits);
+			bdpp_fg_flush_drv_tx_packet();
 			return 0; // OK
 		}
 	}

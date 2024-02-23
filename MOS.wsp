@@ -11,6 +11,7 @@ ptn_Child3=Document-2
 ptn_Child4=Document-3
 ptn_Child5=Document-4
 ptn_Child6=Document-5
+ptn_Child7=Document-6
 
 [WorkState_v1_2.Frames.ChildFrames.Document-0]
 ptn_Child1=ViewFrame-0
@@ -21,7 +22,7 @@ DocTemplateIndex=0
 DocumentString=IDE.Document
 IsActiveChildFrame=False
 IsFrameVisible=True
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPOEAAAAAAOEAAAAAANAEAAAAAANBAAAAA
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPMJAAAAAAMJAAAAAALFEAAAAAPBCAAAAA
 
 [WorkState_v1_2.Frames.ChildFrames.Document-1]
 ptn_Child1=ViewFrame-0
@@ -32,46 +33,57 @@ DocTemplateIndex=0
 DocumentString=IDE.Document
 IsActiveChildFrame=True
 IsFrameVisible=True
-WindowPlacement=MCAAAAAACAAAAAAADAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPIGAAAAAAIGAAAAAABBEAAAAAENBAAAAA
+WindowPlacement=MCAAAAAACAAAAAAADAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPGLAAAAAAGLAAAAAAPFEAAAAADCCAAAAA
 
 [WorkState_v1_2.Frames.ChildFrames.Document-2]
 ptn_Child1=ViewFrame-0
 
 [WorkState_v1_2.Frames.ChildFrames.Document-2.ViewFrame-0]
-DocPathName=src\mos_api.asm
-DocTemplateIndex=0
-DocumentString=IDE.Document
-IsActiveChildFrame=False
-IsFrameVisible=True
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPCIAAAAAACIAAAAAALCEAAAAAOOBAAAAA
-
-[WorkState_v1_2.Frames.ChildFrames.Document-3]
-ptn_Child1=ViewFrame-0
-
-[WorkState_v1_2.Frames.ChildFrames.Document-3.ViewFrame-0]
 DocPathName=src\mos.c
 DocTemplateIndex=0
 DocumentString=IDE.Document
 IsActiveChildFrame=False
 IsFrameVisible=True
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPMJAAAAAAMJAAAAAAFEEAAAAAIACAAAAA
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPAAAAAAAAAAAAAAAAJKDAAAAANGBAAAAA
 
-[WorkState_v1_2.Frames.ChildFrames.Document-4]
+[WorkState_v1_2.Frames.ChildFrames.Document-3]
 ptn_Child1=ViewFrame-0
 
-[WorkState_v1_2.Frames.ChildFrames.Document-4.ViewFrame-0]
+[WorkState_v1_2.Frames.ChildFrames.Document-3.ViewFrame-0]
 DocPathName=src\bdp_protocol.h
 DocTemplateIndex=0
 DocumentString=IDE.Document
 IsActiveChildFrame=False
 IsFrameVisible=True
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPGLAAAAAAGLAAAAAAPFEAAAAACCCAAAAA
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPKBAAAAAAKBAAAAAADMDAAAAAHIBAAAAA
+
+[WorkState_v1_2.Frames.ChildFrames.Document-4]
+ptn_Child1=ViewFrame-0
+
+[WorkState_v1_2.Frames.ChildFrames.Document-4.ViewFrame-0]
+DocPathName=.\main.c
+DocTemplateIndex=0
+DocumentString=IDE.Document
+IsActiveChildFrame=False
+IsFrameVisible=True
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPEDAAAAAAEDAAAAAANNDAAAAABKBAAAAA
 
 [WorkState_v1_2.Frames.ChildFrames.Document-5]
 ptn_Child1=ViewFrame-0
 
 [WorkState_v1_2.Frames.ChildFrames.Document-5.ViewFrame-0]
-DocPathName=src\macros.inc
+DocPathName=src\uart.c
+DocTemplateIndex=0
+DocumentString=IDE.Document
+IsActiveChildFrame=False
+IsFrameVisible=True
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPIGAAAAAAIGAAAAAABBEAAAAAFNBAAAAA
+
+[WorkState_v1_2.Frames.ChildFrames.Document-6]
+ptn_Child1=ViewFrame-0
+
+[WorkState_v1_2.Frames.ChildFrames.Document-6.ViewFrame-0]
+DocPathName=src\clock.c
 DocTemplateIndex=0
 DocumentString=IDE.Document
 IsActiveChildFrame=False

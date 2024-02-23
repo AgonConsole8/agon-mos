@@ -74,12 +74,10 @@ void doLeftCursor() {
 	getCursorPos();
 	if(cursorX > 0) {
 		putch(0x08);
-		bdpp_fg_flush_drv_tx_packet();
 	}
 	else {
 		while(cursorX < (scrcols - 1)) {
 			putch(0x09);
-			bdpp_fg_flush_drv_tx_packet();
 			cursorX++;
 		}
 		putch(0x0B);
@@ -93,12 +91,10 @@ void doRightCursor() {
 	getCursorPos();
 	if(cursorX < (scrcols - 1)) {
 		putch(0x09);
-		bdpp_fg_flush_drv_tx_packet();
 	}
 	else {
 		while(cursorX > 0) {
 			putch(0x08);
-			bdpp_fg_flush_drv_tx_packet();
 			cursorX--;
 		}
 		putch(0x0A);
@@ -209,16 +205,6 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 	gotoEditLineStart(len);
 }
 
-#include "bdp_protocol.h"
-extern BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
-extern BDPP_PACKET* bdpp_free_drv_pkt_tail; // Points to tail of free driver packet list
-extern BYTE bdpp_tx_state; 			// Driver transmitter state
-extern BDPP_PACKET* bdpp_tx_packet; 	// Points to the packet being transmitted
-extern WORD bdpp_tx_byte_count; 		// Number of data bytes transmitted
-extern BDPP_PACKET* bdpp_tx_pkt_head; 	// Points to head of transmit packet list
-extern BDPP_PACKET* bdpp_tx_pkt_tail; 	// Points to tail of transmit packet list
-extern BDPP_PACKET* bdpp_fg_tx_build_packet; // Points to the packet being built
-
 // The main line edit function
 // Parameters:
 // - buffer: Pointer to the line edit buffer
@@ -237,21 +223,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
 	
-	if (bdpp_fg_is_enabled()) {
-		for (limit=0; limit < 500000; limit++) {
-			len++;
-		}
-		for (i = 0; i<20; i++) {
-			printf("%02i.......|.........|.........|s",i);
-			bdpp_fg_flush_drv_tx_packet();
-		}
-		for (limit=0; limit<400; limit++) {
-			len++;
-		}
-		UART0_write_thr(0);
-		while(1);
-		
-	}
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required
@@ -266,6 +237,13 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	//
 	while (keyr == 0) {
 		bdpp_fg_flush_drv_tx_packet();
+
+		// *** KLUDGE - FIX THIS LATER ***
+		//for (i=0; i<400; i++) {
+		//	len++;
+		//}
+		//UART0_write_thr(0);
+
 		len = strlen(buffer);
 		waitKey();
 		keya = keyascii;
