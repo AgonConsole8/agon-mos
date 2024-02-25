@@ -810,7 +810,7 @@ int	mos_cmdBDPP(char *ptr) {
 		for (i=0; i<400; i++) {
 			len++;
 		}
-		UART0_write_thr(0);
+		//UART0_write_thr(0);
 
 			printf("<%hX>",pushed_index_bits);
 			bdpp_fg_flush_drv_tx_packet();
@@ -819,7 +819,7 @@ int	mos_cmdBDPP(char *ptr) {
 		for (i=0; i<400; i++) {
 			len++;
 		}
-		UART0_write_thr(0);
+		//UART0_write_thr(0);
 
 			return 0; // OK
 		}
