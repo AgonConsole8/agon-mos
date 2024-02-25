@@ -31,9 +31,9 @@ ptn_Child1=ViewFrame-0
 DocPathName=src\bdp_protocol.c
 DocTemplateIndex=0
 DocumentString=IDE.Document
-IsActiveChildFrame=True
+IsActiveChildFrame=False
 IsFrameVisible=True
-WindowPlacement=MCAAAAAACAAAAAAADAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPGLAAAAAAGLAAAAAAPFEAAAAADCCAAAAA
+WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPGLAAAAAAGLAAAAAAPFEAAAAADCCAAAAA
 
 [WorkState_v1_2.Frames.ChildFrames.Document-2]
 ptn_Child1=ViewFrame-0
@@ -42,9 +42,9 @@ ptn_Child1=ViewFrame-0
 DocPathName=src\mos.c
 DocTemplateIndex=0
 DocumentString=IDE.Document
-IsActiveChildFrame=False
+IsActiveChildFrame=True
 IsFrameVisible=True
-WindowPlacement=MCAAAAAAAAAAAAAABAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPAAAAAAAAAAAAAAAAJKDAAAAANGBAAAAA
+WindowPlacement=MCAAAAAACAAAAAAADAAAAAAAPPPPPPPPPPPPPPPPIPPPPPPPBOPPPPPPAAAAAAAAAAAAAAAAJKDAAAAANGBAAAAA
 
 [WorkState_v1_2.Frames.ChildFrames.Document-3]
 ptn_Child1=ViewFrame-0
