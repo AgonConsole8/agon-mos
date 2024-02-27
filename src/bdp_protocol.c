@@ -120,8 +120,7 @@ void bdpp_enable_tx_interrupt(BDPP_PACKET* old_head) {
 // Initialize the BDPP driver.
 //
 void bdpp_fg_initialize_driver() {
-	int i;
-	int len=0;//KLUDGE
+	BYTE i;
 	BDPP_PACKET* packet;
 
 	DI();
@@ -151,7 +150,7 @@ void bdpp_fg_initialize_driver() {
 	// Initialize the free driver-owned packet list
 	for (i = 0; i < BDPP_MAX_DRIVER_PACKETS; i++) {
 		packet = &bdpp_drv_tx_pkt_header[i];
-		packet->indexes = (BYTE)i;
+		packet->indexes = i;
 		packet->data = bdpp_drv_tx_pkt_data[i];
 		push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail,
 						packet);
@@ -161,7 +160,7 @@ void bdpp_fg_initialize_driver() {
 	// Initialize the free app-owned packet list
 	for (i = 0; i < BDPP_MAX_APP_PACKETS; i++) {
 		packet = &bdpp_app_pkt_header[i];
-		packet->indexes = (BYTE)i;
+		packet->indexes = i;
 		packet->flags |= BDPP_PKT_FLAG_APP_OWNED;
 	}
 
@@ -171,8 +170,8 @@ void bdpp_fg_initialize_driver() {
 	// Bit time:  0.868055 uS
 	// Char time: 8.68055 uS (10 bit times)
 	//
-	// 30 bit times; Reload&Restart, Single-Pass, Interrupt
-	init_timer5(30, 0x42);
+	// # of bit times; Reload&Restart, Single-Pass, Interrupt
+	init_timer5(65535, 0x42);
 
 	EI();
 }
