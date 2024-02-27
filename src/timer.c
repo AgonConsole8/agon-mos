@@ -2,7 +2,7 @@
  * Title:			AGON MOS - Timer
  * Author:			Dean Belfield
  * Created:			19/06/2022
- * Last Updated:	03/08/2023
+ * Last Updated:	27/02/2024
  * 
  * Modinfo:
  * 11/07/2022:		Removed unused functions
@@ -11,6 +11,7 @@
  * 31/03/2023:		Added wait_VDP
  * 08/04/2023:		Fixed timing loop in wait_VDP
  * 03/08/2023:		Fixed timer0 setup overflow in init_timer0
+ * 27/02/2024:		CW Added timer5 functions
  */
 
 #include <eZ80.h>
@@ -24,7 +25,7 @@
 // - clkdiv: 4, 16, 64 or 256
 // - clkflag: Other clock flags (interrupt, etc)
 // Returns:
-// - interval value
+// - interval value (timer ticks)
 //
 unsigned short init_timer0(int interval, int clkdiv, unsigned char ctrlbits) {
 	unsigned short	rr;
@@ -38,7 +39,7 @@ unsigned short init_timer0(int interval, int clkdiv, unsigned char ctrlbits) {
 	}
 	ctl = (ctrlbits | clkbits);
 
-	rr = (unsigned short)((SysClkFreq / 1000) / clkdiv) * interval;
+	rr = (unsigned short)((SysClkFreq * interval) / (clkdiv * 1000));
 
 	TMR0_CTL = 0x00;													// Disable the timer and clear all settings	
 	TMR0_RR_L = (unsigned char)(rr);
@@ -89,3 +90,33 @@ BOOL wait_VDP(unsigned char mask) {
 	}
 	return retVal;
 }
+
+// Configure Timer 5
+// Parameters:
+// - interval: Interval in serial bit times
+// - clkflag: Other clock flags (interrupt, etc)
+//
+void init_timer5(int interval, unsigned char ctrlbits) {
+	unsigned char ctl = (ctrlbits | 0x04); // use main clock / 16
+
+	TMR5_CTL = 0x00; // Disable the timer and clear all settings	
+	TMR5_RR_L = (unsigned char)(interval);
+	TMR5_RR_H = (unsigned char)(interval >> 8);
+    TMR5_CTL = ctl;
+}
+
+// Enable Timer 5
+// Parameters:
+// - enable: 0 = disable, 1 = enable
+//
+void enable_timer5(unsigned char enable) {
+	unsigned char b;
+
+	if(enable <= 1) {
+		b = TMR5_CTL;
+		b &= 0xFC;
+		b |= (enable | 0x02); // RST bit
+		TMR5_CTL = b;	
+	}
+}
+

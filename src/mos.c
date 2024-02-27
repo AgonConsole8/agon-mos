@@ -784,8 +784,7 @@ void print_head() {
 	}
 }
 int	mos_cmdBDPP(char *ptr) {
-	int i;//KLUDGE
-	int len=0; //KLUDGE
+	short i;
 	if (bdpp_fg_is_enabled()) {
 		return 0; // OK
 	}
@@ -805,22 +804,9 @@ int	mos_cmdBDPP(char *ptr) {
 				printf("[%i]d123456789d123456789d123456789d123456789d123456789d123456789d123456789\r\n",i);
 			}
 			bdpp_fg_flush_drv_tx_packet();
-			
-		// *** KLUDGE - FIX THIS LATER ***
-		for (i=0; i<400; i++) {
-			len++;
-		}
-		//UART0_write_thr(0);
 
 			printf("<%hX>",pushed_index_bits);
 			bdpp_fg_flush_drv_tx_packet();
-
-		// *** KLUDGE - FIX THIS LATER ***
-		for (i=0; i<400; i++) {
-			len++;
-		}
-		//UART0_write_thr(0);
-
 			return 0; // OK
 		}
 	}

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "uart.h"
+#include "timer.h"
 
 #define FALSE 0
 #define TRUE  1
@@ -110,11 +111,7 @@ static void reset_receiver() {
 //
 void bdpp_enable_tx_interrupt(BDPP_PACKET* old_head) {
 	UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
-	if (!bdpp_tx_packet && !old_head) {
-		// Not currently transmitting; clear any pending interrupt.
-		//UART0_write_thr(0);
-		//bdpp_run_tx_state_machine();
-	}
+	enable_timer5(FALSE);
 }
 
 //----------------------------------------------------------
@@ -169,11 +166,22 @@ void bdpp_fg_initialize_driver() {
 	}
 
 	reset_receiver();
+
+	// Baud Rate: 1152000
+	// Bit time:  0.868055 uS
+	// Char time: 8.68055 uS (10 bit times)
+	//
+	// 30 bit times; Reload&Restart, Single-Pass, Interrupt
+	init_timer5(30, 0x42);
+
 	EI();
-	// *** KLUDGE
-	for (i=0; i<500000; i++) {
-		len++;
-	}
+}
+
+// Handle the timeout for the last packet
+//
+void bdpp_timeout() {
+	BYTE dummy = TMR5_CTL; // clear PRT_IRQ bit
+	UART0_write_thr(0); // kick reception of last packet
 }
 
 // Get whether BDPP is allowed (both CPUs have it)
@@ -962,6 +970,7 @@ void bdpp_run_tx_state_machine() {
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START_1;
 				} else {
 					UART0_disable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
+					enable_timer5(TRUE);
 					return;
 				}
 			} break;
