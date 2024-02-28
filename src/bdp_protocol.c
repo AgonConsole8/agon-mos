@@ -960,7 +960,7 @@ void bdpp_run_tx_state_machine() {
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START_1;
 				} else {
 					UART0_disable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
-					enable_timer5(TRUE);
+					//enable_timer5(TRUE);
 					return;
 				}
 			} break;
