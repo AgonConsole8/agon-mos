@@ -213,6 +213,9 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
+extern void bdpp_bg_flush_drv_tx_packet();
+extern BOOL bdpp_fg_is_enabled();
+extern void timer0_delay(WORD t);
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int i;
 	BYTE keya = 0;					// The ASCII key	
@@ -223,6 +226,13 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
 	
+	if (bdpp_fg_is_enabled()) {
+		for(i=0;i<100;i++)
+		{
+			printf(" [%i]",i);
+			bdpp_bg_flush_drv_tx_packet();
+		}
+	}
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required
@@ -363,9 +373,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	}
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
-	if (keyr == 0x1B) {
-		printf("---HIT ESCAPE---///hit escape///+++hit escape+++");
-	}
 	bdpp_fg_flush_drv_tx_packet();
 	return keyr;					// Finally return the keycode
 }

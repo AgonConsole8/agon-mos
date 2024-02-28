@@ -169,7 +169,6 @@ BYTE mos_getkey() {
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
 	putch(MOS_prompt);
-	bdpp_fg_flush_drv_tx_packet();
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
 	bdpp_fg_flush_drv_tx_packet();
@@ -773,16 +772,6 @@ int	mos_cmdCLS(char *ptr) {
 // Returns:
 // - MOS error code
 //
-
-extern WORD pushed_index_bits;
-extern BDPP_PACKET* bdpp_free_drv_pkt_head;
-void print_head() {
-	if (bdpp_free_drv_pkt_head) {
-		putch('m'+(bdpp_free_drv_pkt_head->indexes&0xf));
-	} else {
-		putch('?');
-	}
-}
 int	mos_cmdBDPP(char *ptr) {
 	short i;
 	if (bdpp_fg_is_enabled()) {
@@ -795,18 +784,14 @@ int	mos_cmdBDPP(char *ptr) {
 		putch(0xA2);
 		// Wait for the VDU command to go out.
 		UART0_serial_IDLE();
+		timer0_delay(50); // wait 50 ms
+		for (i = 0; i < 64; i++) {
+			putch(0);
+		}
+		UART0_serial_IDLE();
+		timer0_delay(25); // wait 25 ms
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
-			for (i=0;i<20;i++) {
-				printf("[%i]A123456789A123456789A123456789A123456789A123456789A123456789A123456789\r\n",i);
-				printf("[%i]b123456789b123456789b123456789b123456789b123456789b123456789b123456789\r\n",i);
-				printf("[%i]C123456789C123456789C123456789C123456789C123456789C123456789C123456789\r\n",i);
-				printf("[%i]d123456789d123456789d123456789d123456789d123456789d123456789d123456789\r\n",i);
-			}
-			bdpp_fg_flush_drv_tx_packet();
-
-			printf("<%hX>",pushed_index_bits);
-			bdpp_fg_flush_drv_tx_packet();
 			return 0; // OK
 		}
 	}

@@ -21,8 +21,6 @@ extern void bdpp_handler(void);
 extern void * set_vector(unsigned int vector, void(*handler)(void));
 extern void call_vdp_protocol(BYTE data);
 
-WORD pushed_index_bits;
-
 BYTE bdpp_driver_flags;	// Flags controlling the driver
 
 BDPP_PACKET* bdpp_free_drv_pkt_head; // Points to head of free driver packet list
@@ -171,7 +169,7 @@ void bdpp_fg_initialize_driver() {
 	// Char time: 8.68055 uS (10 bit times)
 	//
 	// # of bit times; Reload&Restart, Single-Pass, Interrupt
-	init_timer5(65535, 0x42);
+	init_timer5(32768, 0x42);
 
 	EI();
 }
@@ -233,10 +231,6 @@ BOOL bdpp_fg_enable(BYTE stream) {
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
 			set_vector(UART0_IVECT, bdpp_handler);
 		}
-		printf("(%02hX %02hX %02hX)",
-				bdpp_drv_tx_pkt_header[0].indexes,
-				bdpp_drv_tx_pkt_header[1].indexes,
-				bdpp_drv_tx_pkt_header[2].indexes);
 		return TRUE;
 	} else {
 		return FALSE;
@@ -424,7 +418,6 @@ static void bdpp_fg_internal_flush_drv_tx_packet() {
 	BDPP_PACKET* packet;
 	if (bdpp_fg_tx_build_packet) {
 		DI();
-			pushed_index_bits |= (((WORD)1) << (bdpp_fg_tx_build_packet->indexes & BDPP_PACKET_INDEX_BITS));
 			bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 			bdpp_fg_tx_build_packet = NULL;
@@ -532,12 +525,10 @@ void bdpp_fg_flush_drv_tx_packet() {
 // Returns NULL if no packet is available.
 //
 BDPP_PACKET* bdpp_bg_init_rx_drv_packet() {
-	BDPP_PACKET* packet = pull_from_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail);
-	if (packet) {
-		packet->flags = 0;
-		packet->max_size = BDPP_SMALL_DATA_SIZE;
-		packet->act_size = 0;
-	}
+	BDPP_PACKET* packet = &bdpp_drv_rx_pkt_header;
+	packet->flags = 0;
+	packet->max_size = BDPP_SMALL_DATA_SIZE;
+	packet->act_size = 0;
 	return packet;
 }
 
