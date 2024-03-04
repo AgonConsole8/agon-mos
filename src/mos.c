@@ -792,6 +792,7 @@ int	mos_cmdBDPP(char *ptr) {
 		timer0_delay(25); // wait 25 ms
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
+			timer0_delay(250); // wait 250 ms
 			return 0; // OK
 		}
 	}

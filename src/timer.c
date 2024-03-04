@@ -112,6 +112,8 @@ void init_timer5(int interval, unsigned char ctrlbits) {
 void enable_timer5(unsigned char enable) {
 	unsigned char b = TMR5_CTL;
 	b &= 0xFC;
-	b |= (enable | 0x02); // RST bit
+	if (enable) {
+		b |= 0x03; // ENA and RST bits
+	}
 	TMR5_CTL = b;	
 }

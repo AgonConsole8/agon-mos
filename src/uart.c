@@ -152,6 +152,7 @@ void close_UART1() {
 void UART0_write_thr(BYTE data) {
 	UART0_wait_CTS();
 	UART0_THR = data;
+	UART1_THR = data;
 }
 
 // Read from UART0 line status register

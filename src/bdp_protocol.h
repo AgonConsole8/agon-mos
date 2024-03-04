@@ -133,7 +133,7 @@ WORD bdpp_fg_get_rx_app_packet_size(BYTE index);
 
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream);
+volatile BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream);
 
 // Queue an app-owned packet for transmission
 // The packet is expected to be full when this function is called.
@@ -150,7 +150,7 @@ BOOL bdpp_fg_stop_using_app_packet(BYTE index);
 // Start building a driver-owned, outgoing packet.
 // If there is an existing packet being built, it will be flushed first.
 // This returns NULL if there is no packet available.
-BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream);
+volatile BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
@@ -186,7 +186,7 @@ void bdpp_fg_flush_drv_tx_packet();
 
 // Initialize an incoming driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_bg_init_rx_drv_packet();
+volatile BDPP_PACKET* bdpp_bg_init_rx_drv_packet();
 
 // Prepare an app-owned packet for reception
 // This function can fail if the packet is presently involved in a data transfer.
@@ -208,7 +208,7 @@ WORD bdpp_bg_get_rx_app_packet_size(BYTE index);
 
 // Initialize an outgoing driver-owned packet, if one is available
 // Returns NULL if no packet is available
-BDPP_PACKET* bdpp_bg_init_tx_drv_packet(BYTE flags, BYTE stream);
+volatile BDPP_PACKET* bdpp_bg_init_tx_drv_packet(BYTE flags, BYTE stream);
 
 // Queue an app-owned packet for transmission
 // The packet is expected to be full when this function is called.
@@ -225,7 +225,7 @@ BOOL bdpp_bg_stop_using_app_packet(BYTE index);
 // Start building a driver-owned, outgoing packet.
 // If there is an existing packet being built, it will be flushed first.
 // This returns NULL if there is no packet available.
-BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream);
+volatile BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
