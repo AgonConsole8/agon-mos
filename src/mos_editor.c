@@ -24,7 +24,6 @@
 #include "defines.h"
 #include "mos.h"
 #include "uart.h"
-#include "timer.h"
 #include "mos_editor.h"
 
 extern void bdpp_fg_flush_drv_tx_packet();
@@ -213,23 +212,8 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
-#include "bdp_protocol.h"
-extern void timer0_delay(WORD t);
-extern volatile BDPP_PACKET* bdpp_tx_pkt_head;
-extern volatile BDPP_PACKET* bdpp_tx_packet;
-extern int useful_flushes;
-extern int useless_flushes;
-extern int useful_int_flushes;
-extern int useless_int_flushes;
-extern WORD last_size;
-extern int tx_start_cnt;
-extern int tx_end_cnt;
-extern WORD tx_total;
 
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
-	int i, uf, ul, uf2, ul2, ufi, uli, ufi2, uli2, sc, sc2, ec, ec2; BOOL ph, ph2, tx, tx2; WORD ls, ls2, t, t2;
-	volatile BDPP_PACKET* pkt;
-	
 	BYTE keya = 0;					// The ASCII key	
 	BYTE keyc = 0;					// The FabGL keycode
 	BYTE keyr = 0;					// The ASCII key to return back to the calling program
@@ -238,58 +222,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
 	
-	if (bdpp_fg_is_enabled()) {		
-		bdpp_fg_flush_drv_tx_packet();
-
-		t = tx_total;
-		sc = tx_start_cnt;
-		ec = tx_end_cnt;
-		ls = last_size;
-		tx = (bdpp_tx_packet != NULL);
-		ph = (bdpp_tx_pkt_head != NULL);
-		uf=useful_flushes; ul=useless_flushes;
-		ufi=useful_int_flushes; uli=useless_int_flushes;
-		printf("123456789");
-		bdpp_fg_flush_drv_tx_packet();
-		uf2=useful_flushes; ul2=useless_flushes;
-		ufi2=useful_int_flushes; uli2=useless_int_flushes;
-		tx2 = (bdpp_tx_packet != NULL);
-		ph2 = (bdpp_tx_pkt_head != NULL);
-		ls2 = last_size;
-		sc2 = tx_start_cnt;
-		ec2 = tx_end_cnt;
-		t2 = tx_total;
-
-		//printf("!abcdefghijklm!ABCDEFGHIJKLMNOPQRSTUVWXYZ!");
-		//bdpp_fg_flush_drv_tx_packet();
-		putch('/');
-		bdpp_fg_flush_drv_tx_packet();
-		printf("ABCDEFGHIJKL");
-		bdpp_fg_flush_drv_tx_packet();
-		putch('/');
-		bdpp_fg_flush_drv_tx_packet();
-		
-		//for(i=0;i<20;i++)
-		//{
-		//	printf(" [%i]",i);
-		//	bdpp_fg_flush_drv_tx_packet();
-		//}
-
-		//printf("<%hu> A",last_size); putch('B');
-		//printf(" uf=%i/%i,ul=%i/%i",uf,uf2,ul,ul2);
-		//printf(", ufi=%i/%i,uli=%i/%i, ph=%hu/%hu, tx=%hu/%hu, ls=%hu/%hu, sc=%i/%i, ec=%i/%i, t=%hu/%hu",
-		//		ufi,ufi2,uli,uli2,ph,ph2,tx,tx2,ls,ls2,sc,sc2,ec,ec2,t,t2);
-		//printf("................................");
-		//bdpp_fg_flush_drv_tx_packet();
-		/*putch('!');
-		putch('!');
-		bdpp_fg_flush_drv_tx_packet();
-		for(i=0;i<20;i++)
-		{
-			printf(" [%i]\n\r",i);
-			bdpp_fg_flush_drv_tx_packet();
-		}*/
-	}
+	bdpp_fg_flush_drv_tx_packet();
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required
@@ -304,12 +237,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	//
 	while (keyr == 0) {
 		bdpp_fg_flush_drv_tx_packet();
-
-		// *** KLUDGE - FIX THIS LATER ***
-		//for (i=0; i<400; i++) {
-		//	len++;
-		//}
-		//UART0_write_thr(0);
 
 		len = strlen(buffer);
 		waitKey();

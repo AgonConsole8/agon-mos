@@ -176,7 +176,7 @@ void bdpp_fg_initialize_driver() {
 	// Char time: 8.68055 uS (10 bit times)
 	//
 	// # of bit times; Single-Pass, Interrupt
-	init_timer5(32768, 0x40);
+	//init_timer5(32768, 0x40);
 
 	EI();
 
@@ -381,7 +381,7 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 			EI();
 			return FALSE;
 		}
-		enable_timer5(FALSE);
+		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
 
@@ -431,7 +431,7 @@ static void bdpp_fg_internal_flush_drv_tx_packet() {
 	volatile BDPP_PACKET* packet;
 	if (bdpp_fg_tx_build_packet) {
 		DI();
-		enable_timer5(FALSE);
+		//enable_timer5(FALSE);
 		bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 		packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 		bdpp_fg_tx_build_packet = NULL;
@@ -654,7 +654,7 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
 			return FALSE;
 		}
-		enable_timer5(FALSE);
+		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
 		packet->flags = flags;
@@ -699,7 +699,7 @@ volatile BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 static void bdpp_bg_internal_flush_drv_tx_packet() {
 	volatile BDPP_PACKET* packet;
 	if (bdpp_bg_tx_build_packet) {
-			enable_timer5(FALSE);
+			//enable_timer5(FALSE);
 			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;

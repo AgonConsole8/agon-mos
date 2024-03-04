@@ -24,7 +24,7 @@ unsigned short  get_timer0();
 BOOL 			wait_VDP(unsigned char mask);
 void            wait_timer0();  // In misc.asm
 
-void			init_timer5(int interval, unsigned char ctrlbits);
-void            enable_timer5(unsigned char enable);
+//void			init_timer5(int interval, unsigned char ctrlbits);
+//void            enable_timer5(unsigned char enable);
 
 #endif TIMER_H

@@ -54,12 +54,12 @@
 #include "ff.h"
 #include "strings.h"
 #include "bdp_protocol.h"
+#include "timer.h"
 
 char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 extern void UART0_serial_IDLE();
-extern void timer0_delay(WORD ms);
 
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
@@ -766,6 +766,15 @@ int	mos_cmdCLS(char *ptr) {
 	return 0;
 }
 
+void wait_n_ms(WORD n) {
+	init_timer0(10, 16, 0x00); // 10ms timer for delay
+	while (n >= 10) {
+		wait_timer0();
+		n -= 10;
+	}
+	enable_timer0(0);
+}
+
 // BDPP
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -784,15 +793,15 @@ int	mos_cmdBDPP(char *ptr) {
 		putch(0xA2);
 		// Wait for the VDU command to go out.
 		UART0_serial_IDLE();
-		timer0_delay(50); // wait 50 ms
-		for (i = 0; i < 64; i++) {
+		wait_n_ms(50); // wait 50 ms
+		for (i = 0; i < 8; i++) {
 			putch(0);
 		}
 		UART0_serial_IDLE();
-		timer0_delay(25); // wait 25 ms
+		wait_n_ms(25); // wait 25 ms
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
-			timer0_delay(250); // wait 250 ms
+			wait_n_ms(250); // wait 250 ms
 			return 0; // OK
 		}
 	}
