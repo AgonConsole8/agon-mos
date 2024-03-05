@@ -279,7 +279,7 @@ BOOL bdpp_fg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size) {
 			return FALSE;
 		}
 		packet->flags &= ~BDPP_PKT_FLAG_DONE;
-		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX;
+		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_FOR_RX;
 		packet->max_size = size;
 		packet->act_size = 0;
 		packet->data = data;
@@ -339,7 +339,7 @@ BOOL bdpp_fg_stop_using_app_packet(BYTE index) {
 			EI();
 			return FALSE;
 		}
-		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX);
+		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		EI();
 		return TRUE;
 	}
@@ -383,7 +383,7 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		}
 		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
-		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
+		flags |= BDPP_PKT_FLAG_APP_OWNED;
 
 		packet->indexes = indexes;
 		packet->max_size = size;
@@ -431,8 +431,6 @@ static void bdpp_fg_internal_flush_drv_tx_packet() {
 	volatile BDPP_PACKET* packet;
 	if (bdpp_fg_tx_build_packet) {
 		DI();
-		//enable_timer5(FALSE);
-		bdpp_fg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 		packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_fg_tx_build_packet);
 		bdpp_fg_tx_build_packet = NULL;
 		bdpp_enable_tx_interrupt(packet);
@@ -568,7 +566,7 @@ BOOL bdpp_bg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size) {
 			return FALSE;
 		}
 		packet->flags &= ~BDPP_PKT_FLAG_DONE;
-		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX;
+		packet->flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_FOR_RX;
 		packet->max_size = size;
 		packet->act_size = 0;
 		packet->data = data;
@@ -619,7 +617,7 @@ BOOL bdpp_bg_stop_using_app_packet(BYTE index) {
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
 			return FALSE;
 		}
-		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_READY|BDPP_PKT_FLAG_FOR_RX);
+		packet->flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		return TRUE;
 	}
 	return FALSE;
@@ -656,7 +654,7 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		}
 		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
-		flags |= BDPP_PKT_FLAG_APP_OWNED|BDPP_PKT_FLAG_READY;
+		flags |= BDPP_PKT_FLAG_APP_OWNED;
 		packet->flags = flags;
 		packet->indexes = indexes;
 		packet->max_size = size;
@@ -700,7 +698,6 @@ static void bdpp_bg_internal_flush_drv_tx_packet() {
 	volatile BDPP_PACKET* packet;
 	if (bdpp_bg_tx_build_packet) {
 			//enable_timer5(FALSE);
-			bdpp_bg_tx_build_packet->flags |= BDPP_PKT_FLAG_READY;
 			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
 			bdpp_enable_tx_interrupt(packet);
@@ -818,7 +815,7 @@ void bdpp_run_rx_state_machine() {
 					have_the_flags:
 					bdpp_rx_hold_pkt_flags =
 						(incoming_byte & (BDPP_PKT_FLAG_USAGE_BITS | BDPP_PKT_FLAG_APP_OWNED)) |
-						(BDPP_PKT_FLAG_FOR_RX | BDPP_PKT_FLAG_READY);
+						(BDPP_PKT_FLAG_FOR_RX);
 					bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_INDEX;
 				}
 			} break;
@@ -959,7 +956,6 @@ void bdpp_run_rx_state_machine() {
 			case BDPP_RX_STATE_AWAIT_END: {
 				if (incoming_byte == BDPP_PACKET_END_MARKER) {
 					// Packet is complete
-					bdpp_rx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
 					if (!(bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {
 						// This is a driver-owned packet, meaning that MOS must handle it.
@@ -1125,7 +1121,6 @@ void bdpp_run_tx_state_machine() {
 			//case BDPP_TX_STATE_SENT_END_1: {
 				UART0_write_thr(BDPP_PACKET_END_MARKER); // tell the UHCI to end the packet
 				tx_total += bdpp_tx_packet->act_size;
-				bdpp_tx_packet->flags &= ~BDPP_PKT_FLAG_READY;
 				bdpp_tx_packet->flags |= BDPP_PKT_FLAG_DONE;
 				if (!(bdpp_tx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {
 					push_to_list(&bdpp_free_drv_pkt_head, &bdpp_free_drv_pkt_tail, bdpp_tx_packet);
