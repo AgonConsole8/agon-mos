@@ -25,6 +25,7 @@
 #include "mos.h"
 #include "uart.h"
 #include "mos_editor.h"
+#include "timer.h"
 
 extern void bdpp_fg_flush_drv_tx_packet();
 

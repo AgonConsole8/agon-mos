@@ -11,7 +11,6 @@
  * 31/03/2023:		Added wait_VDP
  * 08/04/2023:		Fixed timing loop in wait_VDP
  * 03/08/2023:		Fixed timer0 setup overflow in init_timer0
- * 27/02/2024:		CW Added timer5 functions
  */
 
 #include <eZ80.h>
@@ -90,30 +89,3 @@ BOOL wait_VDP(unsigned char mask) {
 	}
 	return retVal;
 }
-
-// Configure Timer 5
-// Parameters:
-// - interval: Interval in serial bit times
-// - clkflag: Other clock flags (interrupt, etc)
-//
-/*void init_timer5(int interval, unsigned char ctrlbits) {
-	unsigned char ctl = (ctrlbits | 0x04); // use main clock / 16
-
-	TMR5_CTL = 0x00; // Disable the timer and clear all settings	
-	TMR5_RR_L = (unsigned char)(interval);
-	TMR5_RR_H = (unsigned char)(interval >> 8);
-    TMR5_CTL = ctl;
-}*/
-
-// Enable Timer 5
-// Parameters:
-// - enable: 0 = disable, 1 = enable
-//
-/*void enable_timer5(unsigned char enable) {
-	unsigned char b = TMR5_CTL;
-	b &= 0xFC;
-	if (enable) {
-		b |= 0x03; // ENA and RST bits
-	}
-	TMR5_CTL = b;	
-}*/

@@ -11,7 +11,6 @@
 #include <string.h>
 #include <stdio.h>
 #include "uart.h"
-#include "timer.h"
 
 #define FALSE 0
 #define TRUE  1
@@ -171,24 +170,7 @@ void bdpp_fg_initialize_driver() {
 
 	reset_receiver();
 
-	// Baud Rate: 1152000
-	// Bit time:  0.868055 uS
-	// Char time: 8.68055 uS (10 bit times)
-	//
-	// # of bit times; Single-Pass, Interrupt
-	//init_timer5(32768, 0x40);
-
 	EI();
-
-	pUART1.baudRate = 230400; // Initialise the UART object
-	pUART1.dataBits = 8;
-	pUART1.stopBits = 1;
-	pUART1.parity = PAR_NOPARITY;
-	pUART1.flowControl = FCTL_NONE;
-	pUART1.interrupts = 0;
-
-	open_UART1(&pUART1); // Open the UART 
-
 }
 
 // Get whether BDPP is allowed (both CPUs have it)
@@ -381,7 +363,6 @@ BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 			EI();
 			return FALSE;
 		}
-		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED;
 
@@ -652,7 +633,6 @@ BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WOR
 		if (bdpp_rx_packet == packet || bdpp_tx_packet == packet) {
 			return FALSE;
 		}
-		//enable_timer5(FALSE);
 		flags &= ~(BDPP_PKT_FLAG_DONE|BDPP_PKT_FLAG_FOR_RX);
 		flags |= BDPP_PKT_FLAG_APP_OWNED;
 		packet->flags = flags;
@@ -697,7 +677,6 @@ volatile BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream) {
 static void bdpp_bg_internal_flush_drv_tx_packet() {
 	volatile BDPP_PACKET* packet;
 	if (bdpp_bg_tx_build_packet) {
-			//enable_timer5(FALSE);
 			packet = push_to_list(&bdpp_tx_pkt_head, &bdpp_tx_pkt_tail, bdpp_bg_tx_build_packet);
 			bdpp_bg_tx_build_packet = NULL;
 			bdpp_enable_tx_interrupt(packet);
@@ -966,7 +945,6 @@ void bdpp_run_tx_state_machine() {
 					bdpp_tx_state = BDPP_TX_STATE_SENT_START_2;
 				} else {
 					UART0_disable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
-					//enable_timer5(TRUE);
 					return;
 				}
 			} break;

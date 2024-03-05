@@ -24,7 +24,6 @@
 			XDEF	_uart0_handler
 			XDEF	_bdpp_handler
 			XDEF	_i2c_handler
-			XDEF	_bdpp_timer_handler
 
 			XREF	_clock
 			XREF	_vdp_protocol_data
@@ -93,26 +92,6 @@ _bdpp_handler:
 			PUSH	IX
 			PUSH	IY
 			CALL	_bdp_protocol ; Go process the protocol states
-			POP		IY
-			POP		IX
-			POP		HL
-			POP		DE
-			POP		BC
-			POP		AF
-			EI
-			RETI.L	
-
-; AGON PRT5 (Timer5) Bidirectional Packet Protocol Interrupt Handler
-;
-_bdpp_timer_handler:
-		 	DI
-			PUSH	AF
-			PUSH	BC
-			PUSH	DE
-			PUSH	HL
-			PUSH	IX
-			PUSH	IY
-			CALL	_bdpp_timeout ; Go handle the timeout
 			POP		IY
 			POP		IX
 			POP		HL

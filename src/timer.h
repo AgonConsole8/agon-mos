@@ -9,7 +9,6 @@
  * 11/07/2022:		Removed unused functions
  * 13/03/2023:      Refactored
  * 31/03/2023:		Added wait_VDP
- * 27/02/2024:		CW Added timer5 functions
  */
 
 #ifndef TIMER_H
@@ -23,8 +22,5 @@ void            enable_timer0(unsigned char enable);
 unsigned short  get_timer0();
 BOOL 			wait_VDP(unsigned char mask);
 void            wait_timer0();  // In misc.asm
-
-//void			init_timer5(int interval, unsigned char ctrlbits);
-//void            enable_timer5(unsigned char enable);
 
 #endif TIMER_H

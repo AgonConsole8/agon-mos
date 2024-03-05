@@ -53,7 +53,6 @@ extern void *	set_vector(unsigned int vector, void(*handler)(void));
 extern void 	vblank_handler(void);
 extern void 	uart0_handler(void);
 extern void 	i2c_handler(void);
-extern void		bdpp_timer_handler(void);
 
 extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
@@ -139,7 +138,6 @@ void init_interrupts(void) {
 	set_vector(PORTB1_IVECT, vblank_handler); 	// 0x32
 	set_vector(UART0_IVECT, uart0_handler);		// 0x18
 	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
-	set_vector(PRT5_IVECT, bdpp_timer_handler); // 0x14
 }
 
 // The main loop
