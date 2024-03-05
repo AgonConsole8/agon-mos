@@ -110,13 +110,6 @@ void bdpp_enable_tx_interrupt(volatile BDPP_PACKET* old_head) {
 	UART0_enable_interrupt(UART_IER_TRANSMITINT|UART_IER_TRANSCOMPLETEINT);
 }
 
-// Handle the timeout for the last packet
-//
-void bdpp_timeout() {
-	BYTE dummy = TMR5_CTL; // clear PRT_IRQ bit
-	UART0_write_thr(BDPP_PACKET_END_MARKER);
-}
-
 //----------------------------------------------------------
 //*** OVERALL MANAGEMENT ***
 
