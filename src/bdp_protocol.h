@@ -36,33 +36,28 @@
 #define BDPP_RX_STATE_AWAIT_FLAGS		'C'		// Waiting for the packet flags
 #define BDPP_RX_STATE_AWAIT_ESC_INDEX	'D'		// Waiting for escape or the packet index
 #define BDPP_RX_STATE_AWAIT_INDEX		'E'		// Waiting for the packet index
-#define BDPP_RX_STATE_AWAIT_ESC_SIZE_1	'F'		// Waiting for escape or the packet size, part 1
-#define BDPP_RX_STATE_AWAIT_SIZE_1		'G'		// Waiting for the packet size, part 1
-#define BDPP_RX_STATE_AWAIT_ESC_SIZE_2	'H'		// Waiting for escape or the packet size, part 2
-#define BDPP_RX_STATE_AWAIT_SIZE_2		'I'		// Waiting for the packet size, part 2
-#define BDPP_RX_STATE_AWAIT_ESC_DATA	'J'		// Waiting for escape or a packet data byte
-#define BDPP_RX_STATE_AWAIT_DATA		'K'		// Waiting for a packet data byte only
-#define BDPP_RX_STATE_AWAIT_END			'L'		// Waiting for the packet end marker
+#define BDPP_RX_STATE_AWAIT_ESC_SIZE	'F'		// Waiting for escape or the packet size
+#define BDPP_RX_STATE_AWAIT_SIZE		'G'		// Waiting for the packet size
+#define BDPP_RX_STATE_AWAIT_ESC_DATA	'H'		// Waiting for escape or a packet data byte
+#define BDPP_RX_STATE_AWAIT_DATA		'I'		// Waiting for a packet data byte only
+#define BDPP_RX_STATE_AWAIT_END			'J'		// Waiting for the packet end marker
 
-#define BDPP_TX_STATE_IDLE				'M'		// Doing nothing (not transmitting)
-#define BDPP_TX_STATE_SENT_START_1		'N'		// Recently sent the packet start marker
-#define BDPP_TX_STATE_SENT_START_2		'O'		// Recently sent the packet start marker (again)
-#define BDPP_TX_STATE_SENT_ESC_FLAGS_SS	'P'		// Recently sent escape for the flags (start substitute)
-#define BDPP_TX_STATE_SENT_ESC_FLAGS_ES	'Q'		// Recently sent escape for the flags (escape substitute)
-#define BDPP_TX_STATE_SENT_FLAGS		'R'		// Recently sent the packet flags
-#define BDPP_TX_STATE_SENT_ESC_INDEX	'S'		// Recently sent escape for the packet index
-#define BDPP_TX_STATE_SENT_INDEX		'T'		// Recently sent the packet index
-#define BDPP_TX_STATE_SENT_ESC_SIZE_1_SS 'U'	// Recently sent escape for the size, part 1 (start substitute)
-#define BDPP_TX_STATE_SENT_ESC_SIZE_1_ES 'V'	// Recently sent escape for the size, part 1 (escape substitute)
-#define BDPP_TX_STATE_SENT_SIZE_1		'W'		// Recently sent the packet size, part 1
-#define BDPP_TX_STATE_SENT_ESC_SIZE_2_SS 'X'	// Recently sent escape for the size, part 2 (start substitute)
-#define BDPP_TX_STATE_SENT_ESC_SIZE_2_ES 'Y'	// Recently sent escape for the size, part 2 (escape substitute)
-#define BDPP_TX_STATE_SENT_SIZE_2		'Z'		// Recently sent the packet size, part 2
-#define BDPP_TX_STATE_SENT_ESC_DATA_SS	'v'		// Recently sent escape for a data byte (start substitute)
-#define BDPP_TX_STATE_SENT_ESC_DATA_ES	'w'		// Recently sent escape for a data byte (escape substitute)
-#define BDPP_TX_STATE_SENT_DATA			'x'		// Recently sent a packet data byte
-#define BDPP_TX_STATE_SENT_ALL_DATA		'y'		// Recently sent the last packet data byte
-#define BDPP_TX_STATE_SENT_END_1		'z'		// Recently sent the trailing separator
+#define BDPP_TX_STATE_IDLE				'K'		// Doing nothing (not transmitting)
+#define BDPP_TX_STATE_SENT_START_1		'L'		// Recently sent the packet start marker
+#define BDPP_TX_STATE_SENT_START_2		'M'		// Recently sent the packet start marker (again)
+#define BDPP_TX_STATE_SENT_ESC_FLAGS_SS	'N'		// Recently sent escape for the flags (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_FLAGS_ES	'O'		// Recently sent escape for the flags (escape substitute)
+#define BDPP_TX_STATE_SENT_FLAGS		'P'		// Recently sent the packet flags
+#define BDPP_TX_STATE_SENT_ESC_INDEX	'Q'		// Recently sent escape for the packet index
+#define BDPP_TX_STATE_SENT_INDEX		'R'		// Recently sent the packet index
+#define BDPP_TX_STATE_SENT_ESC_SIZE_SS 	'S'		// Recently sent escape for the size (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_SIZE_ES 	'T'		// Recently sent escape for the size (escape substitute)
+#define BDPP_TX_STATE_SENT_SIZE			'U'		// Recently sent the packet size
+#define BDPP_TX_STATE_SENT_ESC_DATA_SS	'V'		// Recently sent escape for a data byte (start substitute)
+#define BDPP_TX_STATE_SENT_ESC_DATA_ES	'W'		// Recently sent escape for a data byte (escape substitute)
+#define BDPP_TX_STATE_SENT_DATA			'X'		// Recently sent a packet data byte
+#define BDPP_TX_STATE_SENT_ALL_DATA		'Y'		// Recently sent the last packet data byte
+#define BDPP_TX_STATE_SENT_END_1		'Z'		// Recently sent the trailing separator
 
 #define BDPP_PKT_FLAG_PRINT				0x00	// Indicates packet contains printable data
 #define BDPP_PKT_FLAG_COMMAND			0x01	// Indicates packet contains a command or request

@@ -846,14 +846,14 @@ void bdpp_run_rx_state_machine() {
 						} else {
 							bdpp_rx_packet = packet;
 							bdpp_rx_packet->flags = bdpp_rx_hold_pkt_flags;
-							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE_1;
+							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE;
 						}
 					} else {
 						packet = bdpp_bg_init_rx_drv_packet();
 						if (packet) {
 							bdpp_rx_packet = packet;
 							bdpp_rx_packet->flags = bdpp_rx_hold_pkt_flags;
-							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE_1;
+							bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE;
 						} else {
 							reset_receiver();
 						}
@@ -873,53 +873,33 @@ void bdpp_run_rx_state_machine() {
 				}
 			} break;
 
-			case BDPP_RX_STATE_AWAIT_ESC_SIZE_1: {
+			case BDPP_RX_STATE_AWAIT_ESC_SIZE: {
 				if (incoming_byte == BDPP_PACKET_ESCAPE) {
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_1;
+					bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE;
 				} else {
-					// We received the size part 1
-					have_the_size_1:
-					bdpp_rx_byte_count = (WORD)incoming_byte;
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_SIZE_2;
-				}
-			} break;
+					// We received the size
+					have_the_size:
+					if (incoming_byte) {
+						bdpp_rx_byte_count = (WORD)incoming_byte;
+					} else {
+						bdpp_rx_byte_count = 256;
+					}
 
-			case BDPP_RX_STATE_AWAIT_SIZE_1: {
-				if (incoming_byte == BDPP_PACKET_START_SUBSTITUTE) {
-					incoming_byte = BDPP_PACKET_START_MARKER;
-					goto have_the_size_1;
-				} else if (incoming_byte == BDPP_PACKET_ESCAPE_SUBSTITUTE) {
-					incoming_byte = BDPP_PACKET_ESCAPE;
-					goto have_the_size_1;
-				} else {
-					reset_receiver();
-				}
-			} break;
-
-			case BDPP_RX_STATE_AWAIT_ESC_SIZE_2: {
-				if (incoming_byte == BDPP_PACKET_ESCAPE) {
-					bdpp_rx_state = BDPP_RX_STATE_AWAIT_SIZE_2;
-				} else {
-					// We received the size part 2
-					have_the_size_2:
-					bdpp_rx_byte_count |= (((WORD)incoming_byte) << 8);
 					if (bdpp_rx_byte_count > bdpp_rx_packet->max_size) {
 						reset_receiver();
-					} else if (bdpp_rx_byte_count == 0) {
-						bdpp_rx_state = BDPP_RX_STATE_AWAIT_END;
 					} else {
 						bdpp_rx_state = BDPP_RX_STATE_AWAIT_ESC_DATA;
 					}
 				}
 			} break;
 
-			case BDPP_RX_STATE_AWAIT_SIZE_2: {
+			case BDPP_RX_STATE_AWAIT_SIZE: {
 				if (incoming_byte == BDPP_PACKET_START_SUBSTITUTE) {
 					incoming_byte = BDPP_PACKET_START_MARKER;
-					goto have_the_size_2;
+					goto have_the_size;
 				} else if (incoming_byte == BDPP_PACKET_ESCAPE_SUBSTITUTE) {
 					incoming_byte = BDPP_PACKET_ESCAPE;
-					goto have_the_size_2;
+					goto have_the_size;
 				} else {
 					reset_receiver();
 				}
@@ -1026,54 +1006,31 @@ void bdpp_run_tx_state_machine() {
 			} break;
 
 			case BDPP_TX_STATE_SENT_INDEX: {
+				// This will make size 256 (0x0100) go out as 0 (0x00), on purpose.
 				outgoing_byte = (BYTE)(bdpp_tx_packet->act_size);
 				if (outgoing_byte == BDPP_PACKET_START_MARKER) {
 					UART0_write_thr(BDPP_PACKET_ESCAPE);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_1_SS;
+					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_SS;
 				} else if (outgoing_byte == BDPP_PACKET_ESCAPE) {
 					UART0_write_thr(BDPP_PACKET_ESCAPE);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_1_ES;
+					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_ES;
 				} else {
 					UART0_write_thr(outgoing_byte);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_1;
+					bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE;
 				}
 			} break;
 
-			case BDPP_TX_STATE_SENT_ESC_SIZE_1_SS: {
+			case BDPP_TX_STATE_SENT_ESC_SIZE_SS: {
 				UART0_write_thr(BDPP_PACKET_START_SUBSTITUTE);
-				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_1;
+				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE;
 			} break;
 			
-			case BDPP_TX_STATE_SENT_ESC_SIZE_1_ES: {
+			case BDPP_TX_STATE_SENT_ESC_SIZE_ES: {
 				UART0_write_thr(BDPP_PACKET_ESCAPE_SUBSTITUTE);
-				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_1;
+				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE;
 			} break;
-			
-			case BDPP_TX_STATE_SENT_SIZE_1: {
-				outgoing_byte = (BYTE)(bdpp_tx_packet->act_size >> 8);
-				if (outgoing_byte == BDPP_PACKET_START_MARKER) {
-					UART0_write_thr(BDPP_PACKET_ESCAPE);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_2_SS;
-				} else if (outgoing_byte == BDPP_PACKET_ESCAPE) {
-					UART0_write_thr(BDPP_PACKET_ESCAPE);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_ESC_SIZE_2_ES;
-				} else {
-					UART0_write_thr(outgoing_byte);
-					bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_2;
-				}
-			} break;
-			
-			case BDPP_TX_STATE_SENT_ESC_SIZE_2_SS: {
-				UART0_write_thr(BDPP_PACKET_START_SUBSTITUTE);
-				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_2;
-			} break;
-			
-			case BDPP_TX_STATE_SENT_ESC_SIZE_2_ES: {
-				UART0_write_thr(BDPP_PACKET_ESCAPE_SUBSTITUTE);
-				bdpp_tx_state = BDPP_TX_STATE_SENT_SIZE_2;
-			} break;
-			
-			case BDPP_TX_STATE_SENT_SIZE_2: {
+					
+			case BDPP_TX_STATE_SENT_SIZE: {
 				if (bdpp_tx_packet->act_size == 0) {
 					bdpp_tx_state = BDPP_TX_STATE_SENT_ALL_DATA;
 				} else {
