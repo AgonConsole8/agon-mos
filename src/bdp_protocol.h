@@ -95,7 +95,7 @@ void bdpp_fg_initialize_driver();
 BOOL bdpp_fg_is_allowed();
 
 // Get whether BDPP is presently enabled
-// [BDPP API function code 0x01, signature ]
+// [BDPP API function code 0x01, signature 1]
 BOOL bdpp_fg_is_enabled();
 
 // Get whether BDPP is presently busy (TX or RX)
