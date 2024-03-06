@@ -85,25 +85,37 @@ typedef struct tag_BDPP_PACKET {
 } BDPP_PACKET;
 
 //----------------------------------------------------------
-//*** OVERALL MANAGEMENT ***
+//*** OVERALL MANAGEMENT FROM FOREGROUND ***
 
 // Initialize the BDPP driver.
 void bdpp_fg_initialize_driver();
 
 // Get whether BDPP is allowed (both CPUs have it)
+// [BDPP API function code 0x00, signature 1]
 BOOL bdpp_fg_is_allowed();
 
 // Get whether BDPP is presently enabled
+// [BDPP API function code 0x01, signature ]
 BOOL bdpp_fg_is_enabled();
 
 // Get whether BDPP is presently busy (TX or RX)
+// [BDPP API function code 0x10, signature 1]
 BOOL bdpp_fg_is_busy();
 
 // Enable BDDP mode for a specific stream
+// [BDPP API function code 0x02, signature 2]
 BOOL bdpp_fg_enable(BYTE stream);
 
 // Disable BDDP mode
+// [BDPP API function code 0x03, signature 1]
 BOOL bdpp_fg_disable();
+
+//----------------------------------------------------------
+//*** OVERALL MANAGEMENT FROM BACKGROUND ***
+
+// Get whether BDPP is presently busy (TX or RX)
+// [BDPP API function code 0x1D, signature 1]
+BOOL bdpp_bg_is_busy();
 
 //----------------------------------------------------------
 //*** PACKET RECEPTION (RX) FROM FOREGROUND (MAIN THREAD) ***
@@ -112,15 +124,19 @@ BOOL bdpp_fg_disable();
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the
 // actual size of an incoming packet may be smaller, but not larger.
+// [BDPP API function code 0x05, signature 6]
 BOOL bdpp_fg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
 
 // Check whether an incoming app-owned packet has been received
+// [BDPP API function code 0x07, signature 2]
 BOOL bdpp_fg_is_rx_app_packet_done(BYTE index);
 
 // Get the flags for a received app-owned packet.
+// [BDPP API function code 0x08, signature 2]
 BYTE bdpp_fg_get_rx_app_packet_flags(BYTE index);
 
 // Get the data size for a received app-owned packet.
+// [BDPP API function code 0x09, signature 8]
 WORD bdpp_fg_get_rx_app_packet_size(BYTE index);
 
 //----------------------------------------------------------
@@ -133,13 +149,16 @@ volatile BDPP_PACKET* bdpp_fg_init_tx_drv_packet(BYTE flags, BYTE stream);
 // Queue an app-owned packet for transmission
 // The packet is expected to be full when this function is called.
 // This function can fail if the packet is presently involved in a data transfer.
+// [BDPP API function code 0x04, signature 7]
 BOOL bdpp_fg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 
 // Check whether an outgoing app-owned packet has been transmitted
+// [BDPP API function code 0x06, signature 2]
 BOOL bdpp_fg_is_tx_app_packet_done(BYTE index);
 
 // Free the driver from using an app-owned packet
 // This function can fail if the packet is presently involved in a data transfer.
+// [BDPP API function code 0x0A, signature 2]
 BOOL bdpp_fg_stop_using_app_packet(BYTE index);
 
 // Start building a driver-owned, outgoing packet.
@@ -149,10 +168,12 @@ volatile BDPP_PACKET* bdpp_fg_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
+// [BDPP API function code 0x0B, signature 4]
 void bdpp_fg_write_byte_to_drv_tx_packet(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
+// [BDPP API function code 0x0C, signature 5]
 void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 
 // Append a single data byte to a driver-owned, outgoing packet.
@@ -162,6 +183,7 @@ void bdpp_fg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 // the value of the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
+// [BDPP API function code 0x0D, signature 4]
 void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
@@ -171,9 +193,11 @@ void bdpp_fg_write_drv_tx_byte_with_usage(BYTE data);
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
+// [BDPP API function code 0x0E, signature 5]
 void bdpp_fg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+// [BDPP API function code 0x0F, signature 3]
 void bdpp_fg_flush_drv_tx_packet();
 
 //----------------------------------------------------------
@@ -187,15 +211,19 @@ volatile BDPP_PACKET* bdpp_bg_init_rx_drv_packet();
 // This function can fail if the packet is presently involved in a data transfer.
 // The given size is a maximum, based on app memory allocation, and the
 // actual size of an incoming packet may be smaller, but not larger.
+// [BDPP API function code 0x12, signature 6]
 BOOL bdpp_bg_prepare_rx_app_packet(BYTE index, BYTE* data, WORD size);
 
 // Check whether an incoming app-owned packet has been received
+// [BDPP API function code 0x14, signature 2]
 BOOL bdpp_bg_is_rx_app_packet_done(BYTE index);
 
 // Get the flags for a received app-owned packet.
+// [BDPP API function code 0x15, signature 2]
 BYTE bdpp_bg_get_rx_app_packet_flags(BYTE index);
 
 // Get the data size for a received app-owned packet.
+// [BDPP API function code 0x16, signature 8]
 WORD bdpp_bg_get_rx_app_packet_size(BYTE index);
 
 //----------------------------------------------------------
@@ -208,13 +236,16 @@ volatile BDPP_PACKET* bdpp_bg_init_tx_drv_packet(BYTE flags, BYTE stream);
 // Queue an app-owned packet for transmission
 // The packet is expected to be full when this function is called.
 // This function can fail if the packet is presently involved in a data transfer.
+// [BDPP API function code 0x11, signature 7]
 BOOL bdpp_bg_queue_tx_app_packet(BYTE indexes, BYTE flags, const BYTE* data, WORD size);
 
 // Check whether an outgoing app-owned packet has been transmitted
+// [BDPP API function code 0x13, signature 2]
 BOOL bdpp_bg_is_tx_app_packet_done(BYTE index);
 
 // Free the driver from using an app-owned packet
 // This function can fail if the packet is presently involved in a data transfer.
+// [BDPP API function code 0x17, signature 2]
 BOOL bdpp_bg_stop_using_app_packet(BYTE index);
 
 // Start building a driver-owned, outgoing packet.
@@ -224,10 +255,12 @@ volatile BDPP_PACKET* bdpp_bg_start_drv_tx_packet(BYTE flags, BYTE stream);
 
 // Append a data byte to a driver-owned, outgoing packet.
 // This is a blocking call, and might wait for room for data.
+// [BDPP API function code 0x18, signature 4]
 void bdpp_bg_write_byte_to_drv_tx_packet(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
 // This is a blocking call, and might wait for room for data.
+// [BDPP API function code 0x19, signature 5]
 void bdpp_bg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 
 // Append a single data byte to a driver-owned, outgoing packet.
@@ -237,6 +270,7 @@ void bdpp_bg_write_bytes_to_drv_tx_packet(const BYTE* data, WORD count);
 // the value of the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
+// [BDPP API function code 0x1A, signature 4]
 void bdpp_bg_write_drv_tx_byte_with_usage(BYTE data);
 
 // Append multiple data bytes to one or more driver-owned, outgoing packets.
@@ -246,9 +280,11 @@ void bdpp_bg_write_drv_tx_byte_with_usage(BYTE data);
 // the first byte in the data. To guarantee that the packet usage flags are
 // set correctly, be sure to flush the packet before switching from "print"
 // to "non-print", or vice versa.
+// [BDPP API function code 0x1B, signature 5]
 void bdpp_bg_write_drv_tx_bytes_with_usage(const BYTE* data, WORD count);
 
 // Flush the currently-being-built, driver-owned, outgoing packet, if any exists.
+// [BDPP API function code 0x1C, signature 3]
 void bdpp_bg_flush_drv_tx_packet();
 
 #endif // BDP_PROTOCOL_H
