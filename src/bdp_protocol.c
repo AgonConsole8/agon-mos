@@ -909,7 +909,9 @@ void bdpp_run_rx_state_machine() {
 				if (incoming_byte == BDPP_PACKET_END_MARKER) {
 					// Packet is complete
 					bdpp_rx_packet->flags |= BDPP_PKT_FLAG_DONE;
-					if (!(bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED)) {
+					if (bdpp_rx_packet->flags & BDPP_PKT_FLAG_APP_OWNED) {
+						bdpp_rx_packet = NULL;
+					} else {
 						// This is a driver-owned packet, meaning that MOS must handle it.
 						for (i = 0; i < bdpp_rx_packet->act_size; i++) {
 							call_vdp_protocol(bdpp_rx_packet->data[i]);

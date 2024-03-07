@@ -791,6 +791,8 @@ int	mos_cmdBDPP(char *ptr) {
 		putch(23);
 		putch(0);
 		putch(0xA2);
+		putch(0); // command: enable BDPP
+
 		// Wait for the VDU command to go out.
 		UART0_serial_IDLE();
 		wait_n_ms(50); // wait 50 ms
@@ -799,6 +801,7 @@ int	mos_cmdBDPP(char *ptr) {
 		}
 		UART0_serial_IDLE();
 		wait_n_ms(25); // wait 25 ms
+
 		// Enable BDPP for MOS (stream #0).
 		if (bdpp_fg_enable(0)) {
 			wait_n_ms(250); // wait 250 ms

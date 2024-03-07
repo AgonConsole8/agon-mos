@@ -75,6 +75,7 @@
 
 // Defines one packet in the transmit or receive list
 //
+#pragma pack(push,1)
 typedef struct tag_BDPP_PACKET {
 	BYTE			flags;	// Flags describing the packet
 	BYTE			indexes; // Index of the packet (lower nibble) & stream (upper nibble)
@@ -83,6 +84,7 @@ typedef struct tag_BDPP_PACKET {
 	BYTE*			data;	// Address of the data bytes
 	struct tag_BDPP_PACKET* next; // Points to the next packet in the list
 } BDPP_PACKET;
+#pragma pack(pop)
 
 //----------------------------------------------------------
 //*** OVERALL MANAGEMENT FROM FOREGROUND ***
