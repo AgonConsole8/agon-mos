@@ -138,8 +138,13 @@ _rst_18_handler:	LD	E, A 			; Preserve the delimiter
 ;
 ; Standard loop mode
 ;
-_rst_18_handler_0:
-			CALL	UART0_serial_PUTBUF	; Output
+_rst_18_handler_0:	LD 	A, (HL)			; Fetch the character
+			CALL	UART0_serial_PUTCH	; Output
+			INC 	HL 			; Increment the buffer pointer
+			DEC	BC 			; Decrement the loop counter
+			LD	A, B 			; Is it 0?
+			OR 	C 
+			JR	NZ, _rst_18_handler_0	; No, so loop
 			RET.L
 ;
 ; Delimited mode
