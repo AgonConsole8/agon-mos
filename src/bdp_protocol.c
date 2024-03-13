@@ -213,7 +213,13 @@ BOOL bdpp_fg_enable(BYTE stream) {
 		bdpp_fg_flush_drv_tx_packet();
 		bdpp_fg_tx_next_stream = stream;
 		if (!(bdpp_driver_flags & BDPP_FLAG_ENABLED)) {
+			DI();
 			bdpp_driver_flags |= BDPP_FLAG_ENABLED;
+			// Setup Port D bit 2 (RTS) for alt fcn (output)
+			SETREG(PD_DDR, PORTPIN_TWO);
+			RESETREG(PD_ALT1, PORTPIN_TWO);
+			SETREG(PD_ALT2, PORTPIN_TWO);
+			EI();
 			set_vector(UART0_IVECT, bdpp_handler);
 		}
 		return TRUE;
