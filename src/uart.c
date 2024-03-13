@@ -87,7 +87,7 @@ BYTE open_UART0(UART * pUART) {
 	UART0_BRG_L = (br & 0xFF);										// Load divisor low
 	UART0_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
 	UART0_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
-	UART0_MCTL = 0x00;												// Reste value; enable RTS, so ESP32 can talk
+	UART0_MCTL = 0x00;												// Bring modem control register to reset value
 	UART0_FCTL = 0x01;												// Enable (don't clear) hardware FIFOs
 	UART0_IER = pUART->interrupts;									// Set interrupts
 	
@@ -118,7 +118,7 @@ BYTE open_UART1(UART * pUART) {
 	if(pUART->flowControl == FCTL_HW) {
 		SETREG(PC_DDR, PORTPIN_THREE);								// Set Port C bit 3 (CTS) for input
 		RESETREG(PC_ALT1, PORTPIN_THREE);
-		RESETREG(PC_ALT2, PORTPIN_THREE);
+		SETREG(PC_ALT2, PORTPIN_THREE);
 		serialFlags |= 0x20;
 	}
 	
@@ -183,4 +183,16 @@ void UART0_enable_interrupt(BYTE flag) {
 //
 void UART0_disable_interrupt(BYTE flag) {
 	UART0_IER &= ~flag;
+}
+
+// Turn on RTS (tell ESP32 to transmit)
+//
+void UART0_enable_rts() {
+	UART0_MCTL |= PORTPIN_ONE;
+}
+
+// Turn off RTS (tell ESP32 to wait)
+//
+void UART0_disable_rts() {
+	UART0_MCTL &= ~PORTPIN_ONE;
 }

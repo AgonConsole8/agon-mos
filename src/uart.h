@@ -188,5 +188,7 @@ extern BYTE UART0_read_rbr();
 extern BYTE UART0_read_iir();
 extern void UART0_enable_interrupt(BYTE flag);
 extern void UART0_disable_interrupt(BYTE flag);
+extern void UART0_enable_rts();
+extern void UART0_disable_rts();
 
 #endif UART_H

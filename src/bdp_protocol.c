@@ -219,6 +219,7 @@ BOOL bdpp_fg_enable(BYTE stream) {
 			SETREG(PD_DDR, PORTPIN_TWO);
 			RESETREG(PD_ALT1, PORTPIN_TWO);
 			SETREG(PD_ALT2, PORTPIN_TWO);
+			SETREG(UART0_MCTL, PORTPIN_ONE); // Turn on RTS for the ESP32 to see CTS
 			EI();
 			set_vector(UART0_IVECT, bdpp_handler);
 		}
@@ -1076,18 +1077,8 @@ void bdpp_run_tx_state_machine() {
 //
 void bdp_protocol() {
 	BYTE iir = UART0_read_iir();
+	UART0_disable_rts();
 	bdpp_run_rx_state_machine();
 	bdpp_run_tx_state_machine();
-
-	/*BYTE dummy, i;
-	BYTE iir = UART0_read_iir() & UART_IIR_ISCMASK;;
-	if (iir == UART_IIR_CHARTIMEOUT) {
-		// Read entire FIFO to clear interrupt
-		for (i = 0; i < 16; i++) {
-			dummy = UART0_read_rbr();
-		}
-	} else {
-		bdpp_run_rx_state_machine();
-		bdpp_run_tx_state_machine();
-	}*/
+	UART0_enable_rts();
 }
