@@ -38,7 +38,7 @@ extern void UART0_wait_CTS();
 #define SETREG_LCR1(data, stop, parity) (UART1_LCTL = ((BYTE)(((data)-(BYTE)5)&(BYTE)0x3)|(BYTE)((((stop)-(BYTE)0x1)&(BYTE)0x1)<<(BYTE)0x2)|(BYTE)((parity)<<(BYTE)0x3)))
 
 void init_UART0() {
-	PD_DR = PORTD_DRVAL_DEF;
+	PD_DR = 0;
 	PD_DDR = PORTD_DDRVAL_DEF;
 //	#ifdef _EZ80F91
 //	PD_ALT0 = PORTD_ALT0VAL_DEF;
@@ -49,7 +49,7 @@ void init_UART0() {
 }
 
 void init_UART1() {
-	PC_DR = PORTC_DRVAL_DEF;
+	PC_DR = 0;
 	PC_DDR = PORTC_DDRVAL_DEF;
 //	#ifdef _EZ80F91
 //	PC_ALT0 = PORTC_ALT0VAL_DEF;
@@ -78,8 +78,8 @@ BYTE open_UART0(UART * pUART) {
 
 	if(pUART->flowControl == FCTL_HW) {
 		SETREG(PD_DDR, PORTPIN_THREE);								// Set Port D bit 3 (CTS) for alt fcn (input)
-		SETREG(PD_ALT1, PORTPIN_THREE);
-		RESETREG(PD_ALT2, PORTPIN_THREE);
+		RESETREG(PD_ALT1, PORTPIN_THREE);
+		SETREG(PD_ALT2, PORTPIN_THREE);
 		serialFlags |= 0x02;
 	}
 

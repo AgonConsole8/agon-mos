@@ -84,11 +84,11 @@ UART_LSR_RDY		EQU	%01		; Data ready
 ; Check whether we're clear to send (UART0 only)
 ;
 _UART0_wait_CTS:
-UART0_wait_CTS:		GET_GPIO	PD_DR, 8		; Check Port D, bit 3 (CTS)
+UART0_wait_CTS:		GET_GPIO	UART0_REG_MSR, 10h	; Check Port D, bit 4 (CTS)
 			JR		Z, UART0_wait_CTS
 			RET
 
-UART1_wait_CTS:		GET_GPIO	PC_DR, 8		; Check Port C, bit 3 (CTS)
+UART1_wait_CTS:		GET_GPIO	UART1_REG_MSR, 10h	; Check Port C, bit 4 (CTS)
 			JR		Z, UART1_wait_CTS
 			RET
 
