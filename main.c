@@ -162,6 +162,14 @@ int main(void) {
 	
 	if (((BYTE)gp & 0xF0) >= 0x40) {
 		// The ESP32 code supports bidirectional packet protocol.
+
+		// Setup Port D bit 2 (RTS) for alt fcn (output)
+		SETREG(PD_DDR, PORTPIN_TWO);
+		RESETREG(PD_ALT1, PORTPIN_TWO);
+		SETREG(PD_ALT2, PORTPIN_TWO);
+		SETREG(UART0_MCTL, PORTPIN_ONE); // Turn on RTS for the ESP32 to see CTS
+
+		// Allow BDPP (but don't enable it yet)
 		bdpp_fg_initialize_driver();
 	}
 	
