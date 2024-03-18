@@ -89,6 +89,9 @@
 			XREF	_f_write
 			XREF	_f_stat 
 			XREF	_f_lseek
+			XREF	_f_opendir
+			XREF	_f_closedir
+			XREF	_f_readdir
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -1066,9 +1069,60 @@ ffs_api_fprintf:
 ffs_api_ftell:		
 ffs_api_fsize:		
 ffs_api_ferror:		
-ffs_api_dopen:		
-ffs_api_dclose:		
-ffs_api_dread:		
+
+; Open a directory
+; HLU: Pointer to a blank DIR struct
+; DEU: Pointer to the directory path
+; Returns:
+; A: FRESULT
+ffs_api_dopen:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; const TCHAR *path
+			PUSH    HL		; DIR *dp
+			CALL	_f_opendir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
+			RET
+
+; Close a directory
+; HLU: Pointer to an open DIR struct
+; Returns:
+; A: FRESULT
+ffs_api_dclose:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH    HL		; DIR *dp
+			CALL	_f_closedir
+			LD	A, L		; FRESULT
+			POP	HL
+			RET
+
+; Read the next FILINFO from an open DIR
+; HLU: Pointer to an open DIR struct
+; DEU: Pointer to an empty FILINFO struct
+; Returns:
+; A: FRESULT
+ffs_api_dread:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; FILINFO *fno
+			PUSH    HL		; DIR *dp
+			CALL	_f_readdir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
+			RET
+
 ffs_api_dfindfirst:	
 ffs_api_dfindnext:	
 ffs_api_unlink:		
