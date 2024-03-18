@@ -274,7 +274,12 @@ typedef struct {
 
 
 
-/* File function return code (FRESULT) */
+/**
+ * File function return code (FRESULT)
+ *
+ * Also used as MOS user program return codes, and augmented with non-fatfs codes
+ * (see FR_MOS_xxx)
+ */
 
 typedef enum {
 	FR_OK = 0,				/* (0) Succeeded */
@@ -296,7 +301,11 @@ typedef enum {
 	FR_LOCKED,				/* (16) The operation is rejected according to the file sharing policy */
 	FR_NOT_ENOUGH_CORE,		/* (17) LFN working buffer could not be allocated */
 	FR_TOO_MANY_OPEN_FILES,	/* (18) Number of open files > FF_FS_LOCK */
-	FR_INVALID_PARAMETER	/* (19) Given parameter is invalid */
+	FR_INVALID_PARAMETER,	/* (19) Given parameter is invalid */
+	// additional error codes specific to MOS
+	FR_MOS_INVALID_COMMAND, /* (20) */
+	FR_MOS_INVALID_EXECUTABLE, /* (21) */
+	FR_MOS_OUT_OF_MEMORY, /* (22) */
 } FRESULT;
 
 
