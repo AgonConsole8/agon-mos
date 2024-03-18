@@ -93,7 +93,7 @@ UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD(char * path);
-UINT24	mos_DIR(char * path);
+UINT24	mos_DIR(char * path, BOOL longListing);
 UINT24	mos_DEL(char * filename);
 UINT24 	mos_REN(char * filename1, char * filename2);
 UINT24	mos_COPY(char * filename1, char * filename2);
@@ -121,7 +121,7 @@ extern TCHAR	cwd[256];
 UINT8	fat_EOF(FIL * fp);
 
 #define HELP_CAT			"Directory listing of the current directory\r\n"
-#define HELP_CAT_ARGS		"<path>"
+#define HELP_CAT_ARGS		"[-l] <path>"
 #define HELP_CAT_ALIASES	"DIR and ."
 #define HELP_DIR_ALIASES	"CAT and ."
 #define HELP_DOT_ALIASES	"CAT and DIR"
