@@ -9,6 +9,7 @@
  * 23/03/2023:		Fixed maths overflow in init_UART0 to work with bigger baud rates
  * 29/03/2023:		Added support for UART1
  * 16/05/2023:		Fixed MASTERCLOCK
+ * 24/01/2024:		CW Added functions useful to BDPP.
  */
 
 #ifndef UART_H
@@ -180,5 +181,14 @@ extern volatile BYTE serialFlags;		// In globals.asm
 
 extern INT putch(INT ich);				// Now in serial.asm
 extern INT getch(VOID);					// Now in serial.asm
+
+extern void UART0_write_thr(BYTE data);
+extern BYTE UART0_read_lsr();
+extern BYTE UART0_read_rbr();
+extern BYTE UART0_read_iir();
+extern void UART0_enable_interrupt(BYTE flag);
+extern void UART0_disable_interrupt(BYTE flag);
+extern void UART0_enable_rts();
+extern void UART0_disable_rts();
 
 #endif UART_H

@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS code
  * Author:			Dean Belfield
  * Created:			10/07/2022
- * Last Updated:	11/11/2023
+ * Last Updated:	11/02/2024
  * 
  * Modinfo:
  * 11/07/2022:		Removed mos_cmdBYE, Added mos_cmdLOAD
@@ -29,6 +29,7 @@
  * 30/05/2023:		Function mos_FGETC now returns EOF flag
  * 08/07/2023		Added mos_trim function
  * 11/11/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT
+ * 11/02/2024:		CW Added mos_cmdBDPP
  */
 
 #ifndef MOS_H
@@ -86,6 +87,7 @@ int		mos_cmdEXEC(char * ptr);
 int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
+int		mos_cmdBDPP(char *ptr);
 int		mos_cmdHELP(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
@@ -116,6 +118,8 @@ UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
 
 UINT8	fat_EOF(FIL * fp);
+
+#define HELP_BDPP			"Turn on bidirectional packet protocol (BDPP)\r\n"
 
 #define HELP_CAT			"Directory listing of the current directory\r\n"
 #define HELP_CAT_ARGS		"<path>"

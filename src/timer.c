@@ -2,7 +2,7 @@
  * Title:			AGON MOS - Timer
  * Author:			Dean Belfield
  * Created:			19/06/2022
- * Last Updated:	03/08/2023
+ * Last Updated:	27/02/2024
  * 
  * Modinfo:
  * 11/07/2022:		Removed unused functions
@@ -24,7 +24,7 @@
 // - clkdiv: 4, 16, 64 or 256
 // - clkflag: Other clock flags (interrupt, etc)
 // Returns:
-// - interval value
+// - interval value (timer ticks)
 //
 unsigned short init_timer0(int interval, int clkdiv, unsigned char ctrlbits) {
 	unsigned short	rr;
@@ -38,7 +38,7 @@ unsigned short init_timer0(int interval, int clkdiv, unsigned char ctrlbits) {
 	}
 	ctl = (ctrlbits | clkbits);
 
-	rr = (unsigned short)((SysClkFreq / 1000) / clkdiv) * interval;
+	rr = (unsigned short)((SysClkFreq * interval) / (clkdiv * 1000));
 
 	TMR0_CTL = 0x00;													// Disable the timer and clear all settings	
 	TMR0_RR_L = (unsigned char)(rr);
@@ -82,7 +82,7 @@ BOOL wait_VDP(unsigned char mask) {
 	BOOL	retVal = 0;
 
 	for(i = 0; i < 250000; i++) {				// A small delay loop (~1s)
-		if(vpd_protocol_flags & mask) {			// If we get a result then
+		if(vdp_protocol_flags & mask) {			// If we get a result then
 			retVal = 1;							// Set the return value to true
 			break;								// And exit the loop
 		}

@@ -65,7 +65,7 @@
 			XDEF	_scratchpad
 			XDEF	_keymap 
 
-			XDEF	_vpd_protocol_flags
+			XDEF	_vdp_protocol_flags
 			XDEF	_vdp_protocol_state
 			XDEF	_vdp_protocol_cmd
 			XDEF	_vdp_protocol_len
@@ -88,7 +88,7 @@
 _sysvars:					; Please make sure the sysvar offsets match those in mos_api.inc
 ;
 _clock			DS	4		; + 00h: Clock timer in centiseconds (incremented by 2 every VBLANK)
-_vpd_protocol_flags:	DS	1		; + 04h: Flags to indicate completion of VDP commands
+_vdp_protocol_flags:	DS	1		; + 04h: Flags to indicate completion of VDP commands
 _keyascii:		DS	1		; + 05h: ASCII keycode, or 0 if no key is pressed
 _keymods:		DS	1		; + 06h: Keycode modifiers
 _cursorX:		DS	1		; + 07h: Cursor X position

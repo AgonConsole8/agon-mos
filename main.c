@@ -27,6 +27,7 @@
  * 03/08/2023:				RC2	+ Enhanced low-level keyboard functionality
  * 27/09/2023:					+ Updated RTC
  * 11/11/2023:				RC3	+ See Github for full list of changes
+ * 20/01/2024:	    CW Added support for bidirectional packet protocol
  */
 
 #include <eZ80.h>
@@ -45,6 +46,7 @@
 #include "clock.h"
 #include "mos.h"
 #include "i2c.h"
+#include "bdp_protocol.h"
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -78,16 +80,53 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 
 	open_UART0(pUART);					// Open the UART 
 	init_timer0(10, 16, 0x00);  		// 10ms timer for delay
-	gp = 0;								// Reset the general poll byte	
+	gp = 0;								// Reset the general poll byte
 	for(t = 0; t < 200; t++) {			// A timeout loop (200 x 50ms = 10s)
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
-		putch(1);
+		
+		// There are now 4 possible cases, relative to the
+		// bidirectional packet protocol (BDPP):
+		//
+		// (a) EZ80 does NOT support BDPP, and ESP32 does NOT support BDPP.
+		//     - EZ80 sends 0x01; ESP32 returns 0x01.
+		//
+		// (b) EZ80 does NOT support BDPP, but ESP32 DOES support BDPP.
+		//     - EZ80 sends 0x01, ESP32 returns 0x01.
+		//
+		// (c) EZ80 DOES support BDPP, but ESP32 does NOT support BDPP.
+		//     - EZ80 sends 0x04..0x0F, ESP32 returns 0x04..0x0F.
+		//
+		// (d) EZ80 DOES support BDPP, and ESP32 DOES support BDPP.
+		//     - EZ80 sends 0x04..0x0F, ESP32 returns 0x84..0x8F.
+		//
+		// The range of values allows us to enhance the BDPP over time,
+		// if needed, and be able to identify which version of BDDP is
+		// on each side of the communication. This is EZ80 code, so it
+		// obviously knows its own protocol version.
+
+		putch(EZ80_COMM_PROTOCOL_VERSION); // older EZ80 code will send a 0x01 here!
+
 		for(i = 0; i < 5; i++) {		// Wait 50ms
 			wait_timer0();
 		}
-		if(gp == 1) break;				// If general poll returned, then exit for loop
+
+		// If general poll returned, then exit for loop.
+		// If gp is 0x84..0x8F, then both CPUs support bidirectional protocol;
+		// If gp is 0x04..0x0F, then only the EZ80 supports it.
+
+		if ((gp & 0x7F) >= 0x04 && (gp & 0x7F) <= 0x0F) {
+			// Pack the 2 protocol versions into a single system variable, for app use.
+			if (gp & 0x80) {
+				// The ESP32 DOES support BDPP.
+				gp = ((gp & 0x0F) << 4) | EZ80_COMM_PROTOCOL_VERSION;
+			} else {
+				// The ESP32 does NOT support BDPP.
+				gp = (0x01 << 4) | EZ80_COMM_PROTOCOL_VERSION;
+			}
+			break;
+		}
 	}
 	enable_timer0(0);					// Disable the timer
 	return gp;
@@ -105,6 +144,7 @@ void init_interrupts(void) {
 //
 int main(void) {
 	UART 	pUART0;
+	int		err;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -118,7 +158,21 @@ int main(void) {
 		if(!wait_ESP32(&pUART0, 384000))	{		// If that fails, then fallback to the lower baud rate
 			gp = 2;									// Flag GP as 2, just in case we need to handle this error later
 		}
-	}	
+	}
+	
+	if (((BYTE)gp & 0xF0) >= 0x40) {
+		// The ESP32 code supports bidirectional packet protocol.
+
+		// Setup Port D bit 2 (RTS) for alt fcn (output)
+		SETREG(PD_DDR, PORTPIN_TWO);
+		RESETREG(PD_ALT1, PORTPIN_TWO);
+		SETREG(PD_ALT2, PORTPIN_TWO);
+		SETREG(UART0_MCTL, PORTPIN_ONE); // Turn on RTS for the ESP32 to see CTS
+
+		// Allow BDPP (but don't enable it yet)
+		bdpp_fg_initialize_driver();
+	}
+	
 	if(coldBoot == 0) {								// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
@@ -130,11 +184,14 @@ int main(void) {
 	#ifdef VERSION_BUILD
 		printf(" Build %s", VERSION_BUILD);
 	#endif
-	printf("\n\r\n\r");
+
+	printf("\n\rProtocol versions: MOS(%hu), VDP(%hu)\n\r",
+			(((BYTE)gp) & 0x0F), (((BYTE)gp) >> 4));
+
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
-
+	
 	mos_mount();									// Mount the SD card
 
 	putch(7);										// Startup beep
@@ -145,7 +202,7 @@ int main(void) {
 	//
 	#if enable_config == 1	
 	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
-		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
+		err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
@@ -155,8 +212,11 @@ int main(void) {
 	// The main loop
 	//
 	while(1) {
+		bdpp_fg_flush_drv_tx_packet();
 		if(mos_input(&cmd, sizeof(cmd)) == 13) {
-			int err = mos_exec(&cmd);
+			bdpp_fg_flush_drv_tx_packet();
+			err = mos_exec(&cmd);
+			bdpp_fg_flush_drv_tx_packet();
 			if(err > 0) {
 				mos_error(err);
 			}

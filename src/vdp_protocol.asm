@@ -29,6 +29,8 @@
 			SEGMENT .STARTUP
 			
 			XDEF	vdp_protocol
+			XDEF	call_vdp_protocol
+			XDEF	_call_vdp_protocol
 
 			XREF	_keyascii
 			XREF	_keycode
@@ -54,7 +56,7 @@
 			XREF 	_keyled
 			XREF	_mouseX
 			XREF	_gp
-			XREF	_vpd_protocol_flags
+			XREF	_vdp_protocol_flags
 			XREF	_vdp_protocol_state
 			XREF	_vdp_protocol_cmd
 			XREF	_vdp_protocol_len
@@ -64,10 +66,29 @@
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
-;							
+
+
+; void call_vdp_protocol(BYTE data);
+;
+; Call the function that handles incoming VDP protocol packets.
+;
+_call_vdp_protocol:
+call_vdp_protocol:
+			PUSH	IY				; Standard C prologue
+			LD	IY, 0
+			ADD	IY, SP	
+
+			LD	C, (IY+6)			; get data byte
+			LD	HL, _vdp_protocol_data ; get pointer to data buffer
+			CALL	vdp_protocol	; handle with legacy packet handler
+
+			LD 	SP, IY				; Standard epilogue
+			POP	IY
+			RET
+
 ; The UART protocol handler state machine
 ;
-vdp_protocol:		LD	A, (_vdp_protocol_state)
+vdp_protocol: LD A, (_vdp_protocol_state)
 			OR	A
 			JR	Z, vdp_protocol_state0
 			DEC	A
@@ -190,15 +211,15 @@ $$:			LD	A, (_vdp_protocol_data + 0)	; ASCII key code
 ; Byte: Cursor X
 ; Byte: Cursor Y
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_CURSOR:	LD	A, (_vdp_protocol_data+0)
 			LD	(_cursorX), A
 			LD	A, (_vdp_protocol_data+1)
 			LD	(_cursorY), A
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_CURSOR
-			LD	(_vpd_protocol_flags), A
+			LD	(_vdp_protocol_flags), A
 			RET
 			
 ; Screen character data
@@ -206,13 +227,13 @@ vdp_protocol_CURSOR:	LD	A, (_vdp_protocol_data+0)
 ;
 ; Byte: ASCII code of character 
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vpd_protocol_SCRCHAR:	LD	A, (_vdp_protocol_data+0)
 			LD	(_scrchar), A
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_SCRCHAR
-			LD	(_vpd_protocol_flags), A
+			LD	(_vdp_protocol_flags), A
 			RET
 			
 ; Pixel value data (RGB)
@@ -223,15 +244,15 @@ vpd_protocol_SCRCHAR:	LD	A, (_vdp_protocol_data+0)
 ; Byte: Blue component of read pixel
 ; Byte: The palette index
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_POINT:	LD	HL, (_vdp_protocol_data+0)
 			LD	(_scrpixel), HL
 			LD	A, (_vdp_protocol_data+3)
 			LD	(_scrpixelIndex), A
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_POINT
-			LD	(_vpd_protocol_flags), A
+			LD	(_vdp_protocol_flags), A
 			RET
 			
 ; Audio acknowledgement
@@ -240,15 +261,15 @@ vdp_protocol_POINT:	LD	HL, (_vdp_protocol_data+0)
 ; Byte: channel
 ; Byte: success (1 if successful, otherwise 0)
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_AUDIO:	LD	A, (_vdp_protocol_data+0)
 			LD	(_audioChannel), A
 			LD	A, (_vdp_protocol_data+1)
 			LD	(_audioSuccess), A
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_AUDIO
-			LD	(_vpd_protocol_flags), A
+			LD	(_vdp_protocol_flags), A
 			RET
 			
 ; Screen mode details
@@ -261,7 +282,7 @@ vdp_protocol_AUDIO:	LD	A, (_vdp_protocol_data+0)
 ; Byte: Number of colours
 ; Byte: Screen mode
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_MODE:	LD	A, (_vdp_protocol_data+0)
 			LD	(_scrwidth), A
@@ -279,9 +300,9 @@ vdp_protocol_MODE:	LD	A, (_vdp_protocol_data+0)
 			LD	(_scrcolours), A
 			LD	A, (_vdp_protocol_data+7)
 			LD	(_scrmode), A
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_MODE
-			LD	(_vpd_protocol_flags), A			
+			LD	(_vdp_protocol_flags), A			
 			RET
 
 ; RTC
@@ -289,15 +310,15 @@ vdp_protocol_MODE:	LD	A, (_vdp_protocol_data+0)
 ;
 ; See vdp_time_t struct in clock.h for details
 ;
-; Sets vpd_protocol_flags to flag receipt to apps
+; Sets vdp_protocol_flags to flag receipt to apps
 ;
 vdp_protocol_RTC:	LD	HL, _vdp_protocol_data
 			LD	DE, _rtc 
 			LD	BC,  6
 			LDIR 
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_RTC
-			LD	(_vpd_protocol_flags), A			
+			LD	(_vdp_protocol_flags), A			
 			RET
 
 ; Keyboard status
@@ -327,7 +348,7 @@ vdp_protocol_MOUSE:	LD	HL, _vdp_protocol_data
 			LD	DE, _mouseX
 			LD	BC, 10
 			LDIR 
-			LD	A, (_vpd_protocol_flags)
+			LD	A, (_vdp_protocol_flags)
 			OR	VDPP_FLAG_MOUSE
-			LD	(_vpd_protocol_flags), A
+			LD	(_vdp_protocol_flags), A
 			RET

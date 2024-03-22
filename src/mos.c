@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS code
  * Author:			Dean Belfield
  * Created:			10/07/2022
- * Last Updated:	11/11/2023
+ * Last Updated:	11/02/2024
  * 
  * Modinfo:
  * 11/07/2022:		Added mos_cmdDIR, mos_cmdLOAD, removed mos_cmdBYE
@@ -35,6 +35,7 @@
  * 26/09/2023:		Refactored mos_GETRTC and mos_SETRTC
  * 10/11/2023:		Added CONSOLE to mos_cmdSET
  * 11/11/2023:		Added mos_cmdHELP, mos_cmdTYPE, mos_cmdCLS, mos_cmdMOUNT, mos_mount
+ * 11/02/2024:		CW Added mos_cmdBDPP
  */
 
 #include <eZ80.h>
@@ -52,16 +53,19 @@
 #include "clock.h"
 #include "ff.h"
 #include "strings.h"
+#include "bdp_protocol.h"
+#include "timer.h"
 
 char  	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
+extern void UART0_serial_IDLE();
 
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
 
 extern volatile	BYTE keyascii;					// In globals.asm
-extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile	BYTE vdp_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
@@ -91,11 +95,12 @@ static t_mosCommand mosCommands[] = {
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET,	NULL },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU,	NULL },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME,	NULL },
-	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS,	NULL },
+	{ "CREDITS",	&mos_cmdCREDITS,	NULL,				HELP_CREDITS,	NULL },
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC,	NULL },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE,	NULL },
-	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
-	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
+	{ "CLS",		&mos_cmdCLS,		NULL,				HELP_CLS,	NULL },
+	{ "MOUNT",		&mos_cmdMOUNT,		NULL,				HELP_MOUNT,	NULL },
+	{ "BDPP",		&mos_cmdBDPP,		NULL,				HELP_BDPP,	NULL },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
 };
 
@@ -126,6 +131,7 @@ static char * mos_errors[] = {
 	"Invalid parameter",
 	"Invalid command",
 	"Invalid executable",
+	"Not allowed",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))
@@ -165,6 +171,7 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 	putch(MOS_prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 1);
 	printf("\n\r");
+	bdpp_fg_flush_drv_tx_packet();
 	return retval;
 }
 
@@ -757,6 +764,51 @@ int mos_cmdTYPE(char * ptr) {
 int	mos_cmdCLS(char *ptr) {
 	putchar(12);
 	return 0;
+}
+
+void wait_n_ms(WORD n) {
+	init_timer0(10, 16, 0x00); // 10ms timer for delay
+	while (n >= 10) {
+		wait_timer0();
+		n -= 10;
+	}
+	enable_timer0(0);
+}
+
+// BDPP
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int	mos_cmdBDPP(char *ptr) {
+	short i;
+	if (bdpp_fg_is_enabled()) {
+		return 0; // OK
+	}
+	if (bdpp_fg_is_allowed()) {
+		// Tell VDP to enable BDPP.
+		putch(23);
+		putch(0);
+		putch(0xA2);
+		putch(0); // command: enable BDPP
+
+		// Wait for the VDU command to go out.
+		UART0_serial_IDLE();
+		wait_n_ms(50); // wait 50 ms
+		for (i = 0; i < 8; i++) {
+			putch(0);
+		}
+		UART0_serial_IDLE();
+		wait_n_ms(25); // wait 25 ms
+
+		// Enable BDPP for MOS (stream #0).
+		if (bdpp_fg_enable(0)) {
+			wait_n_ms(250); // wait 250 ms
+			return 0; // OK
+		}
+	}
+	return 22; // Not allowed
 }
 
 // MOUNT

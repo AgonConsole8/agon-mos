@@ -10,6 +10,7 @@
 ; 22/03/2023:	Added serial_PUTCH, moved putch and getch from uart.c
 ; 23/03/2023:	Renamed serial_RX_WAIT to seral_GETCH
 ; 29/03/2023:	Added support for UART1
+; 20/01/2024:	CW Added support for bidirectional packet protocol
 
 			INCLUDE	"macros.inc"
 			INCLUDE	"equs.inc"
@@ -22,12 +23,16 @@
 			XDEF	UART0_serial_TX
 			XDEF	UART0_serial_RX
 			XDEF	UART0_serial_GETCH
-			XDEF	UART0_serial_PUTCH 
+			XDEF	UART0_serial_PUTCH
+			XDEF	UART0_serial_PUTBUF
+			XDEF	UART0_wait_CTS
+			XDEF	_UART0_wait_CTS
+			XDEF	_UART0_serial_IDLE
 
-			XDEF	UART1_serial_TX
+XDEF	UART1_serial_TX
 			XDEF	UART1_serial_RX
 			XDEF	UART1_serial_GETCH
-			XDEF	UART1_serial_PUTCH 
+			XDEF	UART1_serial_PUTCH
 
 			XDEF	_putch
 			XDEF	_getch 
@@ -36,6 +41,9 @@
 			XDEF	getch 
 
 			XREF	_serialFlags	; In globals.asm
+			XREF	_bdpp_driver_flags
+			XREF	_bdpp_fg_write_drv_tx_byte_with_usage
+			XREF	_bdpp_fg_write_drv_tx_bytes_with_usage
 				
 UART0_PORT		EQU	%C0		; UART0
 UART1_PORT		EQU	%D0		; UART1
@@ -75,13 +83,24 @@ UART_LSR_RDY		EQU	%01		; Data ready
 
 ; Check whether we're clear to send (UART0 only)
 ;
-UART0_wait_CTS:		GET_GPIO	PD_DR, 8		; Check Port D, bit 3 (CTS)
-			JR		NZ, UART0_wait_CTS
+_UART0_wait_CTS:
+UART0_wait_CTS:		GET_GPIO	UART0_REG_MSR, 10h	; Check Port D, bit 4 (CTS)
+			JR		Z, UART0_wait_CTS
 			RET
 
-UART1_wait_CTS:		GET_GPIO	PC_DR, 8		; Check Port C, bit 3 (CTS)
-			JR		NZ, UART1_wait_CTS
+UART1_wait_CTS:		GET_GPIO	UART1_REG_MSR, 10h	; Check Port C, bit 4 (CTS)
+			JR		Z, UART1_wait_CTS
 			RET
+
+; Wait for transmitter to be idle
+;
+_UART0_serial_IDLE:
+			PUSH	AF
+UART0_serial_IDLE1:	IN0	A,(UART0_REG_LSR)	; Get the line status register
+			AND 	UART_LSR_ETX			; Check for TX empty
+			JR		Z, UART0_serial_IDLE1	; If clear, then TX is not empty
+			POP		AF
+			RET 
 
 ; Write a character to UART0
 ; Parameters:
@@ -94,8 +113,8 @@ UART0_serial_TX:	PUSH		BC			; Stack BC
 			PUSH		AF 			; Stack AF
 			LD		BC,TX_WAIT		; Set CB to the transmit timeout
 UART0_serial_TX1:	IN0		A,(UART0_REG_LSR)	; Get the line status register
-			AND 		UART_LSR_ETX		; Check for TX empty
-			JR		NZ, UART0_serial_TX2	; If set, then TX is empty, goto transmit
+			AND 		UART_LSR_ETH		; Check for TH empty
+			JR		NZ, UART0_serial_TX2	; If set, then TH is empty, goto transmit
 			DEC		BC
 			LD		A, B
 			OR		C
@@ -121,8 +140,8 @@ UART1_serial_TX:	PUSH		BC			; Stack BC
 			PUSH		AF 			; Stack AF
 			LD		BC,TX_WAIT		; Set CB to the transmit timeout
 UART1_serial_TX1:	IN0		A,(UART1_REG_LSR)	; Get the line status register
-			AND 		UART_LSR_ETX		; Check for TX empty
-			JR		NZ, UART1_serial_TX2	; If set, then TX is empty, goto transmit
+			AND 		UART_LSR_ETH		; Check for TH empty
+			JR		NZ, UART1_serial_TX2	; If set, then TH is empty, goto transmit
 			DEC		BC
 			LD		A, B
 			OR		C
@@ -193,22 +212,102 @@ $$:			CALL 		UART1_serial_RX
 			JR		NC,$B
 			RET 
 
-; Write a character to UART0 (blocking)
+; Write a character to UART0 (blocking),
+; or to a BDDP packet (possibly blocking)
+;
 ; Parameters:
 ; - A: Character to write out
 ; Returns:
 ; - F: C if written
 ; - F: NC if UART not enabled
 ;
-UART0_serial_PUTCH:	PUSH	AF
+UART0_serial_PUTCH:
+			PUSH AF
+			PUSH BC
+			LD C, A				; Save character in C (lower 8 bits of parameter)
+			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
+			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
+			CP	A, 03h					; Are we in packet mode?
+			JR  NZ, UART0_serial_PUTCH_1 ; Go if not (use direct mode)
+
+			PUSH HL
+			PUSH IX
+			PUSH IY
+			PUSH DE
+
+			LD B, 0						; Clear middle 8 bits of parameter
+			PUSH BC						; Set 24-bit parameter for C call
+			CALL _bdpp_fg_write_drv_tx_byte_with_usage ; Give the data byte to BDPP
+			POP BC						; Unstack the parameter
+
+			POP DE
+			POP IY
+			POP IX
+			POP HL
+			POP BC
+			POP AF
+			SCF							; Indicate character written
+			RET
+			
+UART0_serial_PUTCH_1:
 			LD	A, (_serialFlags)		; Get the serial flags
-			TST	01h				; Check UART is enabled
+			TST	01h						; Check UART is enabled
 			JR	Z, UART_serial_NE		; If not, then skip
-			TST	02h				; If hardware flow control enabled then
-			CALL	NZ, UART0_wait_CTS		; Wait for clear to send signal
-			POP	AF
-$$:			CALL	UART0_serial_TX			; Send the character
-			JR	NC, $B				; Repeat until sent
+			TST	02h						; If hardware flow control enabled then
+			CALL	NZ, UART0_wait_CTS	; Wait for clear to send signal
+			LD	A, C					; Restore character to A
+$$:			CALL	UART0_serial_TX		; Send the character
+			JR	NC, $B					; Repeat until sent
+			POP BC
+			POP AF
+			RET
+
+; Write multiple characters to UART0 (blocking),
+; or to a BDDP packet (possibly blocking)
+;
+; Parameters:
+; - HLU: Pointer to characters to write out
+; - BC:  Number of characters to write out
+; Returns:
+; - F: C if written
+; - F: NC if UART not enabled
+;
+UART0_serial_PUTBUF:
+			LD	A, (_serialFlags)		; Get the serial flags
+			TST	01h						; Check UART is enabled
+			JR	Z, UART_serial_NE		; If not, then skip
+
+			TST	02h						; If hardware flow control enabled then
+			CALL NZ, UART0_wait_CTS		; Wait for clear to send signal
+
+			LD	A, (_bdpp_driver_flags)	; Get the BDPP driver flags
+			AND	A, 03h					; Check for BDPP_FLAG_ALLOWED + BDPP_FLAG_ENABLED
+			CP	A, 03h					; Are we in packet mode?
+			JR  NZ, UART0_serial_PUTBUF_2 ; Go if not (use direct mode)
+
+			PUSH IX
+			PUSH IY
+			PUSH DE
+			PUSH BC						; Set 24-bit parameter for C call
+			PUSH HL
+			CALL _bdpp_fg_write_drv_tx_bytes_with_usage ; Give the data bytes to BDPP
+			POP HL
+			POP BC						; Unstack the parameter
+			POP DE
+			POP IY
+			POP IX
+			SCF							; Indicate characters written
+			RET
+			
+UART0_serial_PUTBUF_2:
+			LD	A, 	(HL)				; Get a character
+$$:			CALL	UART0_serial_TX		; Send the character
+			JR	NC, $B					; Repeat until sent
+			INC 	HL 					; Increment the buffer pointer
+			DEC	BC						; Reduce byte count
+			LD	A, B					; Part of BC
+			OR	A, C					; Other part of BC
+			JR	NZ, UART0_serial_PUTBUF_2 ; Go back if more to send
 			RET
 
 ; Write a character to UART1 (blocking)

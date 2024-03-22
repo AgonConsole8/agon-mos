@@ -11,6 +11,7 @@
  * 23/03/2023:		Fixed maths overflow in init_UART0 to work with bigger baud rates
  * 28/03/2023:		Added support for UART1
  * 08/04/2023:		Interrupts now disabled in close_UART1
+ * 20/01/2024:		CW Added support for bidirectional packet protocol
  *
  * NB:
  * The UART is on Port D
@@ -28,6 +29,8 @@
 #include <gpio.h>
 
 #include "uart.h"
+
+extern void UART0_wait_CTS();
  
 // Set the Line Control Register for data, stop and parity bits
 //
@@ -35,7 +38,7 @@
 #define SETREG_LCR1(data, stop, parity) (UART1_LCTL = ((BYTE)(((data)-(BYTE)5)&(BYTE)0x3)|(BYTE)((((stop)-(BYTE)0x1)&(BYTE)0x1)<<(BYTE)0x2)|(BYTE)((parity)<<(BYTE)0x3)))
 
 void init_UART0() {
-	PD_DR = PORTD_DRVAL_DEF;
+	PD_DR = 0;
 	PD_DDR = PORTD_DDRVAL_DEF;
 //	#ifdef _EZ80F91
 //	PD_ALT0 = PORTD_ALT0VAL_DEF;
@@ -46,7 +49,7 @@ void init_UART0() {
 }
 
 void init_UART1() {
-	PC_DR = PORTC_DRVAL_DEF;
+	PC_DR = 0;
 	PC_DDR = PORTC_DDRVAL_DEF;
 //	#ifdef _EZ80F91
 //	PC_ALT0 = PORTC_ALT0VAL_DEF;
@@ -74,9 +77,9 @@ BYTE open_UART0(UART * pUART) {
 	SETREG(PD_ALT2, pins);
 
 	if(pUART->flowControl == FCTL_HW) {
-		SETREG(PD_DDR, PORTPIN_THREE);								// Set Port D bit 3 (CTS) for input
+		SETREG(PD_DDR, PORTPIN_THREE);								// Set Port D bit 3 (CTS) for alt fcn (input)
 		RESETREG(PD_ALT1, PORTPIN_THREE);
-		RESETREG(PD_ALT2, PORTPIN_THREE);
+		SETREG(PD_ALT2, PORTPIN_THREE);
 		serialFlags |= 0x02;
 	}
 
@@ -85,7 +88,7 @@ BYTE open_UART0(UART * pUART) {
 	UART0_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
 	UART0_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
 	UART0_MCTL = 0x00;												// Bring modem control register to reset value
-	UART0_FCTL = 0x07;												// Enable and clear hardware FIFOs
+	UART0_FCTL = 0x01;												// Enable (don't clear) hardware FIFOs
 	UART0_IER = pUART->interrupts;									// Set interrupts
 	
 	SETREG_LCR0(pUART->dataBits, pUART->stopBits, pUART->parity);	// Set the line status register
@@ -115,7 +118,7 @@ BYTE open_UART1(UART * pUART) {
 	if(pUART->flowControl == FCTL_HW) {
 		SETREG(PC_DDR, PORTPIN_THREE);								// Set Port C bit 3 (CTS) for input
 		RESETREG(PC_ALT1, PORTPIN_THREE);
-		RESETREG(PC_ALT2, PORTPIN_THREE);
+		SETREG(PC_ALT2, PORTPIN_THREE);
 		serialFlags |= 0x20;
 	}
 	
@@ -124,7 +127,7 @@ BYTE open_UART1(UART * pUART) {
 	UART1_BRG_H = (CHAR)(( br & 0xFF00 ) >> 8);						// Load divisor high
 	UART1_LCTL &= (~UART_LCTL_DLAB); 								// Reset DLAB; dont disturb other bits
 	UART1_MCTL = 0x00;												// Bring modem control register to reset value
-	UART1_FCTL = 0x07;												// Enable and clear hardware FIFOs
+	UART1_FCTL = 0x01;												// Enable (don't clear) hardware FIFOs
 	UART1_IER = pUART->interrupts;									// Set interrupts
 
 	serialFlags |= 0x10;
@@ -142,4 +145,54 @@ void close_UART1() {
 	UART1_MCTL = 0x00;												// Bring modem control register to reset value.
 	UART1_FCTL = 0x00;												// Bring FIFO control register to reset value.	
 	serialFlags &= 0x0F;
+}
+
+// Write to UART0 transmitter holding register
+//
+void UART0_write_thr(BYTE data) {
+	UART0_wait_CTS();
+	UART0_THR = data;
+	UART1_THR = data;
+}
+
+// Read from UART0 line status register
+//
+BYTE UART0_read_lsr() {
+	return UART0_LSR;
+}
+
+// Read from UART0 receiver buffer register
+//
+BYTE UART0_read_rbr() {
+	return UART0_RBR;
+}
+
+// Read from UART0 interrupt identification register
+//
+BYTE UART0_read_iir() {
+	return UART0_IIR;
+}
+
+// Enable interrupt on UART0
+//
+void UART0_enable_interrupt(BYTE flag) {
+	UART0_IER |= flag;
+}
+
+// Disable interrupt on UART0
+//
+void UART0_disable_interrupt(BYTE flag) {
+	UART0_IER &= ~flag;
+}
+
+// Turn on RTS (tell ESP32 to transmit)
+//
+void UART0_enable_rts() {
+	UART0_MCTL |= PORTPIN_ONE;
+}
+
+// Turn off RTS (tell ESP32 to wait)
+//
+void UART0_disable_rts() {
+	UART0_MCTL &= ~PORTPIN_ONE;
 }

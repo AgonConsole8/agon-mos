@@ -2,7 +2,7 @@
  * Title:			AGON MOS - MOS line editor
  * Author:			Dean Belfield
  * Created:			18/09/2022
- * Last Updated:	31/03/2023
+ * Last Updated:	15/02/2024
  * 
  * Modinfo:
  * 28/09/2022:		Added clear parameter to mos_EDITLINE
@@ -12,6 +12,7 @@
  * 21/03/2023:		Improved backspace, and editing of long lines, after scroll, at bottom of screen
  * 22/03/2023:		Added a single-entry command line history
  * 31/03/2023:		Added timeout for VDP protocol
+ * 15/02/2024:		CW Integrate BDPP
  */
 
 #include <eZ80.h>
@@ -23,10 +24,12 @@
 #include "defines.h"
 #include "mos.h"
 #include "uart.h"
-#include "timer.h"
 #include "mos_editor.h"
+#include "timer.h"
 
-extern volatile BYTE vpd_protocol_flags;		// In globals.asm
+extern void bdpp_fg_flush_drv_tx_packet();
+
+extern volatile BYTE vdp_protocol_flags;		// In globals.asm
 extern volatile BYTE keyascii;					// In globals.asm
 extern volatile BYTE keycode;					// In globals.asm
 extern volatile BYTE keydown;					// In globals.asm
@@ -46,20 +49,22 @@ static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
 // Get the current cursor position from the VPD
 //
 void getCursorPos() {
-	vpd_protocol_flags &= 0xFE;					// Clear the semaphore flag
+	vdp_protocol_flags &= 0xFE;					// Clear the semaphore flag
 	putch(23);									// Request the cursor position
 	putch(0);
 	putch(VDP_cursor);
+	bdpp_fg_flush_drv_tx_packet();
 	wait_VDP(0x01);								// Wait until the semaphore has been set, or a timeout happens
 }
 
 // Get the current screen dimensions from the VDU
 //
 void getModeInformation() {
-	vpd_protocol_flags &= 0xEF;					// Clear the semaphore flag
+	vdp_protocol_flags &= 0xEF;					// Clear the semaphore flag
 	putch(23);
 	putch(0);
 	putch(VDP_mode);
+	bdpp_fg_flush_drv_tx_packet();
 	wait_VDP(0x10);								// Wait until the semaphore has been set, or a timeout happens
 }
 
@@ -77,6 +82,7 @@ void doLeftCursor() {
 		}
 		putch(0x0B);
 	}
+	bdpp_fg_flush_drv_tx_packet();
 }
 
 // Move Cursor Right
@@ -93,6 +99,7 @@ void doRightCursor() {
 		}
 		putch(0x0A);
 	}
+	bdpp_fg_flush_drv_tx_packet();
 }
 
 // Insert a character in the input string
@@ -118,6 +125,7 @@ BOOL insertCharacter(char *buffer, char c, int insertPos, int len, int limit) {
 		for(i = insertPos + 1; i <= len; i++, count++) {
 			putch(buffer[i]);
 		}
+		bdpp_fg_flush_drv_tx_packet();
 		for(i = 0; i < count; i++) {
 			doLeftCursor();
 		}
@@ -144,6 +152,7 @@ BOOL deleteCharacter(char *buffer, int insertPos, int len) {
 			buffer[i] = b;
 			putch(b ? b : ' ');
 		}
+		bdpp_fg_flush_drv_tx_packet();
 		for(i = 0; i < count; i++) {
 			doLeftCursor();
 		}
@@ -204,6 +213,7 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
+
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	BYTE keya = 0;					// The ASCII key	
 	BYTE keyc = 0;					// The FabGL keycode
@@ -213,6 +223,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
 	
+	bdpp_fg_flush_drv_tx_packet();
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required
@@ -226,6 +237,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	// Loop until an exit key is pressed
 	//
 	while (keyr == 0) {
+		bdpp_fg_flush_drv_tx_packet();
+
 		len = strlen(buffer);
 		waitKey();
 		keya = keyascii;
@@ -345,5 +358,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 	}
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
+	bdpp_fg_flush_drv_tx_packet();
 	return keyr;					// Finally return the keycode
 }
