@@ -92,6 +92,7 @@
 			XREF	_f_opendir
 			XREF	_f_closedir
 			XREF	_f_readdir
+			XREF	_f_getcwd
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -1063,15 +1064,25 @@ $$:			PUSH	BC 		; FSIZE_t ofs (msb)
 ; Commands that have not been implemented yet
 ;
 ffs_api_ftruncate:	
+			JP mos_api_not_implemented
 ffs_api_fsync:		
+			JP mos_api_not_implemented
 ffs_api_fforward:	
+			JP mos_api_not_implemented
 ffs_api_fexpand:	
+			JP mos_api_not_implemented
 ffs_api_fgets:		
+			JP mos_api_not_implemented
 ffs_api_fputc:		
+			JP mos_api_not_implemented
 ffs_api_fputs:		
+			JP mos_api_not_implemented
 ffs_api_fprintf:	
+			JP mos_api_not_implemented
 ffs_api_ftell:		
+			JP mos_api_not_implemented
 ffs_api_fsize:		
+			JP mos_api_not_implemented
 ffs_api_ferror:		
 			JP mos_api_not_implemented
 
@@ -1129,20 +1140,52 @@ $$:
 			RET
 
 ffs_api_dfindfirst:	
+			JP mos_api_not_implemented
 ffs_api_dfindnext:	
+			JP mos_api_not_implemented
 ffs_api_unlink:		
+			JP mos_api_not_implemented
 ffs_api_rename:		
+			JP mos_api_not_implemented
 ffs_api_chmod:		
+			JP mos_api_not_implemented
 ffs_api_utime:		
+			JP mos_api_not_implemented
 ffs_api_mkdir:		
+			JP mos_api_not_implemented
 ffs_api_chdir:		
+			JP mos_api_not_implemented
 ffs_api_chdrive:	
-ffs_api_getcwd:		
+			JP mos_api_not_implemented
+; Copy the current directory (string) into buffer (hl)
+; HLU: Pointer to a buffer
+; BCU: Maximum length of buffer
+; Returns:
+; A: FRESULT
+ffs_api_getcwd:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	BC 		; sizeof(buffer)
+			PUSH    HL		; buffer
+			CALL	_f_getcwd
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	BC
+			RET
+
 ffs_api_mount:		
+			JP mos_api_not_implemented
 ffs_api_mkfs:		
+			JP mos_api_not_implemented
 ffs_api_fdisk		
+			JP mos_api_not_implemented
 ffs_api_getfree:	
+			JP mos_api_not_implemented
 ffs_api_getlabel:	
+			JP mos_api_not_implemented
 ffs_api_setlabel:	
+			JP mos_api_not_implemented
 ffs_api_setcp:		
 			JP mos_api_not_implemented
