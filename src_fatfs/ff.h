@@ -306,6 +306,7 @@ typedef enum {
 	FR_MOS_INVALID_COMMAND, /* (20) */
 	FR_MOS_INVALID_EXECUTABLE, /* (21) */
 	FR_MOS_OUT_OF_MEMORY, /* (22) */
+	FR_MOS_NOT_IMPLEMENTED, /* (23) */
 } FRESULT;
 
 

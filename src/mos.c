@@ -136,6 +136,7 @@ static char * mos_errors[] = {
 	"Invalid command",
 	"Invalid executable",
 	"Out of memory",
+	"Not implemented",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))

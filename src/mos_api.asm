@@ -101,7 +101,7 @@
 mos_api:		CP	80h			; Check if it is a FatFS command
 			JR	NC, $F			; Yes, so jump to next block
 			CP	mos_api_block1_size	; Check if out of bounds
-			RET	NC			; It is, so do nothing
+			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; Switch on this table
 ;
 mos_api_block1_start:	DW	mos_api_getkey		; 0x00
@@ -144,7 +144,7 @@ mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
 $$:			AND	7Fh			; Else remove the top bit
 			CP	mos_api_block2_size	; Check if out of bounds
-			RET	NC			; It is, so do nothing
+			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; And switch on this table
 
 mos_api_block2_start:	DW	ffs_api_fopen
@@ -187,6 +187,10 @@ mos_api_block2_start:	DW	ffs_api_fopen
 			DW	ffs_api_setcp
 
 mos_api_block2_size:	EQU 	($ - mos_api_block2_start) / 2
+
+mos_api_not_implemented:
+			LD	HL, 23			; FR_MOS_NOT_IMPLEMENTED
+			RET
 
 ; Get keycode
 ; Returns:
@@ -1069,7 +1073,7 @@ ffs_api_fprintf:
 ffs_api_ftell:		
 ffs_api_fsize:		
 ffs_api_ferror:		
-			RET
+			JP mos_api_not_implemented
 
 ; Open a directory
 ; HLU: Pointer to a blank DIR struct
@@ -1141,4 +1145,4 @@ ffs_api_getfree:
 ffs_api_getlabel:	
 ffs_api_setlabel:	
 ffs_api_setcp:		
-			RET
+			JP mos_api_not_implemented
