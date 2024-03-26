@@ -569,7 +569,7 @@ int mos_cmdLOAD(char * ptr) {
 	if(
 		!mos_parseString(NULL, &filename)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	if(!mos_parseNumber(NULL, &addr)) addr = MOS_defaultLoadAddress;
 	fr = mos_LOAD(filename, addr, 0);
@@ -592,7 +592,7 @@ int mos_cmdEXEC(char *ptr) {
 	if(
 		!mos_parseString(NULL, &filename)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_EXEC(filename, buf, sizeof buf);
 	return fr;
@@ -615,7 +615,7 @@ int mos_cmdSAVE(char * ptr) {
 		!mos_parseNumber(NULL, &addr) ||
 		!mos_parseNumber(NULL, &size)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_SAVE(filename, addr, size);
 	return fr;
@@ -635,7 +635,7 @@ int mos_cmdDEL(char * ptr) {
 	if(
 		!mos_parseString(NULL, &filename) 
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_DEL(filename);
 	return fr;
@@ -651,7 +651,7 @@ int mos_cmdJMP(char *ptr) {
 	UINT24 	addr;
 	void (* dest)(void) = 0;
 	if(!mos_parseNumber(NULL, &addr)) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	};
 	dest = (void *)addr;
 	dest();
@@ -702,7 +702,7 @@ int mos_cmdCD(char * ptr) {
 	if(
 		!mos_parseString(NULL, &path) 
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
 	f_getcwd(cwd, sizeof(cwd)); //Update full path.
@@ -724,7 +724,7 @@ int mos_cmdREN(char *ptr) {
 		!mos_parseString(NULL, &filename1) ||
 		!mos_parseString(NULL, &filename2)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_REN(filename1, filename2);
 	return fr;
@@ -745,7 +745,7 @@ int mos_cmdCOPY(char *ptr) {
 		!mos_parseString(NULL, &filename1) ||
 		!mos_parseString(NULL, &filename2)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_COPY(filename1, filename2);
 	return fr;
@@ -765,7 +765,7 @@ int mos_cmdMKDIR(char * ptr) {
 	if(
 		!mos_parseString(NULL, &filename) 
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_MKDIR(filename);
 	return fr;
@@ -785,7 +785,7 @@ int mos_cmdSET(char * ptr) {
 		!mos_parseString(NULL, &command) ||
 		!mos_parseNumber(NULL, &value)
 	) {
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 	}
 	if(strcasecmp(command, "KEYBOARD") == 0) {
 		putch(23);
@@ -801,7 +801,7 @@ int mos_cmdSET(char * ptr) {
 		putch(value & 0xFF);
 		return 0;
 	}
-	return 19; // Bad Parameter
+	return FR_INVALID_PARAMETER;
 }
 
 // VDU <char1> <char2> ... <charN>
@@ -847,7 +847,7 @@ int mos_cmdVDU(char *ptr) {
         value = strtol(value_str, &endPtr, base);
 
         if (*endPtr != '\0' || value > 65535) {
-            return 19;
+            return FR_INVALID_PARAMETER;
         }
 		
         if (value > 255) {
@@ -888,7 +888,7 @@ int mos_cmdTIME(char *ptr) {
 			!mos_parseNumber(NULL, &mi) ||
 			!mos_parseNumber(NULL, &se) 
 		) {
-			return 19;
+			return FR_INVALID_PARAMETER;
 		}
 		buffer[0] = yr - EPOCH_YEAR;
 		buffer[1] = mo;
@@ -930,7 +930,7 @@ int mos_cmdTYPE(char * ptr) {
 	UINT24 	addr;
 
 	if(!mos_parseString(NULL, &filename))
-		return 19; // Bad Parameter
+		return FR_INVALID_PARAMETER;
 
 	fr = mos_TYPE(filename);
 	return fr;
@@ -1000,7 +1000,7 @@ int mos_cmdHELP(char *ptr) {
 	}
 
 	if (cmd != NULL && !found) {
-		return 20;
+		return FR_MOS_INVALID_COMMAND;
 	}
 	return 0;
 }
