@@ -185,7 +185,10 @@ UINT8	fat_EOF(FIL * fp);
 							"   12: Swiss (French)\r\n" \
 							"   13: Danish\r\n" \
 							"   14: Swedish\r\n" \
-							"   15: Portuguese\r\n\r\n" \
+							"   15: Portuguese\r\n" \
+							"   16: Brazilian Portugese\r\n" \
+							"   17: Dvorak\r\n" \
+							"\r\n" \
 							"Serial Console\r\n" \
 							"SET CONSOLE n: Serial console\r\n" \
 							"    0: Console off (default)\r\n" \
