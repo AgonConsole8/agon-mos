@@ -1386,6 +1386,8 @@ UINT8 fat_EOF(FIL * fp) {
 // - fatfs error code
 //
 int mos_mount(void) {
-	return f_mount(&fs, "", 1);			// Mount the SD card
+	int ret = f_mount(&fs, "", 1);			// Mount the SD card
+	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	return ret;
 }
 
