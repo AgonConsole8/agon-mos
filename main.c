@@ -134,6 +134,10 @@ int main(void) {
 	#if VERSION_CANDIDATE > 0
 		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
 	#endif
+	// Show version subtitle, if we have one
+	#ifdef VERSION_SUBTITLE
+		printf(" %s", VERSION_SUBTITLE);
+	#endif
 	// Show build if defined (intended to be auto-generated string from build script from git commit hash)
 	#ifdef VERSION_BUILD
 		printf(" Build %s", VERSION_BUILD);
