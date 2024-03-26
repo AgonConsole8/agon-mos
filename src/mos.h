@@ -43,7 +43,6 @@ typedef struct {
 	int (*func)(char * ptr);
 	char * args;
 	char * help;
-	char * aliases;
 } t_mosCommand;
 
 typedef struct {
@@ -122,9 +121,6 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_CAT			"Directory listing of the current directory\r\n"
 #define HELP_CAT_ARGS		"[-l] <path>"
-#define HELP_CAT_ALIASES	"DIR and ."
-#define HELP_DIR_ALIASES	"CAT and ."
-#define HELP_DOT_ALIASES	"CAT and DIR"
 
 #define HELP_CD				"Change current directory\r\n"
 #define HELP_CD_ARGS		"<path>"
@@ -137,8 +133,6 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
 #define HELP_DELETE_ARGS	"<filename>"
-#define HELP_DELETE_ALIASES	"ERASE"
-#define HELP_ERASE_ALIASES	"DELETE"
 
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"
@@ -156,8 +150,6 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_RENAME			"Rename a file in the same folder\r\n"
 #define HELP_RENAME_ARGS	"<filename1> <filename2>"
-#define HELP_RENAME_ALIASES	"MOVE"
-#define HELP_MOVE_ALIASES	"RENAME"
 
 #define HELP_RUN			"Call an executable binary loaded in memory.\r\n" \
 							"If no parameters are passed, then addr will " \
@@ -211,17 +203,14 @@ UINT8	fat_EOF(FIL * fp);
 							"KEY without any arguments will list the currently assigned\r\n" \
 							"command strings.\r\n"
 							
-#define HELP_KEY_ARGS		"<key number> <command string>\r\n"
+#define HELP_KEY_ARGS		"<key number> <command string>"
 
 #define HELP_CLS			"Clear the screen\r\n"
 
 #define HELP_MOUNT			"(Re-)mount the MicroSD card\r\n"
 
-#define HELP_HELP			"Display help on a single or all commands.\r\n"	\
-							"List of commands:\r\n"				\
-							"CAT, CD, CLS, COPY, CREDITS, DELETE, EXEC, \r\n"	\
-							"HELP, KEY, JMP, LOAD, MKDIR, MOUNT, RENAME, \r\n"	\
-							"RUN, SAVE, SET, TIME, TYPE, VDU.\r\n"
+#define HELP_HELP			"Display help on a single or all commands.\r\n"
+
 #define HELP_HELP_ARGS		"[ <command> | all ]"
 
 #endif MOS_H

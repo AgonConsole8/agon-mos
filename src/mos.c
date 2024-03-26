@@ -75,35 +75,35 @@ extern volatile BYTE history_no;
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
 
 // Array of MOS commands and pointer to the C function to run
+// NB this list is iterated over, so the order is important
+// both for abbreviations and for the help command
 //
 static t_mosCommand mosCommands[] = {
-	{ ".", 			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT,		HELP_DOT_ALIASES },
-	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT,		HELP_DIR_ALIASES },
-	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT,		HELP_DIR_ALIASES },
-
-
-	{ "CAT",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT,		HELP_CAT_ALIASES },
-	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD,		NULL },
-	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE,		NULL },
-	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE,	HELP_DELETE_ALIASES },
-	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE,	HELP_ERASE_ALIASES },
-	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP,		NULL },
-	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN,		NULL },
-	{ "CD", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD,		NULL },
-	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME,	HELP_RENAME_ALIASES },
-	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME,	HELP_MOVE_ALIASES },
-	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR,	NULL },
-	{ "COPY", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY,	NULL },
-	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET,	NULL },
-	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU,	NULL },
-	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME,	NULL },
-	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS,	NULL },
-	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC,	NULL },
-	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE,	NULL },
-	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS,	NULL },
-	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT,	NULL },
-	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP,	NULL },
-    { "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY,		NULL },
+	{ ".", 			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "CAT",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "CD", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
+	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS },
+	{ "COPY", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
+	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
+	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
+	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
+	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
+	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
+	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
+	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
+    { "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY },
+	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
+	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
+	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
+	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
+	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
+	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
+	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
+	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -963,14 +963,41 @@ int	mos_cmdMOUNT(char *ptr) {
 	return 0;
 }
 
-void printCommandInfo(t_mosCommand * cmd) {
+void printCommandInfo(t_mosCommand * cmd, BOOL full) {
+	int aliases = 0;
+	int i;
+
 	printf("%s", cmd->name);
 	if (cmd->args != NULL)
 		printf(" %s", cmd->args);
-	if (cmd->aliases != NULL)
-		printf(" (Aliases: %s)", cmd->aliases);
+	
+	// find aliases
+	for (i = 0; i < mosCommands_count; ++i) {
+		if (mosCommands[i].func == cmd->func && mosCommands[i].name != cmd->name) {
+			aliases++;
+		}
+	}
+	if (aliases > 0) {
+		// print the aliases
+		printf(" (Aliases: ");
+		for (i = 0; i < mosCommands_count; ++i) {
+			if (mosCommands[i].func == cmd->func && mosCommands[i].name != cmd->name) {
+				printf("%s", mosCommands[i].name);
+				if (aliases == 2) {
+					printf(" and ");
+				} else if (aliases > 1) {
+					printf(", ");
+				}
+				aliases--;
+			}
+		}
+		printf(")");
+	}
+
 	printf("\r\n");
-	printf("%s\r\n", cmd->help);
+	if (full) {
+		printf("%s\r\n", cmd->help);
+	}
 }
 
 // HELP
@@ -978,30 +1005,50 @@ void printCommandInfo(t_mosCommand * cmd) {
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
 // -  0: Success
-//   20: Failure
 //
 int mos_cmdHELP(char *ptr) {
 	int i;
 	int found = 0;
 	char *cmd;
 
-	mos_parseString(NULL, &cmd);
-	if (cmd != NULL && strcasecmp(cmd, "all") == 0)
-		cmd = NULL;
+	BOOL hasCmd = mos_parseString(NULL, &cmd);
+	if (!hasCmd) {
+		cmd = "help";
+	}
 
-	for (i = 0; i < sizeof(mosCommands) / sizeof(mosCommands[0]); ++i) {
-		if (cmd == NULL) 
-			printCommandInfo(&mosCommands[i]);
-		else
-			if (strcasecmp(cmd, mosCommands[i].name) == 0) {
-				printCommandInfo(&mosCommands[i]);
-				found = 1;
+	for (i = 0; i < mosCommands_count; ++i) {
+		if (strcasecmp(cmd, mosCommands[i].name) == 0) {
+			printCommandInfo(&mosCommands[i], TRUE);
+			if (!hasCmd) {
+				// must be showing "help" command with no args, so show list of all commands
+				int col = 0;
+				int maxCol = scrcols;
+				printf("List of commands:\r\n");
+				for (i = 1; i < mosCommands_count; ++i) {
+					if (col + strlen(mosCommands[i].name) + 2 > maxCol) {
+						printf("\r\n");
+						col = 0;
+					}
+					printf("%s", mosCommands[i].name);
+					if (i < mosCommands_count - 1) {
+						printf(", ");
+					}
+					col += strlen(mosCommands[i].name) + 2;
+				}
+				printf("\r\n");
 			}
+			return 0;
+		}
 	}
 
-	if (cmd != NULL && !found) {
-		return FR_MOS_INVALID_COMMAND;
+	if (hasCmd && strcasecmp(cmd, "all") == 0) {
+		for (i = 0; i < mosCommands_count; ++i) {
+			printCommandInfo(&mosCommands[i], FALSE);
+		}
+		return 0;
 	}
+
+	printf("Command not found: %s\r\n", cmd);
 	return 0;
 }
 
