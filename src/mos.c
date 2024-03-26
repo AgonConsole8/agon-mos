@@ -65,7 +65,6 @@ extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
-TCHAR cwd[256];						// Hold current working directory.
 static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 TCHAR cwd[256];						// Hold current working directory.
