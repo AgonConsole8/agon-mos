@@ -1069,6 +1069,7 @@ ffs_api_fprintf:
 ffs_api_ftell:		
 ffs_api_fsize:		
 ffs_api_ferror:		
+			RET
 
 ; Open a directory
 ; HLU: Pointer to a blank DIR struct
