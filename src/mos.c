@@ -60,6 +60,7 @@ extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vecto
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
 
+extern BYTE scrcols, scrcolours;               // In globals.asm
 extern volatile	BYTE keyascii;					// In globals.asm
 extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm

@@ -46,6 +46,9 @@
 #include "mos.h"
 #include "i2c.h"
 
+extern BYTE scrcolours;               // In globals.asm
+
+extern void getModeInformation(void);
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
 extern void 	vblank_handler(void);
@@ -122,6 +125,11 @@ int main(void) {
 	if(coldBoot == 0) {								// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
+
+	scrcolours = 0;
+	getModeInformation();
+	while (scrcolours == 0) {}
+
 	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 	#if VERSION_CANDIDATE > 0
 		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
