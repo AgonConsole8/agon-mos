@@ -93,7 +93,7 @@ static t_mosCommand mosCommands[] = {
 	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
-    { "KEY",		&mos_cmdKEY,		HELP_KEY_ARGS,		HELP_KEY },
+    { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
 	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
@@ -504,13 +504,13 @@ int mos_cmdDIR(char * ptr) {
  	return mos_DIR(path, longListing);
 }
 
-// KEY command
+// HOTKEY command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
 // - MOS error code
 //
-int mos_cmdKEY(char *ptr) {
+int mos_cmdHOTKEY(char *ptr) {
 	UINT24 fn_number = 0;
 	char *hotkey_string;
 
