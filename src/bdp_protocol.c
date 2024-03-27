@@ -118,7 +118,6 @@ void bdpp_enable_tx_interrupt(volatile BDPP_PACKET* old_head) {
 void bdpp_fg_initialize_driver() {
 	BYTE i;
 	volatile BDPP_PACKET* packet;
-	UART pUART1;
 
 	DI();
 	bdpp_driver_flags = BDPP_FLAG_ALLOWED;

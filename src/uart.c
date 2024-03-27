@@ -9,7 +9,7 @@
  * 08/08/2022:		Enabled UART0 CTS port
  * 22/03/2023:		Moved putch and getch to serial.asm
  * 23/03/2023:		Fixed maths overflow in init_UART0 to work with bigger baud rates
- * 28/03/2023:		Added support for UART1
+ * 28/03/2023:		Added support for d
  * 08/04/2023:		Interrupts now disabled in close_UART1
  * 20/01/2024:		CW Added support for bidirectional packet protocol
  *
@@ -152,7 +152,6 @@ void close_UART1() {
 void UART0_write_thr(BYTE data) {
 	UART0_wait_CTS();
 	UART0_THR = data;
-	UART1_THR = data;
 }
 
 // Read from UART0 line status register
