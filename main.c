@@ -174,7 +174,7 @@ int main(void) {
 			}
 		}
 		else {
-			printf("%s%cEscape\n\r", cwd, MOS_prompt);
+			printf("Escape\n\r");
 		}
 	}
 

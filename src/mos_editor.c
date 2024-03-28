@@ -198,15 +198,63 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 	gotoEditLineStart(len);
 }
 
+// Handle hotkey, if defined
+// Returns:
+// - 1 if the hotkey was handled, otherwise 0
+//
+BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, int len) {
+	if (hotkey_strings[fkey] != NULL) {
+		char *wildcardPos = strstr(hotkey_strings[fkey], "%s");
+
+		if (wildcardPos == NULL) { // No wildcard in the hotkey string
+			removeEditLine(buffer, insertPos, len);
+			strcpy(buffer, hotkey_strings[fkey]);
+			printf("%s", buffer);
+		} else {
+			UINT8 prefixLength = wildcardPos - hotkey_strings[fkey];
+			UINT8 replacementLength = strlen(buffer);
+			UINT8 suffixLength = strlen(wildcardPos + 2);
+			char *result;
+
+			if (prefixLength + replacementLength + suffixLength + 1 >= bufferLength) {
+				// Exceeds max command length (256 chars)
+				putch(0x07); // Beep
+				return 0;
+			}
+
+			result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
+
+			strncpy(result, hotkey_strings[fkey], prefixLength); // Copy the portion preceding the wildcard to the buffer
+			result[prefixLength] = '\0'; // Terminate
+
+			strcat(result, buffer);
+			strcat(result, wildcardPos + 2);
+
+			removeEditLine(buffer, insertPos, len);
+			strcpy(buffer, result);
+			printf("%s", buffer);
+
+			free(result);
+		}
+		return 1;
+		// Key was present, so drop through to ASCII key handling
+	}
+	return 0;
+}
+
 // The main line edit function
 // Parameters:
 // - buffer: Pointer to the line edit buffer
 // - bufferLength: Size of the buffer in bytes
-// - clear: Set to 0 to not clear, 1 to clear on entry
+// - flags: Set bit0 to 0 to not clear, 1 to clear on entry
 // Returns:
 // - The exit key pressed (ESC or CR)
 //
-UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
+UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
+	BOOL clear = flags & 0x01;		// Clear the buffer on entry
+	BOOL enableTab = flags & 0x02;	// Enable tab completion (default off)
+	BOOL enableHotkeys = !(flags & 0x04); // Enable hotkeys (default on)
+	BOOL enableHistory = !(flags & 0x08); // Enable history (default on)
 	BYTE keya = 0;					// The ASCII key	
 	BYTE keyc = 0;					// The FabGL keycode
 	BYTE keyr = 0;					// The ASCII key to return back to the calling program
@@ -256,50 +304,13 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 			case 0xA9: //F11	
 			case 0xAA: //F12
 			{
-				if (hotkey_strings[keyc - 159] != NULL) {
-
-					char *wildcardPos = strstr(hotkey_strings[keyc - 159], "%s");
-
-					if (wildcardPos == NULL) { //No wildcard in the hotkey string
-
-						removeEditLine(buffer, insertPos, len);
-						strcpy(buffer, hotkey_strings[keyc - 159]);
-						printf("%s", buffer);
-						len = strlen(buffer);
-						insertPos = len;
-						keya = 0x0D;
-					} else {
-
-						UINT8 prefixLength = wildcardPos - hotkey_strings[keyc - 159];
-						UINT8 replacementLength = strlen(buffer);
-						UINT8 suffixLength = strlen(wildcardPos + 2);
-						char *result;
-
-						if (prefixLength + replacementLength + suffixLength + 1 >= bufferLength) {
-							break;  // Exceeds max command length (256 chars)
-						}
-
-						result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
-
-						strncpy(result, hotkey_strings[keyc - 159], prefixLength); //Copy the portion preceding the wildcard to the buffer
-						result[prefixLength] = '\0'; //Terminate
-
-						strcat(result, buffer);
-						strcat(result, wildcardPos + 2);
-
-						removeEditLine(buffer, insertPos, len);
-						strcpy(buffer, result);
-						printf("%s", buffer);
-						len = strlen(buffer);
-						insertPos = len;
-						
-						keya = 0x0D;
-
-						free(result);
-
-					}
-
-				} else break;
+				UINT8 fkey = keyc - 0x9F;
+				if (enableHotkeys && handleHotkey(fkey, buffer, bufferLength, insertPos, len)) {
+					len = strlen(buffer);
+					insertPos = len;
+					keya = 0x0D;
+					// Key was present, so drop through to ASCII key handling
+				} else break; // key wasn't present, so do nothing
 			}	
 			
 			//
@@ -314,7 +325,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 					} else {				
 						switch (keya) {
 							case 0x0D:		// Enter
-								if (len > 0) {										// If there is data in the buffer
+								if (enableHistory && len > 0) {										// If there is data in the buffer
 									// If we're at the end of the history, then we need to shift all our entries up by one
 									if (history_size == (cmd_historyDepth - 1)) {
 										int i;
@@ -326,6 +337,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									strncpy(cmd_history[history_size++], buffer, cmd_historyWidth);	// Save in the history and fall through to next case
 									history_no = history_size;
 								}
+								// fall through to...
 							case 0x1B:	{	// Escape
 								keyr = keya;
 							} break;
@@ -351,7 +363,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									insertPos = gotoEditLineEnd(insertPos, len);
 								} else {
 									// otherwise do history thing
-									if (history_no < history_size) {
+									if (enableHistory && history_no < history_size) {
 										// only replace line if we're not at the end of our history list
 										removeEditLine(buffer, insertPos, len);
 										strncpy(buffer, cmd_history[++history_no], limit);			// Copy from the history to the buffer
@@ -370,26 +382,28 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									// otherwise if our insertion pos > 0 then move to start of line
 									insertPos = gotoEditLineStart(insertPos);
 								} else {
-									// otherwise do history thing
-									if (history_no > 0) {
-										removeEditLine(buffer, insertPos, len);
-										strncpy(buffer, cmd_history[--history_no], limit);			// Copy from the history to the buffer
-										printf("%s", buffer);							// Output the buffer
-										insertPos = strlen(buffer);						// Set cursor to end of string
-										len = strlen(buffer);
-									} else if (history_size > 0) {
-										// we're at the top of our history list
-										// replace current line (which may have been edited) with first entry
-										removeEditLine(buffer, insertPos, len);
-										strncpy(buffer, cmd_history[0], limit);			// Copy from the history to the buffer
-										printf("%s", buffer);							// Output the buffer
-										insertPos = strlen(buffer);						// Set cursor to end of string
-										len = strlen(buffer);
+									if (enableHistory) {
+										// otherwise do history thing
+										if (history_no > 0) {
+											removeEditLine(buffer, insertPos, len);
+											strncpy(buffer, cmd_history[--history_no], limit);			// Copy from the history to the buffer
+											printf("%s", buffer);							// Output the buffer
+											insertPos = strlen(buffer);						// Set cursor to end of string
+											len = strlen(buffer);
+										} else if (history_size > 0) {
+											// we're at the top of our history list
+											// replace current line (which may have been edited) with first entry
+											removeEditLine(buffer, insertPos, len);
+											strncpy(buffer, cmd_history[0], limit);			// Copy from the history to the buffer
+											printf("%s", buffer);							// Output the buffer
+											insertPos = strlen(buffer);						// Set cursor to end of string
+											len = strlen(buffer);
+										}
 									}
 								}
 							} break;
 							
-							case 0x09: { // Tab
+							case 0x09: if (enableTab) { // Tab
 								char *search_term;
 								char *path;
 
@@ -459,8 +473,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 										free(search_term);
 										break;									
 									}
-									
-									
 								}
 								
 								if (lastSlash != NULL) {
@@ -472,7 +484,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									if (lastSpace == NULL) {
 										lastSpace = buffer;
 										pathLength = lastSlash - lastSpace;
-										
 									}
 
 									path = (char*) malloc(pathLength + 1); // +1 for null terminator
@@ -489,7 +500,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 									}
 									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
 								} else {
-									
 									path = (char*) malloc(1);
 									if (path == NULL) {
 										break;
@@ -512,7 +522,6 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 								fr = f_findfirst(&dj, &fno, path, search_term);
 								
 								if (fr == FR_OK && fno.fname[0]) {
-
 									if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
 									else printf("%s", fno.fname + strlen(search_term) - 1);
 
@@ -521,14 +530,13 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 clear) {
 
 									len = strlen(buffer);
 									insertPos = strlen(buffer);
-									
 								}
 
 								// Free the allocated memory
 								free(search_term);
 								free(path);
-
-							} break;							
+							}
+							break;							
 							
 							case 0x7F: {	// Backspace
 								if (deleteCharacter(buffer, insertPos, len)) {

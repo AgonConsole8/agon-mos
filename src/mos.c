@@ -162,6 +162,7 @@ BYTE mos_getkey() {
 }
 
 // Call the line editor from MOS
+// Used by main loop to get input from the user
 // Parameters:
 // - buffer: Pointer to the line edit buffer
 // - bufferLength: Size of the line edit buffer in bytes
@@ -170,8 +171,8 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	printf("%s%c", cwd, MOS_prompt);
-	retval = mos_EDITLINE(buffer, bufferLength, 1);
+	printf("%s %c", cwd, MOS_prompt);
+	retval = mos_EDITLINE(buffer, bufferLength, 3);
 	printf("\n\r");
 	return retval;
 }
