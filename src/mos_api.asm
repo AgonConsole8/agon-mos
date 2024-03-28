@@ -89,6 +89,9 @@
 			XREF	_f_write
 			XREF	_f_stat 
 			XREF	_f_lseek
+			XREF	_f_opendir
+			XREF	_f_closedir
+			XREF	_f_readdir
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -97,8 +100,11 @@
 ;
 mos_api:		CP	80h			; Check if it is a FatFS command
 			JR	NC, $F			; Yes, so jump to next block
+			CP	mos_api_block1_size	; Check if out of bounds
+			RET	NC			; It is, so do nothing
 			CALL	SWITCH_A		; Switch on this table
-			DW	mos_api_getkey		; 0x00
+;
+mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_load		; 0x01
 			DW	mos_api_save		; 0x02
 			DW	mos_api_cd		; 0x03
@@ -133,10 +139,15 @@ mos_api:		CP	80h			; Check if it is a FatFS command
 			DW	mos_api_i2c_close	; 0x20
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
+
+mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
 $$:			AND	7Fh			; Else remove the top bit
+			CP	mos_api_block2_size	; Check if out of bounds
+			RET	NC			; It is, so do nothing
 			CALL	SWITCH_A		; And switch on this table
-			DW	ffs_api_fopen
+
+mos_api_block2_start:	DW	ffs_api_fopen
 			DW	ffs_api_fclose
 			DW	ffs_api_fread
 			DW	ffs_api_fwrite
@@ -174,6 +185,8 @@ $$:			AND	7Fh			; Else remove the top bit
 			DW	ffs_api_getlabel
 			DW	ffs_api_setlabel
 			DW	ffs_api_setcp
+
+mos_api_block2_size:	EQU 	($ - mos_api_block2_start) / 2
 
 ; Get keycode
 ; Returns:
@@ -1056,9 +1069,61 @@ ffs_api_fprintf:
 ffs_api_ftell:		
 ffs_api_fsize:		
 ffs_api_ferror:		
-ffs_api_dopen:		
-ffs_api_dclose:		
-ffs_api_dread:		
+			RET
+
+; Open a directory
+; HLU: Pointer to a blank DIR struct
+; DEU: Pointer to the directory path
+; Returns:
+; A: FRESULT
+ffs_api_dopen:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; const TCHAR *path
+			PUSH    HL		; DIR *dp
+			CALL	_f_opendir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
+			RET
+
+; Close a directory
+; HLU: Pointer to an open DIR struct
+; Returns:
+; A: FRESULT
+ffs_api_dclose:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH    HL		; DIR *dp
+			CALL	_f_closedir
+			LD	A, L		; FRESULT
+			POP	HL
+			RET
+
+; Read the next FILINFO from an open DIR
+; HLU: Pointer to an open DIR struct
+; DEU: Pointer to an empty FILINFO struct
+; Returns:
+; A: FRESULT
+ffs_api_dread:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; FILINFO *fno
+			PUSH    HL		; DIR *dp
+			CALL	_f_readdir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
+			RET
+
 ffs_api_dfindfirst:	
 ffs_api_dfindnext:	
 ffs_api_unlink:		

@@ -26,6 +26,7 @@
 #define VDP_mode				0x86
 #define VDP_rtc					0x87
 #define VDP_keystate			0x88
+#define VDP_palette             0x94
 #define VDP_logicalcoords		0xC0
 #define VDP_consolemode			0xFE
 #define VDP_terminalmode		0xFF
