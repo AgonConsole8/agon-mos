@@ -445,7 +445,7 @@ int mos_cmdDIR(char * ptr) {
  		if(!mos_parseString(NULL, &path)) {
  			return mos_DIR(".", longListing);
  		}
- 		if (strcmp(path, "-l") == 0) {
+ 		if (strcasecmp(path, "-l") == 0) {
  			longListing = TRUE;
  		} else {
  			break;
@@ -1080,15 +1080,13 @@ UINT24	mos_CD(char *path) {
 	return fr;
 }
 
-static UINT24 get_num_dirents(const char *path)
+static UINT24 get_num_dirents(const char *path, int *cnt)
 
 
 {
 
 
-	int cnt = 0;
-
-
+	// int cnt = 0;
 	FRESULT	fr;
 
 
@@ -1098,6 +1096,7 @@ static UINT24 get_num_dirents(const char *path)
 	static 	FILINFO  fno;
 
 
+	*cnt = 0;
 	
 
 
@@ -1114,7 +1113,9 @@ static UINT24 get_num_dirents(const char *path)
 
 
 			if (fr != FR_OK || fno.fname[0] == 0) {
-
+				if (*cnt == 0 && fr == FR_DISK_ERR) {
+					fr = FR_NO_PATH;
+				}
 
 				break;  // Break on error or end of dir
 
@@ -1122,7 +1123,7 @@ static UINT24 get_num_dirents(const char *path)
 			}
 
 
-			cnt++;
+			*cnt = *cnt + 1;
 
 
 		}
@@ -1134,7 +1135,7 @@ static UINT24 get_num_dirents(const char *path)
 	f_closedir(&dir);
 
 
-	return cnt;
+	return fr;
 
 
 }
@@ -1195,6 +1196,8 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
 	BOOL useColour = scrcolours > 2 && vdpSupportsTextPalette;
     char str[12]; // Buffer for volume label
     int yr, mo, da, hr, mi;
+	int longestFilename = 0;
+	int filenameLength = 0;
 	static FILINFO filinfo;
 	BYTE textBg;
 	BYTE textFg = 15;
@@ -1210,7 +1213,7 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
 
 
     fr = f_getlabel("", str, 0);
-    if (fr != 0) {
+    if (fr != FR_OK) {
         return fr;
     }
 
@@ -1258,7 +1261,7 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
 	}
 
 
- 	num_dirents = get_num_dirents(dirPath);
+ 	fr = get_num_dirents(dirPath, &num_dirents);
 
 
  	
@@ -1316,10 +1319,16 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
 	fnos[fno_num].fattrib = filinfo.fattrib;
 
 
-	fnos[fno_num].fname = malloc(strlen(filinfo.fname)+1);
+	filenameLength = strlen(filinfo.fname) + 1;
+
+	fnos[fno_num].fname = malloc(filenameLength);
 
 
 	strcpy(fnos[fno_num].fname, filinfo.fname);
+
+	if (filenameLength > longestFilename) {
+		longestFilename = filenameLength;
+	}
 
 
 	fno_num++;
@@ -1351,6 +1360,7 @@ f_closedir(&dir);
 
 
 		int col = 0;
+		int maxCols = scrcols / longestFilename;
 
 
 		for (; fno_num < num_dirents; fno_num++) {
@@ -1390,37 +1400,17 @@ f_closedir(&dir);
 
 			} else {
 
-
-				if (col + strlen(fno->fname) + 1 > scrcols) {
-
-
+				if (col == maxCols) {
 					col = 0;
-
-
 					printf("\r\n");
-
-
 				}
-
 
 				if (useColour) {
-
-
-					printf("\x11%c%s ", fno->fattrib & AM_DIR ? dirColour : fileColour, fno->fname);
-
-
+					printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, longestFilename, fno->fname);
 				} else {
-
-
-					printf("%s ", fno->fname);
-
-
+					printf("%-*s", longestFilename, fno->fname);
 				}
-				col += strlen(fno->fname) + 1;
-
-
-				if (col == scrcols) col = 0;
-
+				col++;
 
 			}
 			free(fno->fname);
