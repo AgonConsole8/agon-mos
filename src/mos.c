@@ -289,35 +289,6 @@ char * mos_strtok_r(char *s1, const char *s2, char **ptr) {
 	return s1;
 }
 
-//Alternative to missing strnlen() in ZDS libraries
-size_t mos_strnlen(const char *s, size_t maxlen) {
-    size_t len = 0;
-    while (len < maxlen && s[len] != '\0') {
-        len++;
-    }
-    return len;
-}
-
-//Alternative to missing strdup() in ZDS libraries
-char *mos_strdup(const char *s) {
-    char *d = malloc(strlen(s) + 1);  // Allocate memory
-    if (d != NULL) strcpy(d, s);      // Copy the string
-    return d;
-}
-
-//Alternative to missing strndup() in ZDS libraries
-char *mos_strndup(const char *s, size_t n) {
-    size_t len = mos_strnlen(s, n);
-    char *d = malloc(len + 1);  // Allocate memory for length plus null terminator
-
-    if (d != NULL) {
-        strncpy(d, s, len);  // Copy up to len characters
-        d[len] = '\0';       // Null-terminate the string
-    }
-
-    return d;
-}
-
 // Parse a number from the line edit buffer
 // Parameters:
 // - ptr: Pointer to the number in the line edit buffer
@@ -365,6 +336,21 @@ BOOL mos_parseString(char * ptr, char ** p_Value) {
 	return 1;
 }
 
+int mos_runBin(UINT24 addr) {
+	UINT8 mode = mos_execMode((UINT8 *)addr);
+	switch(mode) {
+		case 0:		// Z80 mode
+			return exec16(addr, mos_strtok_ptr);
+			break;
+		case 1: 	// ADL mode
+			return exec24(addr, mos_strtok_ptr);
+			break;	
+		default:	// Unrecognised header
+			return FR_MOS_INVALID_EXECUTABLE;
+			break;
+	}
+}
+
 // Execute a MOS command
 // Parameters:
 // - buffer: Pointer to a zero terminated string that contains the MOS command with arguments
@@ -381,82 +367,43 @@ int mos_exec(char * buffer, BOOL in_mos) {
 
 	ptr = mos_trim(buffer);
 	if (ptr != NULL && *ptr == '#') {
-	    return fr;
+	    return FR_OK;
 	}
 
 	ptr = mos_strtok(ptr, " ");
-	if(ptr != NULL) {
+	if (ptr != NULL) {
 		cmd = mos_getCommand(ptr);
 		func = cmd->func;
-		if(cmd != NULL && func != 0) {
-			fr = func(ptr);
+		if (cmd != NULL && func != 0) {
+			return func(ptr);
 		}
 		else {		
-			if(strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
-				fr = FR_MOS_INVALID_COMMAND;
+			if (strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
+				return FR_MOS_INVALID_COMMAND;
 			}
 			else {
 				sprintf(path, "/mos/%s.bin", ptr);
 				fr = mos_LOAD(path, MOS_starLoadAddress, 0);
-				if(fr == 0) {
-					mode = mos_execMode((UINT8 *)MOS_starLoadAddress);
-					switch(mode) {
-						case 0:		// Z80 mode
-							fr = exec16(MOS_starLoadAddress, mos_strtok_ptr);
-							break;
-						case 1: 	// ADL mode
-							fr = exec24(MOS_starLoadAddress, mos_strtok_ptr);
-							break;	
-						default:	// Unrecognised header
-							fr = FR_MOS_INVALID_EXECUTABLE;
-							break;
-					}
-					return fr;
+				if (fr == FR_OK) {
+					return mos_runBin(MOS_starLoadAddress);
 				}
 
 				if (in_mos) {
-				
 					sprintf(path, "%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-					if(fr == 0) {
-						mode = mos_execMode((UINT8 *)MOS_defaultLoadAddress);
-						switch(mode) {
-							case 0:		// Z80 mode
-								fr = exec16(MOS_defaultLoadAddress, mos_strtok_ptr);
-								break;
-							case 1: 	// ADL mode
-								fr = exec24(MOS_defaultLoadAddress, mos_strtok_ptr);
-								break;	
-							default:	// Unrecognised header
-								fr = FR_MOS_INVALID_EXECUTABLE;
-								break;
-						}
-						return fr;
+					if (fr == FR_OK) {
+						return mos_runBin(MOS_defaultLoadAddress);
 					}				
 					
 					sprintf(path, "/bin/%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-					if(fr == 0) {
-						mode = mos_execMode((UINT8 *)MOS_defaultLoadAddress);
-						switch(mode) {
-							case 0:		// Z80 mode
-								fr = exec16(MOS_defaultLoadAddress, mos_strtok_ptr);
-								break;
-							case 1: 	// ADL mode
-								fr = exec24(MOS_defaultLoadAddress, mos_strtok_ptr);
-								break;	
-							default:	// Unrecognised header
-								fr = FR_MOS_INVALID_EXECUTABLE;
-								break;
-						}
-						return fr;
+					if (fr == FR_OK) {
+						return mos_runBin(MOS_defaultLoadAddress);
 					}
-
 				}				
-				else {
-					if(fr == 4) {
-						fr = FR_MOS_INVALID_COMMAND;
-					}
+
+				if (fr == FR_NO_FILE) {
+					return FR_MOS_INVALID_COMMAND;
 				}
 			}
 		}
@@ -666,7 +613,6 @@ int mos_cmdJMP(char *ptr) {
 // - MOS error code
 //
 int mos_cmdRUN(char *ptr) {
-	int 	fr;
 	UINT24 	addr;
 	UINT8	mode;
 	void (* dest)(void) = 0;
@@ -675,18 +621,7 @@ int mos_cmdRUN(char *ptr) {
 		addr = MOS_defaultLoadAddress;
 	}
 	mode = mos_execMode((UINT8 *)addr);
-	switch(mode) {
-		case 0:		// Z80 mode
-			fr = exec16(addr, mos_strtok_ptr);
-			break;
-		case 1: 	// ADL mode
-			fr = exec24(addr, mos_strtok_ptr);
-			break;	
-		default:	// Unrecognised header
-			fr = FR_MOS_INVALID_EXECUTABLE;
-			break;
-	}	
-	return fr;
+	return mos_runBin(addr);
 }
 
 // CD <path> command
