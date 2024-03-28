@@ -389,7 +389,7 @@ mos_api_mkdir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename
-			CALL	_mos_MKDIR	; Call the C function mos_DEL
+			CALL	_mos_MKDIR	; Call the C function mos_MKDIR
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET

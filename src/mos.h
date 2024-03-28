@@ -132,7 +132,7 @@ UINT8	fat_EOF(FIL * fp);
 							"third-party libraries used in the Agon firmware\r\n"
 
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
-#define HELP_DELETE_ARGS	"<filename>"
+#define HELP_DELETE_ARGS	"[-f] <filename>"
 
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"

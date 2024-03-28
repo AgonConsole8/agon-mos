@@ -437,21 +437,21 @@ UINT8 mos_execMode(UINT8 * ptr) {
 // Returns:
 // - MOS error code
 //
-int mos_cmdDIR(char * ptr) {	
- 	BOOL longListing = FALSE;
+int mos_cmdDIR(char * ptr) {
+	BOOL longListing = FALSE;
 	char	*path;
 
- 	for (;;) {
- 		if(!mos_parseString(NULL, &path)) {
- 			return mos_DIR(".", longListing);
- 		}
- 		if (strcasecmp(path, "-l") == 0) {
- 			longListing = TRUE;
- 		} else {
- 			break;
- 		}
- 	}
- 	return mos_DIR(path, longListing);
+	for (;;) {
+		if (!mos_parseString(NULL, &path)) {
+			return mos_DIR(".", longListing);
+		}
+		if (strcasecmp(path, "-l") == 0) {
+			longListing = TRUE;
+		} else {
+			break;
+		}
+	}
+	return mos_DIR(path, longListing);
 }
 
 // HOTKEY command
@@ -578,17 +578,121 @@ int mos_cmdSAVE(char * ptr) {
 // - MOS error code
 //
 int mos_cmdDEL(char * ptr) {
-	char *  filename;
-	
 	FRESULT	fr;
-	
-	if(
+	DIR dir;
+	static FILINFO fno;
+	char *dirPath = NULL;
+	char *pattern = NULL;
+	BOOL usePattern = FALSE;
+	BOOL force = FALSE;
+	char *filename;
+	char *lastSeparator;
+	char verify[7];
+
+	if (
 		!mos_parseString(NULL, &filename) 
 	) {
 		return FR_INVALID_PARAMETER;
 	}
-	fr = mos_DEL(filename);
-	return fr;
+
+	if (strcasecmp(filename, "-f") == 0) {
+		force = TRUE;
+		if (!mos_parseString(NULL, &filename)) {
+			return FR_INVALID_PARAMETER;
+		}
+	}
+
+	fr = FR_INT_ERR;
+
+	lastSeparator = strrchr(filename, '/');
+
+	if (strchr(filename, '*') != NULL) {
+		usePattern = TRUE;
+		if (filename[0] == '/' && strchr(filename + 1, '/') == NULL) {
+			dirPath = mos_strdup("/");
+			if (strchr(filename + 1, '*') != NULL) {
+				pattern = mos_strdup(filename + 1);
+				if (!pattern) goto cleanup;
+			}
+		} else if (lastSeparator != NULL) {
+			dirPath = mos_strndup(filename, lastSeparator - filename);
+			if (!dirPath) return FR_INT_ERR;
+
+			pattern = mos_strdup(lastSeparator + 1);
+			if (!pattern) {
+				free(dirPath);
+				return FR_INT_ERR;
+			}
+        } else {
+			dirPath = mos_strdup(".");
+			pattern = mos_strdup(filename);
+			if (!dirPath || !pattern) {
+				free(dirPath);
+				free(pattern);
+				return FR_INT_ERR;
+			}
+        }
+	} else {
+		dirPath = mos_strdup(filename);
+		if (!dirPath) return FR_INT_ERR;
+	}	
+
+	if (usePattern) {
+		fr = f_opendir(&dir, dirPath);
+		if (fr != FR_OK) goto cleanup;
+
+		fr = f_findfirst(&dir, &fno, dirPath, pattern);
+		while (fr == FR_OK && fno.fname[0] != '\0') {
+			size_t fullPathLen = strlen(dirPath) + strlen(fno.fname) + 2;
+			char *fullPath = malloc(fullPathLen);
+			if (!fullPath) {
+				fr = FR_INT_ERR;
+				break;
+			}
+
+			sprintf(fullPath, "%s/%s", dirPath, fno.fname);  // Construct full path
+
+			if (!force) {
+				INT24 retval;
+				// we could potentially support "All" here, and when detected changing `force` to true
+				printf("Delete %s? (Yes/No/Cancel) ", fullPath);
+				retval = mos_EDITLINE(&verify, sizeof(verify), 13);
+				printf("\n\r");
+				if (retval == 13) {
+					if (strcasecmp(verify, "Cancel") == 0 || strcasecmp(verify, "C") == 0) {
+						printf("Cancelled.\r\n");
+						free(fullPath);
+						break;
+					}
+					if (strcasecmp(verify, "Yes") == 0 || strcasecmp(verify, "Y") == 0) {
+						printf("Deleting %s.\r\n", fullPath);
+						fr = f_unlink(fullPath);
+					}
+				} else {
+					printf("Cancelled.\r\n");
+					free(fullPath);
+					break;
+				}
+			} else {
+				printf("Deleting %s\r\n", fullPath);
+				fr = f_unlink(fullPath);
+			}
+			free(fullPath);
+
+			if (fr != FR_OK) break;
+			fr = f_findnext(&dir, &fno);
+		}
+
+		f_closedir(&dir);
+		printf("\r\n");
+	} else {
+		fr = f_unlink(filename);
+	}
+
+	cleanup:
+		free(dirPath);
+		free(pattern);
+		return fr;
 }
 
 // JMP <addr> command
@@ -1445,79 +1549,10 @@ f_closedir(&dir);
 // - FatFS return code
 // 
 UINT24 mos_DEL(char * filename) {
-    FRESULT fr = FR_INT_ERR;
-    DIR dir;
-    static FILINFO fno;
-    char *dirPath = NULL;
-    char *pattern = NULL;
-    BOOL usePattern = FALSE;
+	FRESULT	fr;	
 
-    char *lastSeparator = strrchr(filename, '/');
-
-    if (strchr(filename, '*') != NULL) {
-        usePattern = TRUE;
-        if (filename[0] == '/' && strchr(filename + 1, '/') == NULL) {
-			dirPath = mos_strdup("/");
-			if (strchr(filename + 1, '*') != NULL) {
-				pattern = mos_strdup(filename + 1);
-				if (!pattern) goto cleanup;
-			}
-		
-		} else if (lastSeparator != NULL) {
-            dirPath = mos_strndup(filename, lastSeparator - filename);
-            if (!dirPath) return FR_INT_ERR;
-
-            pattern = mos_strdup(lastSeparator + 1);
-            if (!pattern) {
-                free(dirPath);
-                return FR_INT_ERR;
-            }
-        } else {
-            dirPath = mos_strdup(".");
-            pattern = mos_strdup(filename);
-            if (!dirPath || !pattern) {
-                free(dirPath);
-                free(pattern);
-                return FR_INT_ERR;
-            }
-        }
-    } else {
-        dirPath = mos_strdup(filename);
-        if (!dirPath) return FR_INT_ERR;
-    }	
-
-    if (usePattern) {
-        fr = f_opendir(&dir, dirPath);
-        if (fr != FR_OK) goto cleanup;
-
-        fr = f_findfirst(&dir, &fno, dirPath, pattern);
-        while (fr == FR_OK && fno.fname[0] != '\0') {
-            size_t fullPathLen = strlen(dirPath) + strlen(fno.fname) + 2;
-            char *fullPath = malloc(fullPathLen);
-            if (!fullPath) {
-                fr = FR_INT_ERR;
-                break;
-            }
-
-            sprintf(fullPath, "%s/%s", dirPath, fno.fname);  // Construct full path
-            printf("Deleting %s\r\n", fullPath);
-			fr = f_unlink(fullPath);
-            free(fullPath);
-
-            if (fr != FR_OK) break;
-            fr = f_findnext(&dir, &fno);
-        }
-
-        f_closedir(&dir);
-		printf("\r\n");
-    } else {
-        fr = f_unlink(filename);
-    }
-
-	cleanup:
-		free(dirPath);
-		free(pattern);
-		return fr;
+	fr = f_unlink(filename);
+	return fr;
 }
 
 // Rename file
