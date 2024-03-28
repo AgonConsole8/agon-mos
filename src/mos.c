@@ -60,7 +60,7 @@ extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vecto
 extern int 		exec16(UINT24 addr, char * params);	// In misc.asm
 extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
 
-extern BYTE scrcols, scrcolours;               // In globals.asm
+extern BYTE scrcols, scrcolours, scrpixelIndex; // In globals.asm
 extern volatile	BYTE keyascii;					// In globals.asm
 extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
@@ -73,6 +73,8 @@ TCHAR cwd[256];						// Hold current working directory.
 extern volatile BYTE history_no;
 
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
+
+BOOL	vdpSupportsTextPalette = FALSE;
 
 // Array of MOS commands and pointer to the C function to run
 // NB this list is iterated over, so the order is important
@@ -1190,9 +1192,14 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
     //char dirPath[256], pattern[32] = {0};
 	char *dirPath = NULL, *pattern = NULL;
     BOOL usePattern = FALSE;
+	BOOL useColour = scrcolours > 2 && vdpSupportsTextPalette;
     char str[12]; // Buffer for volume label
     int yr, mo, da, hr, mi;
 	static FILINFO filinfo;
+	BYTE textBg;
+	BYTE textFg = 15;
+	BYTE dirColour = 2;
+	BYTE fileColour = 15;
 
 
 	SmallFilInfo 	*fnos, *fno;
@@ -1238,7 +1245,17 @@ UINT24 mos_DIR(char * inputPath, BOOL longListing) {
         }
     }
 	
- 
+
+	if (useColour) {
+		readPalette(128, TRUE);
+		textFg = scrpixelIndex;
+		fileColour = textFg;
+		readPalette(129, TRUE);
+		textBg = scrpixelIndex;
+		while(dirColour == textBg || dirColour == fileColour) {
+			dirColour = (dirColour + 1) % scrcolours;
+		}
+	}
 
 
  	num_dirents = get_num_dirents(dirPath);
@@ -1363,7 +1380,12 @@ f_closedir(&dir);
 				
 
 
-				printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno->fattrib & AM_DIR ? 'D' : ' ', 8, fno->fsize, fno->fname);
+				if (useColour) {
+					BOOL isDir = fno->fattrib & AM_DIR;
+					printf("\x11%c%04d/%02d/%02d\t%02d:%02d %c %*lu \x11%c%s\n\r", textFg, yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fno->fsize, isDir ? dirColour : fileColour, fno->fname);
+				} else {
+					printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno->fattrib & AM_DIR ? 'D' : ' ', 8, fno->fsize, fno->fname);
+				}
 
 
 			} else {
@@ -1381,10 +1403,10 @@ f_closedir(&dir);
 				}
 
 
-				if (scrcolours > 2) {
+				if (useColour) {
 
 
-					printf("\x11%c%s\x11\x0f ", fno->fattrib & AM_DIR ? 2 : 15, fno->fname);
+					printf("\x11%c%s ", fno->fattrib & AM_DIR ? dirColour : fileColour, fno->fname);
 
 
 				} else {
@@ -1415,6 +1437,9 @@ f_closedir(&dir);
 	}
 	free(fnos);
 
+	if (useColour) {
+		printf("\x11%c", textFg);
+	}
 
 
 	cleanup:

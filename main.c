@@ -43,12 +43,12 @@
 #include "timer.h"
 #include "ff.h"
 #include "clock.h"
+#include "mos_editor.h"
 #include "mos.h"
 #include "i2c.h"
 
-extern BYTE scrcolours;               // In globals.asm
+extern BYTE scrcolours, scrpixelIndex;  // In globals.asm
 
-extern void getModeInformation(void);
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
 extern void 	vblank_handler(void);
@@ -61,6 +61,8 @@ extern volatile char	gp;				// General poll variable
 
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
+
+extern BOOL	vdpSupportsTextPalette;
 
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
@@ -127,8 +129,19 @@ int main(void) {
 	}
 
 	scrcolours = 0;
+	scrpixelIndex = 255;
+	readPalette(128, FALSE);
 	getModeInformation();
-	while (scrcolours == 0) {}
+
+	if (scrpixelIndex < 128) {
+		vdpSupportsTextPalette = TRUE;
+	} else {
+		// VDP doesn't properly support text colour reading
+		// so we may have printed a duff character to screen
+		// home cursor and go down a row
+		putch(0x1E);
+		putch(0x0A);
+	}
 
 	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 	#if VERSION_CANDIDATE > 0

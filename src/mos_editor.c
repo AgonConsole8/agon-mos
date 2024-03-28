@@ -65,6 +65,19 @@ void getModeInformation() {
 	wait_VDP(0x10);								// Wait until the semaphore has been set, or a timeout happens
 }
 
+// Get palette entry
+//
+void readPalette(BYTE entry, BOOL wait) {
+	vpd_protocol_flags &= 0xFB;					// Clear the semaphore flag
+	putch(23);
+	putch(0);
+	putch(VDP_palette);
+	putch(entry);
+	if (wait) {
+		wait_VDP(0x04);							// Wait until the semaphore has been set, or a timeout happens
+	}
+}
+
 // Move cursor left
 //
 void doLeftCursor() {
