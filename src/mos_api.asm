@@ -43,9 +43,9 @@
 			XREF	_mos_LOAD
 			XREF	_mos_SAVE
 			XREF	_mos_CD
-			XREF	_mos_DIR
+			XREF	_mos_DIR_API
 			XREF	_mos_DEL
-			XREF	_mos_REN
+			XREF	_mos_REN_API
 			XREF	_mos_FOPEN
 			XREF	_mos_FCLOSE
 			XREF	_mos_FGETC
@@ -53,7 +53,7 @@
 			XREF	_mos_FEOF
 			XREF	_mos_GETERROR
 			XREF	_mos_MKDIR
-			XREF	_mos_COPY
+			XREF	_mos_COPY_API
 			XREF	_mos_GETRTC 
 			XREF	_mos_SETRTC 
 			XREF	_mos_SETINTVECTOR
@@ -299,7 +299,7 @@ mos_api_dir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can run the command
 ;
 			PUSH	HL		; char * path
-			CALL	_mos_DIR
+			CALL	_mos_DIR_API
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			RET
@@ -343,7 +343,7 @@ mos_api_ren:		LD	A, MB		; Check if MBASE is 0
 ; 
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
-			CALL	_mos_REN	; Call the C function mos_REN
+			CALL	_mos_REN_API	; Call the C function mos_REN_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			POP	DE
@@ -368,7 +368,7 @@ mos_api_copy:		LD	A, MB		; Check if MBASE is 0
 ; 
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
-			CALL	_mos_COPY	; Call the C function mos_COPY
+			CALL	_mos_COPY_API	; Call the C function mos_COPY_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			POP	DE

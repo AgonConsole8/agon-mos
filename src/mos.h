@@ -92,10 +92,13 @@ UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD(char * path);
+UINT24	mos_DIR_API(char * path);
 UINT24	mos_DIR(char * path, BOOL longListing);
 UINT24	mos_DEL(char * filename);
-UINT24 	mos_REN(char * filename1, char * filename2);
-UINT24	mos_COPY(char * filename1, char * filename2);
+UINT24	mos_REN_API(char *srcPath, char *dstPath);
+UINT24	mos_REN(char *srcPath, char *dstPath, BOOL verbose);
+UINT24	mos_COPY_API(char *srcPath, char *dstPath);
+UINT24	mos_COPY(char *srcPath, char *dstPath, BOOL verbose);
 UINT24	mos_MKDIR(char * filename);
 UINT24 	mos_EXEC(char * filename, char * buffer, UINT24 size);
 

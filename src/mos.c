@@ -768,7 +768,7 @@ int mos_cmdREN(char *ptr) {
 	) {
 		return FR_INVALID_PARAMETER;
 	}
-	fr = mos_REN(filename1, filename2);
+	fr = mos_REN(filename1, filename2, TRUE);
 	return fr;
 }
 
@@ -789,7 +789,7 @@ int mos_cmdCOPY(char *ptr) {
 	) {
 		return FR_INVALID_PARAMETER;
 	}
-	fr = mos_COPY(filename1, filename2);
+	fr = mos_COPY(filename1, filename2, TRUE);
 	return fr;
 }
 
@@ -1286,6 +1286,14 @@ static int cmp_filinfo(const SmallFilInfo *a, const SmallFilInfo *b)
 }
 
 
+// Directory listing, for MOS API compatibility
+// Returns:
+// - FatFS return code
+// 
+UINT24 mos_DIR_API(char * inputPath) {
+	return mos_DIR(inputPath, TRUE);
+}
+
 
 // Directory listing
 // Returns:
@@ -1555,14 +1563,26 @@ UINT24 mos_DEL(char * filename) {
 	return fr;
 }
 
+
 // Rename file
 // Parameters:
-// - filename1: Path of file to rename
-// - filename2: New filename
+// - srcPath: Source path of file to rename
+// - dstPath: Destination file path
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_REN(char *srcPath, char *dstPath) {
+UINT24 mos_REN_API(char *srcPath, char *dstPath) {
+	return mos_REN(srcPath, dstPath, FALSE);
+}
+
+// Rename file
+// Parameters:
+// - srcPath: Source path of file to rename
+// - dstPath: Destination file path
+// Returns:
+// - FatFS return code
+// 
+UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     FRESULT fr;
     DIR dir;
     static FILINFO fno;
@@ -1571,7 +1591,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath) {
     BOOL usePattern = FALSE;
 
     if (strchr(dstPath, '*') != NULL) {
-        printf("Wildcards permitted in source only.\r\n");
+        // printf("Wildcards permitted in source only.\r\n");
         return FR_INVALID_PARAMETER;
     }
 
@@ -1618,7 +1638,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath) {
             sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
             sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), fno.fname);
 
-            printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
+            if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
 			fr = f_rename(fullSrcPath, fullDstPath);
             free(fullSrcPath);
             free(fullDstPath);
@@ -1632,31 +1652,30 @@ UINT24 mos_REN(char *srcPath, char *dstPath) {
         f_closedir(&dir);
 		
     } else {
-	FILINFO fil;
+		FILINFO fil;
 
-	// check if destination is a directory
-	f_stat(dstPath, &fil);
+		// check if destination is a directory
+		f_stat(dstPath, &fil);
 
-	if (fil.fname[0] && (fil.fattrib & AM_DIR)) {
-		// copy into a directory, keeping name
-		size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-		fullDstPath = malloc(fullDstPathLen);
-		if (!fullDstPath) {
-			fr = FR_MOS_OUT_OF_MEMORY;
-			goto cleanup;
+		if (fil.fname[0] && (fil.fattrib & AM_DIR)) {
+			// copy into a directory, keeping name
+			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
+			fullDstPath = malloc(fullDstPathLen);
+			if (!fullDstPath) {
+				fr = FR_MOS_OUT_OF_MEMORY;
+				goto cleanup;
+			}
+			srcFilename = strrchr(srcPath, '/');
+			srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
+			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
+
+			fr = f_rename(srcPath, fullDstPath);
+			free(fullDstPath);
+		} else {
+			fr = f_rename(srcPath, dstPath);
 		}
-		srcFilename = strrchr(srcPath, '/');
-		srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
-		sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
-
-		fr = f_rename(srcPath, fullDstPath);
-		free(fullDstPath);
-	} else {
-		fr = f_rename(srcPath, dstPath);
-	}
 		
     }
-	printf("\r\n");
 
 cleanup:
     free(srcDir);
@@ -1666,12 +1685,24 @@ cleanup:
 
 // Copy file
 // Parameters:
-// - filename1: Path of file to rename
-// - filename2: New filename
+// - srcPath: Source path of file to copy
+// - dstPath: Destination file path
 // Returns:
 // - FatFS return code
 // 
-UINT24 mos_COPY(char *srcPath, char *dstPath) {
+UINT24 mos_COPY_API(char *srcPath, char *dstPath) {
+	return mos_COPY(srcPath, dstPath, FALSE);
+}
+
+// Copy file
+// Parameters:
+// - srcPath: Source path of file to copy
+// - dstPath: Destination file path
+// - verbose: Print progress messages
+// Returns:
+// - FatFS return code
+// 
+UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     FRESULT fr;
     FIL fsrc, fdst;
     DIR dir;
@@ -1734,7 +1765,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath) {
                 goto file_cleanup;
             }
 
-			printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
+			if (verbose) printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
             while (1) {
                 fr = f_read(&fsrc, buffer, sizeof(buffer), &br);
                 if (br == 0 || fr != FR_OK) break;
@@ -1776,7 +1807,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath) {
             return fr;
         }
 
-		printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
+		if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
         while (1) {
             fr = f_read(&fsrc, buffer, sizeof(buffer), &br);
             if (br == 0 || fr != FR_OK) break;
@@ -1788,7 +1819,6 @@ UINT24 mos_COPY(char *srcPath, char *dstPath) {
         f_close(&fdst);
         free(fullDstPath);
     }
-	printf("\r\n");
 
 cleanup:
     free(srcDir);
