@@ -1519,9 +1519,9 @@ f_closedir(&dir);
 				}
 
 				if (useColour) {
-					printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, longestFilename, fno->fname);
+					printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
 				} else {
-					printf("%-*s", longestFilename, fno->fname);
+					printf("%-*s", col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
 				}
 				col++;
 
