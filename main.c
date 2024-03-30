@@ -106,6 +106,43 @@ void init_interrupts(void) {
 	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
 }
 
+int quickrand(void) {
+	asm("ld a,r\n"
+		"ld hl,0\n"
+		"ld l,a\n");
+}
+
+void rainbow_msg(char* msg) {
+	BYTE i = quickrand() & (scrcolours - 1);
+	if (i == 0)
+		i++;
+	for (; *msg; msg++) {
+		printf("%c%c%c", 17, i, *msg);
+		i = (i + 1 < scrcolours) ? i + 1 : 1;
+	}
+	printf("%c%c", 17, 15);
+}
+
+void bootmsg(void) {
+	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+	#if VERSION_CANDIDATE > 0
+		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
+	#endif
+	// Show version subtitle, if we have one
+	#ifdef VERSION_SUBTITLE
+		printf(" ");
+		rainbow_msg(VERSION_SUBTITLE);
+	#endif
+	// Show build if defined (intended to be auto-generated string from build script from git commit hash)
+	#ifdef VERSION_BUILD
+		printf(" Build %s", VERSION_BUILD);
+	#endif
+	printf("\n\r\n\r");
+	#if	DEBUG > 0
+	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
+	#endif
+}
+
 // The main loop
 //
 int main(void) {
@@ -130,8 +167,9 @@ int main(void) {
 
 	scrcolours = 0;
 	scrpixelIndex = 255;
-	readPalette(128, FALSE);
 	getModeInformation();
+    while (scrcolours == 0) { }
+	readPalette(128, TRUE);
 
 	if (scrpixelIndex < 128) {
 		vdpSupportsTextPalette = TRUE;
@@ -143,22 +181,7 @@ int main(void) {
 		putch(0x0A);
 	}
 
-	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-	#if VERSION_CANDIDATE > 0
-		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
-	#endif
-	// Show version subtitle, if we have one
-	#ifdef VERSION_SUBTITLE
-		printf(" %s", VERSION_SUBTITLE);
-	#endif
-	// Show build if defined (intended to be auto-generated string from build script from git commit hash)
-	#ifdef VERSION_BUILD
-		printf(" Build %s", VERSION_BUILD);
-	#endif
-	printf("\n\r\n\r");
-	#if	DEBUG > 0
-	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
-	#endif
+	bootmsg();
 
 	mos_mount();									// Mount the SD card
 
