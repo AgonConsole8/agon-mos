@@ -43,7 +43,6 @@ typedef struct {
 	int (*func)(char * ptr);
 	char * args;
 	char * help;
-	char * aliases;
 } t_mosCommand;
 
 typedef struct {
@@ -55,12 +54,12 @@ void 	mos_error(int error);
 
 BYTE	mos_getkey(void);
 UINT24	mos_input(char * buffer, int bufferLength);
-void *	mos_getCommand(char * ptr);
+t_mosCommand	*mos_getCommand(char * ptr);
 BOOL 	mos_cmp(char *p1, char *p2);
 char *	mos_trim(char * s);
 char *	mos_strtok(char *s1, char * s2);
 char *	mos_strtok_r(char *s1, const char *s2, char **ptr);
-int		mos_exec(char * buffer);
+int		mos_exec(char * buffer, BOOL in_mos);
 UINT8 	mos_execMode(UINT8 * ptr);
 
 int		mos_mount(void);
@@ -87,15 +86,19 @@ int		mos_cmdTYPE(char *ptr);
 int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
+int		mos_cmdHOTKEY(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD(char * path);
-UINT24	mos_DIR(char * path);
+UINT24	mos_DIR_API(char * path);
+UINT24	mos_DIR(char * path, BOOL longListing);
 UINT24	mos_DEL(char * filename);
-UINT24 	mos_REN(char * filename1, char * filename2);
-UINT24	mos_COPY(char * filename1, char * filename2);
+UINT24	mos_REN_API(char *srcPath, char *dstPath);
+UINT24	mos_REN(char *srcPath, char *dstPath, BOOL verbose);
+UINT24	mos_COPY_API(char *srcPath, char *dstPath);
+UINT24	mos_COPY(char *srcPath, char *dstPath, BOOL verbose);
 UINT24	mos_MKDIR(char * filename);
 UINT24 	mos_EXEC(char * filename, char * buffer, UINT24 size);
 
@@ -115,13 +118,12 @@ void	mos_SETRTC(UINT24 address);
 UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
 
+extern TCHAR	cwd[256];
+
 UINT8	fat_EOF(FIL * fp);
 
 #define HELP_CAT			"Directory listing of the current directory\r\n"
-#define HELP_CAT_ARGS		"<path>"
-#define HELP_CAT_ALIASES	"DIR and ."
-#define HELP_DIR_ALIASES	"CAT and ."
-#define HELP_DOT_ALIASES	"CAT and DIR"
+#define HELP_CAT_ARGS		"[-l] <path>"
 
 #define HELP_CD				"Change current directory\r\n"
 #define HELP_CD_ARGS		"<path>"
@@ -133,9 +135,7 @@ UINT8	fat_EOF(FIL * fp);
 							"third-party libraries used in the Agon firmware\r\n"
 
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
-#define HELP_DELETE_ARGS	"<filename>"
-#define HELP_DELETE_ALIASES	"ERASE"
-#define HELP_ERASE_ALIASES	"DELETE"
+#define HELP_DELETE_ARGS	"[-f] <filename>"
 
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"
@@ -153,8 +153,6 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_RENAME			"Rename a file in the same folder\r\n"
 #define HELP_RENAME_ARGS	"<filename1> <filename2>"
-#define HELP_RENAME_ALIASES	"MOVE"
-#define HELP_MOVE_ALIASES	"RENAME"
 
 #define HELP_RUN			"Call an executable binary loaded in memory.\r\n" \
 							"If no parameters are passed, then addr will " \
@@ -167,7 +165,7 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_SET			"Set a system option\r\n\r\n" \
 							"Keyboard Layout\r\n" \
 							"SET KEYBOARD n: Set the keyboard layout\r\n" \
-							"    0: UK\r\n" \
+							"    0: UK (default)\r\n" \
 							"    1: US\r\n" \
 							"    2: German\r\n" \
 							"    3: Italian\r\n" \
@@ -175,10 +173,20 @@ UINT8	fat_EOF(FIL * fp);
 							"    5: French\r\n" \
 							"    6: Belgian\r\n" \
 							"    7: Norwegian\r\n" \
-							"    8: Japanese\r\n\r\n" \
+							"    8: Japanese\r\n" \
+							"    9: US International\r\n" \
+							"   10: US International (alternative)\r\n" \
+							"   11: Swiss (German)\r\n" \
+							"   12: Swiss (French)\r\n" \
+							"   13: Danish\r\n" \
+							"   14: Swedish\r\n" \
+							"   15: Portuguese\r\n" \
+							"   16: Brazilian Portugese\r\n" \
+							"   17: Dvorak\r\n" \
+							"\r\n" \
 							"Serial Console\r\n" \
 							"SET CONSOLE n: Serial console\r\n" \
-							"    0: Console off\r\n" \
+							"    0: Console off (default)\r\n" \
 							"    1: Console on\r\n"
 #define HELP_SET_ARGS		"<option> <value>"
 
@@ -192,15 +200,20 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_TYPE			"Display the contents of a file on the screen\r\n"
 #define HELP_TYPE_ARGS		"<filename>"
 
+#define HELP_HOTKEY			"Store a command in one of 12 hotkey slots assigned to F1-F12\r\n\r\n" \
+							"Optionally, the command string can include \"%s\" as a marker\r\n" \
+							"in which case the hotkey command will be built either side.\r\n\r\n" \
+							"HOTKEY without any arguments will list the currently assigned\r\n" \
+							"command strings.\r\n"
+							
+#define HELP_HOTKEY_ARGS	"<key number> <command string>"
+
 #define HELP_CLS			"Clear the screen\r\n"
 
 #define HELP_MOUNT			"(Re-)mount the MicroSD card\r\n"
 
-#define HELP_HELP			"Display help on a single or all commands.\r\n"	\
-							"List of commands:\r\n"				\
-							"CAT, CD, CLS, COPY, CREDITS, DELETE, EXEC, \r\n"	\
-							"HELP, JMP, LOAD, MKDIR, MOUNT, RENAME, RUN, \r\n"	\
-							"SAVE, SET, TIME, TYPE, VDU.\r\n"
+#define HELP_HELP			"Display help on a single or all commands.\r\n"
+
 #define HELP_HELP_ARGS		"[ <command> | all ]"
 
 #endif MOS_H

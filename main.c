@@ -43,8 +43,11 @@
 #include "timer.h"
 #include "ff.h"
 #include "clock.h"
+#include "mos_editor.h"
 #include "mos.h"
 #include "i2c.h"
+
+extern BYTE scrcolours, scrpixelIndex;  // In globals.asm
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -58,6 +61,8 @@ extern volatile char	gp;				// General poll variable
 
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
+
+extern BOOL	vdpSupportsTextPalette;
 
 // Wait for the ESP32 to respond with a GP packet to signify it is ready
 // Parameters:
@@ -101,6 +106,43 @@ void init_interrupts(void) {
 	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
 }
 
+int quickrand(void) {
+	asm("ld a,r\n"
+		"ld hl,0\n"
+		"ld l,a\n");
+}
+
+void rainbow_msg(char* msg) {
+	BYTE i = quickrand() & (scrcolours - 1);
+	if (i == 0)
+		i++;
+	for (; *msg; msg++) {
+		printf("%c%c%c", 17, i, *msg);
+		i = (i + 1 < scrcolours) ? i + 1 : 1;
+	}
+	printf("%c%c", 17, 15);
+}
+
+void bootmsg(void) {
+	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+	#if VERSION_CANDIDATE > 0
+		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
+	#endif
+	// Show version subtitle, if we have one
+	#ifdef VERSION_SUBTITLE
+		printf(" ");
+		rainbow_msg(VERSION_SUBTITLE);
+	#endif
+	// Show build if defined (intended to be auto-generated string from build script from git commit hash)
+	#ifdef VERSION_BUILD
+		printf(" Build %s", VERSION_BUILD);
+	#endif
+	printf("\n\r\n\r");
+	#if	DEBUG > 0
+	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
+	#endif
+}
+
 // The main loop
 //
 int main(void) {
@@ -122,18 +164,24 @@ int main(void) {
 	if(coldBoot == 0) {								// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
-	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-	#if VERSION_CANDIDATE > 0
-		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
-	#endif
-	// Show build if defined (intended to be auto-generated string from build script from git commit hash)
-	#ifdef VERSION_BUILD
-		printf(" Build %s", VERSION_BUILD);
-	#endif
-	printf("\n\r\n\r");
-	#if	DEBUG > 0
-	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
-	#endif
+
+	scrcolours = 0;
+	scrpixelIndex = 255;
+	getModeInformation();
+    while (scrcolours == 0) { }
+	readPalette(128, TRUE);
+
+	if (scrpixelIndex < 128) {
+		vdpSupportsTextPalette = TRUE;
+	} else {
+		// VDP doesn't properly support text colour reading
+		// so we may have printed a duff character to screen
+		// home cursor and go down a row
+		putch(0x1E);
+		putch(0x0A);
+	}
+
+	bootmsg();
 
 	mos_mount();									// Mount the SD card
 
@@ -143,26 +191,26 @@ int main(void) {
 
 	// Load the autoexec.bat config file
 	//
-	#if enable_config == 1	
-	if(coldBoot > 0) {								// Check it's a cold boot (after reset, not RST 00h)
+	#if enable_config == 1
+	{
 		int err = mos_EXEC("autoexec.txt", cmd, sizeof cmd);	// Then load and run the config file
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
-	}	
+	}
 	#endif
 
 	// The main loop
 	//
 	while(1) {
 		if(mos_input(&cmd, sizeof(cmd)) == 13) {
-			int err = mos_exec(&cmd);
+			int err = mos_exec(&cmd, TRUE);
 			if(err > 0) {
 				mos_error(err);
 			}
 		}
 		else {
-			printf("%cEscape\n\r", MOS_prompt);
+			printf("Escape\n\r");
 		}
 	}
 

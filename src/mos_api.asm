@@ -43,9 +43,9 @@
 			XREF	_mos_LOAD
 			XREF	_mos_SAVE
 			XREF	_mos_CD
-			XREF	_mos_DIR
+			XREF	_mos_DIR_API
 			XREF	_mos_DEL
-			XREF	_mos_REN
+			XREF	_mos_REN_API
 			XREF	_mos_FOPEN
 			XREF	_mos_FCLOSE
 			XREF	_mos_FGETC
@@ -53,7 +53,7 @@
 			XREF	_mos_FEOF
 			XREF	_mos_GETERROR
 			XREF	_mos_MKDIR
-			XREF	_mos_COPY
+			XREF	_mos_COPY_API
 			XREF	_mos_GETRTC 
 			XREF	_mos_SETRTC 
 			XREF	_mos_SETINTVECTOR
@@ -89,6 +89,10 @@
 			XREF	_f_write
 			XREF	_f_stat 
 			XREF	_f_lseek
+			XREF	_f_opendir
+			XREF	_f_closedir
+			XREF	_f_readdir
+			XREF	_f_getcwd
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -97,8 +101,11 @@
 ;
 mos_api:		CP	80h			; Check if it is a FatFS command
 			JR	NC, $F			; Yes, so jump to next block
+			CP	mos_api_block1_size	; Check if out of bounds
+			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; Switch on this table
-			DW	mos_api_getkey		; 0x00
+;
+mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_load		; 0x01
 			DW	mos_api_save		; 0x02
 			DW	mos_api_cd		; 0x03
@@ -133,10 +140,15 @@ mos_api:		CP	80h			; Check if it is a FatFS command
 			DW	mos_api_i2c_close	; 0x20
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
+
+mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
 $$:			AND	7Fh			; Else remove the top bit
+			CP	mos_api_block2_size	; Check if out of bounds
+			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; And switch on this table
-			DW	ffs_api_fopen
+
+mos_api_block2_start:	DW	ffs_api_fopen
 			DW	ffs_api_fclose
 			DW	ffs_api_fread
 			DW	ffs_api_fwrite
@@ -174,6 +186,12 @@ $$:			AND	7Fh			; Else remove the top bit
 			DW	ffs_api_getlabel
 			DW	ffs_api_setlabel
 			DW	ffs_api_setcp
+
+mos_api_block2_size:	EQU 	($ - mos_api_block2_start) / 2
+
+mos_api_not_implemented:
+			LD	HL, 23			; FR_MOS_NOT_IMPLEMENTED
+			RET
 
 ; Get keycode
 ; Returns:
@@ -286,7 +304,7 @@ mos_api_dir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can run the command
 ;
 			PUSH	HL		; char * path
-			CALL	_mos_DIR
+			CALL	_mos_DIR_API
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			RET
@@ -330,7 +348,7 @@ mos_api_ren:		LD	A, MB		; Check if MBASE is 0
 ; 
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
-			CALL	_mos_REN	; Call the C function mos_REN
+			CALL	_mos_REN_API	; Call the C function mos_REN_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			POP	DE
@@ -355,7 +373,7 @@ mos_api_copy:		LD	A, MB		; Check if MBASE is 0
 ; 
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
-			CALL	_mos_COPY	; Call the C function mos_COPY
+			CALL	_mos_COPY_API	; Call the C function mos_COPY_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			POP	DE
@@ -376,7 +394,7 @@ mos_api_mkdir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename
-			CALL	_mos_MKDIR	; Call the C function mos_DEL
+			CALL	_mos_MKDIR	; Call the C function mos_MKDIR
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
@@ -1046,34 +1064,128 @@ $$:			PUSH	BC 		; FSIZE_t ofs (msb)
 ; Commands that have not been implemented yet
 ;
 ffs_api_ftruncate:	
+			JP mos_api_not_implemented
 ffs_api_fsync:		
+			JP mos_api_not_implemented
 ffs_api_fforward:	
+			JP mos_api_not_implemented
 ffs_api_fexpand:	
+			JP mos_api_not_implemented
 ffs_api_fgets:		
+			JP mos_api_not_implemented
 ffs_api_fputc:		
+			JP mos_api_not_implemented
 ffs_api_fputs:		
+			JP mos_api_not_implemented
 ffs_api_fprintf:	
+			JP mos_api_not_implemented
 ffs_api_ftell:		
+			JP mos_api_not_implemented
 ffs_api_fsize:		
+			JP mos_api_not_implemented
 ffs_api_ferror:		
-ffs_api_dopen:		
-ffs_api_dclose:		
-ffs_api_dread:		
-ffs_api_dfindfirst:	
-ffs_api_dfindnext:	
-ffs_api_unlink:		
-ffs_api_rename:		
-ffs_api_chmod:		
-ffs_api_utime:		
-ffs_api_mkdir:		
-ffs_api_chdir:		
-ffs_api_chdrive:	
-ffs_api_getcwd:		
-ffs_api_mount:		
-ffs_api_mkfs:		
-ffs_api_fdisk		
-ffs_api_getfree:	
-ffs_api_getlabel:	
-ffs_api_setlabel:	
-ffs_api_setcp:		
+			JP mos_api_not_implemented
+
+; Open a directory
+; HLU: Pointer to a blank DIR struct
+; DEU: Pointer to the directory path
+; Returns:
+; A: FRESULT
+ffs_api_dopen:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; const TCHAR *path
+			PUSH    HL		; DIR *dp
+			CALL	_f_opendir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
 			RET
+
+; Close a directory
+; HLU: Pointer to an open DIR struct
+; Returns:
+; A: FRESULT
+ffs_api_dclose:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH    HL		; DIR *dp
+			CALL	_f_closedir
+			LD	A, L		; FRESULT
+			POP	HL
+			RET
+
+; Read the next FILINFO from an open DIR
+; HLU: Pointer to an open DIR struct
+; DEU: Pointer to an empty FILINFO struct
+; Returns:
+; A: FRESULT
+ffs_api_dread:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	DE 		; FILINFO *fno
+			PUSH    HL		; DIR *dp
+			CALL	_f_readdir
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	DE
+			RET
+
+ffs_api_dfindfirst:	
+			JP mos_api_not_implemented
+ffs_api_dfindnext:	
+			JP mos_api_not_implemented
+ffs_api_unlink:		
+			JP mos_api_not_implemented
+ffs_api_rename:		
+			JP mos_api_not_implemented
+ffs_api_chmod:		
+			JP mos_api_not_implemented
+ffs_api_utime:		
+			JP mos_api_not_implemented
+ffs_api_mkdir:		
+			JP mos_api_not_implemented
+ffs_api_chdir:		
+			JP mos_api_not_implemented
+ffs_api_chdrive:	
+			JP mos_api_not_implemented
+; Copy the current directory (string) into buffer (hl)
+; HLU: Pointer to a buffer
+; BCU: Maximum length of buffer
+; Returns:
+; A: FRESULT
+ffs_api_getcwd:		LD	A, MB		; A: MB
+			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
+			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
+$$:
+			PUSH	BC 		; sizeof(buffer)
+			PUSH    HL		; buffer
+			CALL	_f_getcwd
+			LD	A, L		; FRESULT
+			POP	HL
+			POP	BC
+			RET
+
+ffs_api_mount:		
+			JP mos_api_not_implemented
+ffs_api_mkfs:		
+			JP mos_api_not_implemented
+ffs_api_fdisk		
+			JP mos_api_not_implemented
+ffs_api_getfree:	
+			JP mos_api_not_implemented
+ffs_api_getlabel:	
+			JP mos_api_not_implemented
+ffs_api_setlabel:	
+			JP mos_api_not_implemented
+ffs_api_setcp:		
+			JP mos_api_not_implemented

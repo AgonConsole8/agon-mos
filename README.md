@@ -2,7 +2,7 @@
 
 Part of the official firmware for the [Agon Console8](https://www.heber.co.uk/agon-console8)
 
-This firmware is intended for use on the Agon Console8, but should be fully compatible with other Agon Light hardware.  As well as the Console8, it has been tested on the Olimex Agon Light 2.
+This firmware is intended for use on any Agon Light compatible computer.  As well as the Agon Console8, it has been tested on the Olimex Agon Light 2.
 
 This version of agon-mos may differ from the [official Quark firmware](https://github.com/breakintoprogram/agon-mos) and contain some extensions, but software written for the official Quark firmware should be fully compatible with this version.
 
@@ -69,9 +69,9 @@ Unless you are using the ZDS II tools to program the eZ80 directly, it is recomm
 
 The MOS can also be flashed on your device using the [agon-flash Agon MOS firmware upgrade utility](https://github.com/envenomator/agon-flash).  This is a command line utility that runs on the Agon itself, and can flash MOS to the eZ80 from a file stored on your SD card.
 
-In the event that you flash a MOS that does not work, you will need to revert your Agon back to a known working version.  This can be done using the [agon-vdpflash utility](https://github.com/envenomator/agon-vdpflash).  
+In the event that you flash a MOS that does not work, you will need to revert your Agon back to a known working version.  With the exception of the Agon Console8, this can be done using the [agon-vdpflash utility](https://github.com/envenomator/agon-vdpflash).  
 
-NB At this time to use this utility on an Agon Console8 you may need to use an external ESP32-based machine, or make some physical modifications to your Agon Console8.  Generally speaking this is not recommended unless you are an advanced user, and should only be necessary in only the most exceptional circumstances.  This is a developing situation and may change in the future, so you are advised to consult with the community on Discord.
+Recovery for an Agon Console8 requires the use of a second external ESP32-based machine.  Guidance on this, and a tool for recovery, can be found in the [Agon Console8 Recovery Tool](https://github.com/envenomator/console8-recover) repository.
 
 It is recommended when using the agon-flash utility that you use a filename other than `MOS.bin` for your new experimental MOS version, and keep a known working version of the `MOS.bin` file in the root of your SD card, as this is the file that the agon-vdpflash utility uses.
 
@@ -93,9 +93,7 @@ Other options for programming the Agon are available, and the community will be 
 
 ### Documentation
 
-The Agon Light documentation can now be found on the [Agon Light Documentation Wiki](https://github.com/breakintoprogram/agon-docs/wiki)
-
-Documentation for the Agon Console8 is currently being worked on.
+The Agon Platform documentation can now be found on the [Community Documentation](https://agonconsole8.github.io/agon-docs/) site.  This site provides extensive documentation about the Agon platform firmware, covering both Quark and Console8 firmware releases.
 
 ### Community
 
