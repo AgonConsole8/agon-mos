@@ -507,7 +507,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 
 								if (search_term == NULL) {
-									free(path);
+									if (path) free(path);
 									break;
 								}
 
@@ -529,8 +529,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 
 								// Free the allocated memory
-								free(search_term);
-								free(path);
+								if (search_term) free(search_term);
+								if (path) free(path);
 							}
 							break;							
 							

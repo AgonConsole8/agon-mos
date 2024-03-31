@@ -634,8 +634,8 @@ int mos_cmdDEL(char * ptr) {
 			dirPath = mos_strdup(".");
 			pattern = mos_strdup(filename);
 			if (!dirPath || !pattern) {
-				free(dirPath);
-				free(pattern);
+				if (dirPath) free(dirPath);
+				if (pattern) free(pattern);
 				return FR_INT_ERR;
 			}
         }
@@ -697,8 +697,8 @@ int mos_cmdDEL(char * ptr) {
 	}
 
 	cleanup:
-		free(dirPath);
-		free(pattern);
+		if (dirPath) free(dirPath);
+		if (pattern) free(pattern);
 		return fr;
 }
 
@@ -1363,6 +1363,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             filenameLength = strlen(filinfo.fname) + 1;
             fnos[fno_num].fname = malloc(filenameLength);
 			if (!fnos[fno_num].fname) {
+				// TODO if we're failing here, we need to do an alternate directory display
 				fr = FR_INT_ERR;
 				break;
 			}
@@ -1434,8 +1435,8 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
     }
 
 cleanup:
-    free(pattern);
-    free(dirPath);
+    if (pattern) free(pattern);
+    if (dirPath) free(dirPath);
     return fr;
 }
 
@@ -1536,8 +1537,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 
             if (!fullSrcPath || !fullDstPath) {
                 fr = FR_INT_ERR; // Out of memory
-                free(fullSrcPath);
-                free(fullDstPath);
+                if (fullSrcPath) free(fullSrcPath);
+                if (fullDstPath) free(fullDstPath);
                 break;
             }
 
@@ -1579,8 +1580,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    free(srcDir);
-    free(pattern);
+    if (srcDir) free(srcDir);
+    if (pattern) free(pattern);
     return fr;
 }
 
@@ -1682,8 +1683,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             f_close(&fdst);
 
         file_cleanup:
-            free(fullSrcPath);
-            free(fullDstPath);
+            if (fullSrcPath) free(fullSrcPath);
+            if (fullDstPath) free(fullDstPath);
             fullSrcPath = NULL;
             fullDstPath = NULL;
 
@@ -1730,10 +1731,10 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    free(srcDir);
-    free(pattern);
-    free(fullSrcPath);
-    free(fullDstPath);
+    if (srcDir) free(srcDir);
+    if (pattern) free(pattern);
+    if (fullSrcPath) free(fullSrcPath);
+    if (fullDstPath) free(fullDstPath);
     return fr;
 }
 
