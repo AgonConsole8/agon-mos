@@ -84,8 +84,10 @@ static t_mosCommand mosCommands[] = {
 	{ ".", 			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "CAT",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "CD", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
+	{ "CDIR", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS },
 	{ "COPY", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
+	{ "CP", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
 	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
 	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
@@ -99,7 +101,9 @@ static t_mosCommand mosCommands[] = {
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
 	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "MV",			&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
@@ -1576,6 +1580,17 @@ UINT24 mos_REN_API(char *srcPath, char *dstPath) {
 	return mos_REN(srcPath, dstPath, FALSE);
 }
 
+// Check if a path is a directory
+BOOL isDirectory(char *path) {
+	FILINFO fil;
+
+	// check if destination is a directory
+	f_stat(path, &fil);
+
+	return fil.fname[0] && (fil.fattrib & AM_DIR);
+}
+
+
 // Rename file
 // Parameters:
 // - srcPath: Source path of file to rename
@@ -1619,6 +1634,11 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
     if (usePattern) {
+		if (!isDirectory(dstPath)) {
+			fr = FR_INVALID_PARAMETER;
+			goto cleanup;
+		}
+
         fr = f_opendir(&dir, srcDir);
         if (fr != FR_OK) goto cleanup;
 
@@ -1653,12 +1673,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
         f_closedir(&dir);
 		
     } else {
-		FILINFO fil;
-
-		// check if destination is a directory
-		f_stat(dstPath, &fil);
-
-		if (fil.fname[0] && (fil.fattrib & AM_DIR)) {
+		if (isDirectory(dstPath)) {
 			// copy into a directory, keeping name
 			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
 			fullDstPath = malloc(fullDstPathLen);
@@ -1740,6 +1755,10 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
     if (usePattern) {
+		if (!isDirectory(dstPath)) {
+			fr = FR_INVALID_PARAMETER;
+			goto cleanup;
+		}
         fr = f_opendir(&dir, srcDir);
         if (fr != FR_OK) goto cleanup;
 
@@ -1794,18 +1813,20 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         if (!fullDstPath) return FR_INT_ERR;
         srcFilename = strrchr(srcPath, '/');
         srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
-        sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
+		if (isDirectory(dstPath)) {
+			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
+		} else {
+			strcpy(fullDstPath, dstPath);
+		}
 
         fr = f_open(&fsrc, srcPath, FA_READ);
         if (fr != FR_OK) {
-            free(fullDstPath);
-            return fr;
+			goto cleanup;
         }
         fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
         if (fr != FR_OK) {
             f_close(&fsrc);
-            free(fullDstPath);
-            return fr;
+			goto cleanup;
         }
 
 		if (verbose) printf("Copying %s to %s\r\n", srcPath, fullDstPath);
@@ -1818,7 +1839,6 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 
         f_close(&fsrc);
         f_close(&fdst);
-        free(fullDstPath);
     }
 
 cleanup:
