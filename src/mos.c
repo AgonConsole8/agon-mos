@@ -1808,7 +1808,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             return fr;
         }
 
-		if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
+		if (verbose) printf("Copying %s to %s\r\n", srcPath, fullDstPath);
         while (1) {
             fr = f_read(&fsrc, buffer, sizeof(buffer), &br);
             if (br == 0 || fr != FR_OK) break;
