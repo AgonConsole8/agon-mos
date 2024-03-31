@@ -237,6 +237,10 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 			}
 
 			result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
+			if (!result) {
+				// Memory allocation failed
+				return 0;
+			}
 
 			strncpy(result, hotkey_strings[fkey], prefixLength); // Copy the portion preceding the wildcard to the buffer
 			result[prefixLength] = '\0'; // Terminate
@@ -392,8 +396,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 							} break;
 							
 							case 0x09: if (enableTab) { // Tab
-								char *search_term;
-								char *path;
+								char *search_term = NULL;
+								char *path = NULL;
 
 								FRESULT fr;
 								DIR dj;
@@ -406,6 +410,10 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								if (lastSlash == NULL && lastSpace == NULL) { //Try commands first before fatfs completion
 									
 									search_term = (char*) malloc(strlen(buffer) + 6);
+									if (!search_term) {
+										// malloc failed, so no tab completion for us today
+										break;
+									}
 									
 									strcpy(search_term, buffer);
 									strcat(search_term, ".");
