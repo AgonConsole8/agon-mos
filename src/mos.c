@@ -409,7 +409,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					}
 				}				
 
-				if (fr == FR_NO_FILE) {
+				if (fr == FR_NO_FILE || fr == FR_NO_PATH) {
 					return FR_MOS_INVALID_COMMAND;
 				}
 			}
@@ -1244,6 +1244,63 @@ UINT24 mos_DIR_API(char* inputPath) {
     return mos_DIR(inputPath, TRUE);
 }
 
+UINT24	mos_DIRFallback(char * path, BOOL longListing, BOOL hideVolumeInfo) {
+	FRESULT	fr;
+	DIR	  	dir;
+	static 	FILINFO  fno;
+	int		yr, mo, da, hr, mi;
+	char 	str[12];
+	int 	col = 0;
+
+	if (!hideVolumeInfo) {
+		fr = f_getlabel("", str, 0);
+		if(fr != 0) {
+			return fr;
+		}	
+		printf("Volume: ");
+		if(strlen(str) > 0) {
+			printf("%s", str);
+		}
+		else {
+			printf("<No Volume Label>");
+		}
+		printf("\n\r\n\r");
+	}
+
+	fr = f_opendir(&dir, path);
+	if (fr == FR_OK) {
+		for (;;) {
+			fr = f_readdir(&dir, &fno);
+			if (fr != FR_OK || fno.fname[0] == 0) {
+				break;  // Break on error or end of dir
+			}
+			if (longListing) {
+				yr = (fno.fdate & 0xFE00) >>  9;	// Bits 15 to  9, from 1980
+				mo = (fno.fdate & 0x01E0) >>  5;	// Bits  8 to  5
+				da = (fno.fdate & 0x001F);			// Bits  4 to  0
+				hr = (fno.ftime & 0xF800) >> 11;	// Bits 15 to 11
+				mi = (fno.ftime & 0x07E0) >>  5;	// Bits 10 to  5
+
+				printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+			} else {
+				if (col + strlen(fno.fname) + 2 >= scrcols) {
+					printf("\r\n");
+					col = 0;
+				}
+                printf("%s  ", fno.fname);
+				col += strlen(fno.fname) + 2;
+			}
+		}
+	}
+	if (!longListing) {
+		printf("\r\n");
+	}
+
+	f_closedir(&dir);
+	return fr;
+}
+
+
 // Directory listing
 // Returns:
 // - FatFS return code
@@ -1273,41 +1330,57 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 
     if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
         dirPath = mos_strdup(".");
-        if (!dirPath)
+        if (!dirPath) {
+			fr = mos_DIRFallback(inputPath, longListing, FALSE);
             goto cleanup;
+		}
         pattern = mos_strdup(inputPath);
-        if (!pattern)
+        if (!pattern) {
+			fr = mos_DIRFallback(inputPath, longListing, FALSE);
             goto cleanup;
+		}
         usePattern = TRUE;
     } else if (strcmp(inputPath, ".") == 0) {
         dirPath = mos_strdup(".");
-        if (!dirPath)
+        if (!dirPath) {
+			fr = mos_DIRFallback(inputPath, longListing, FALSE);
             goto cleanup;
+		}
     } else if (inputPath[0] == '/' && strchr(inputPath + 1, '/') == NULL) {
         dirPath = mos_strdup("/");
-        if (!dirPath)
+        if (!dirPath) {
+			fr = mos_DIRFallback(inputPath, longListing, FALSE);
             goto cleanup;
+		}
         if (strchr(inputPath + 1, '*') != NULL) {
             pattern = mos_strdup(inputPath + 1);
-            if (!pattern)
+            if (!pattern) {
+				fr = mos_DIRFallback(inputPath, longListing, FALSE);
                 goto cleanup;
+			}
             usePattern = TRUE;
         }
     } else {
         char* lastSeparator = strrchr(inputPath, '/');
         if (lastSeparator != NULL && *(lastSeparator + 1) != '\0') {
             dirPath = mos_strndup(inputPath, lastSeparator - inputPath + 1);
-            if (!dirPath)
+            if (!dirPath) {
+				fr = mos_DIRFallback(inputPath, longListing, FALSE);
                 goto cleanup;
+			}
             dirPath[lastSeparator - inputPath + 1] = '\0';
             pattern = mos_strdup(lastSeparator + 1);
-            if (!pattern)
+            if (!pattern) {
+				fr = mos_DIRFallback(inputPath, longListing, FALSE);
                 goto cleanup;
+			}
             usePattern = TRUE;
         } else {
             dirPath = mos_strdup(inputPath);
-            if (!dirPath)
+            if (!dirPath) {
+				fr = mos_DIRFallback(inputPath, longListing, FALSE);
                 goto cleanup;
+			}
         }
     }
 
@@ -1329,7 +1402,10 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 
     fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
 	// TODO rather than just bailing here, skip to alternate non-sorted method of listing
-	if (!fnos) goto cleanup;
+	if (!fnos) {
+		fr = mos_DIRFallback(inputPath, longListing, FALSE);
+		goto cleanup;
+	}
 
     fno_num = 0;
     fr = f_opendir(&dir, dirPath);
@@ -1363,9 +1439,11 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             filenameLength = strlen(filinfo.fname) + 1;
             fnos[fno_num].fname = malloc(filenameLength);
 			if (!fnos[fno_num].fname) {
-				// TODO if we're failing here, we need to do an alternate directory display
-				fr = FR_INT_ERR;
-				break;
+				fr = mos_DIRFallback(inputPath, longListing, TRUE);
+				while (fno_num > 0) {
+					free(fnos[--fno_num].fname);
+				}
+				goto cleanup;
 			}
             strcpy(fnos[fno_num].fname, filinfo.fname);
             if (filenameLength > longestFilename) {
@@ -1415,9 +1493,9 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
                 }
 
                 if (useColour) {
-                    printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, longestFilename, fno->fname);
+                    printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
                 } else {
-                    printf("%-*s", longestFilename, fno->fname);
+                    printf("%-*s", col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
                 }
                 col++;
             }
