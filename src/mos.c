@@ -1320,7 +1320,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
     BYTE           textFg = 15;
     BYTE           dirColour = 2;
     BYTE           fileColour = 15;
-    SmallFilInfo * fnos, *fno;
+    SmallFilInfo * fnos = NULL, *fno = NULL;
     int            num_dirents, fno_num;
 
     fr = f_getlabel("", str, 0);
@@ -1395,18 +1395,6 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
         }
     }
 
-    fr = get_num_dirents(dirPath, &num_dirents);
-
-    if (num_dirents == 0)
-        return fr;
-
-    fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
-	// TODO rather than just bailing here, skip to alternate non-sorted method of listing
-	if (!fnos) {
-		fr = mos_DIRFallback(inputPath, longListing, FALSE);
-		goto cleanup;
-	}
-
     fno_num = 0;
     fr = f_opendir(&dir, dirPath);
 
@@ -1424,6 +1412,19 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             printf("Directory: %s\r\n\r\n", cwd);
         } else
             printf("Directory: %s\r\n\r\n", dirPath);
+
+		fr = get_num_dirents(dirPath, &num_dirents);
+
+		if (num_dirents == 0) {
+			printf("No files found\r\n");
+			goto cleanup;
+		}
+
+		fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
+		if (!fnos) {
+			fr = mos_DIRFallback(inputPath, longListing, FALSE);
+			goto cleanup;
+		}
 
         if (usePattern) {
             fr = f_findfirst(&dir, &filinfo, dirPath, pattern);
