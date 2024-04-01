@@ -170,6 +170,16 @@ $$:			push af 		; Stack AF, will store later as __c_startup clears globals area
 			LD	A, GPIOMODE_INTRE
 			LD	B, 2
 			CALL	GPIOB_SETMODE
+
+; Protect flash pages by default
+			
+			LD        A, b6h    ; unlock
+			OUT0    (F5h), A
+			LD        A, 49h
+			OUT0    (F5h), A
+			LD        A, ffh    ; protect all pages
+			OUT0    (FAh), A			
+
 ;
 ; Start application
 ;
