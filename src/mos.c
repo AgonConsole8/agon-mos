@@ -1191,6 +1191,22 @@ UINT24	mos_CD(char *path) {
 	return fr;
 }
 
+
+// Check if a path is a directory
+BOOL isDirectory(char *path) {
+	FILINFO fil;
+	FRESULT fr;
+
+	if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0) {
+		return TRUE;
+	}
+
+	// check if destination is a directory
+	fr = f_stat(path, &fil);
+
+	return (fr == FR_OK) && fil.fname[0] && (fil.fattrib & AM_DIR);
+}
+
 static UINT24 get_num_dirents(const char* path, int* cnt) {
     FRESULT        fr;
     DIR            dir;
@@ -1422,7 +1438,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 
 		fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
 		if (!fnos) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
+			fr = mos_DIRFallback(inputPath, longListing, TRUE);
 			goto cleanup;
 		}
 
@@ -1461,16 +1477,16 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             if (!usePattern && filinfo.fname[0] == 0)
                 break;
         }
-    }
+	}
     f_closedir(&dir);
 
-    num_dirents = fno_num;
-    qsort(fnos, num_dirents, sizeof(SmallFilInfo), cmp_filinfo);
-
     if (fr == FR_OK) {
-        int fno_num = 0;
         int col = 0;
         int maxCols = scrcols / longestFilename;
+
+		num_dirents = fno_num;
+		qsort(fnos, num_dirents, sizeof(SmallFilInfo), cmp_filinfo);
+        fno_num = 0;
 
         for (; fno_num < num_dirents; fno_num++) {
             fno = &fnos[fno_num];
@@ -1545,16 +1561,6 @@ UINT24 mos_REN_API(char *srcPath, char *dstPath) {
 	return mos_REN(srcPath, dstPath, FALSE);
 }
 
-// Check if a path is a directory
-BOOL isDirectory(char *path) {
-	FILINFO fil;
-
-	// check if destination is a directory
-	f_stat(path, &fil);
-
-	return fil.fname[0] && (fil.fattrib & AM_DIR);
-}
-
 
 // Rename file
 // Parameters:
@@ -1593,8 +1599,6 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
         }
         usePattern = TRUE;
     } else {
-        srcDir = mos_strdup(srcPath);
-        if (!srcDir) return FR_INT_ERR; // Out of memory
         usePattern = FALSE;
     }
 
