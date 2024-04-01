@@ -32,6 +32,7 @@
 #include <eZ80.h>
 #include <defines.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <CTYPE.h>
 #include <String.h>
 
@@ -147,6 +148,7 @@ void bootmsg(void) {
 //
 int main(void) {
 	UART 	pUART0;
+	void *  empty = NULL;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -164,6 +166,9 @@ int main(void) {
 	if(coldBoot == 0) {								// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
+
+	empty = malloc(1000);							// Allocate some memory to ensure the heap is initialised
+	free(empty);									// Free the memory
 
 	scrcolours = 0;
 	scrpixelIndex = 255;

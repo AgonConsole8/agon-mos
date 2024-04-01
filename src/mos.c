@@ -1433,7 +1433,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 
 		fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
 		if (!fnos) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
+			fr = mos_DIRFallback(inputPath, longListing, TRUE);
 			goto cleanup;
 		}
 
