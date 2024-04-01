@@ -1418,12 +1418,6 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
         }
         printf("\n\r");
 
-		if (!isDirectory(dirPath)) {
-			// belt & braces - detects false positive f_opendir in emulator
-			fr = FR_NO_PATH;
-			goto cleanup;
-		}
-
         if (strcmp(dirPath, ".") == 0) {
             f_getcwd(cwd, sizeof(cwd));
             printf("Directory: %s\r\n\r\n", cwd);
