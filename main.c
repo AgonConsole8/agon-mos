@@ -167,8 +167,11 @@ int main(void) {
 		putch(12);									// Clear the screen
 	}
 
-	empty = malloc(1000);							// Allocate some memory to ensure the heap is initialised
+	empty = malloc(8088);							// Allocate some memory to ensure the heap is initialised
 	free(empty);									// Free the memory
+	if (empty == NULL) {
+		printf("Memory allocation failed\n\r");
+	}
 
 	scrcolours = 0;
 	scrpixelIndex = 255;
