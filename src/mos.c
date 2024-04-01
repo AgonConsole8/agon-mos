@@ -1197,9 +1197,9 @@ BOOL isDirectory(char *path) {
 	FILINFO fil;
 
 	// check if destination is a directory
-	f_stat(path, &fil);
+	FRESULT fr = f_stat(path, &fil);
 
-	return fil.fname[0] && (fil.fattrib & AM_DIR);
+	return fr == FR_OK && fil.fname[0] && (fil.fattrib & AM_DIR);
 }
 
 static UINT24 get_num_dirents(const char* path, int* cnt) {
