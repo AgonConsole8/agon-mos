@@ -1195,11 +1195,16 @@ UINT24	mos_CD(char *path) {
 // Check if a path is a directory
 BOOL isDirectory(char *path) {
 	FILINFO fil;
+	FRESULT fr;
+
+	if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0) {
+		return TRUE;
+	}
 
 	// check if destination is a directory
-	FRESULT fr = f_stat(path, &fil);
+	fr = f_stat(path, &fil);
 
-	return fr == FR_OK && fil.fname[0] && (fil.fattrib & AM_DIR);
+	return (fr == FR_OK) && fil.fname[0] && (fil.fattrib & AM_DIR);
 }
 
 static UINT24 get_num_dirents(const char* path, int* cnt) {
