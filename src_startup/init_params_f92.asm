@@ -160,6 +160,20 @@ __init:			ld a, %FF
 			jr z, $F
 			dec a			; Otherwise set to 0
 $$:			push af 		; Stack AF, will store later as __c_startup clears globals area
+
+; Clear external memory
+			ld hl, 40000h
+			ld de, 40001h
+			ld bc, 80000h - 1
+			ld (hl), ffh
+			ldir
+; Clear internal memory
+			ld hl,b7e000h
+			ld de,b7e001h
+			ld bc,  2000h - 1
+			ld (hl), ffh
+			ldir
+
 ;
 ; Initialize the interrupt vector table
 ;
@@ -213,5 +227,6 @@ _abort:			jr $                	; If we return from main loop forever here
 			XDEF _SysClkFreq
 
 _SysClkFreq:		DL _SYS_CLK_FREQ
-			
+
+	
 			END
