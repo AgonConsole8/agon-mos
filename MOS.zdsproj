@@ -32,6 +32,7 @@
 <file filter-key="">src\defines.h</file>
 <file filter-key="">src\i2c.c</file>
 <file filter-key="">src\strings.c</file>
+<file filter-key="">src\umm_malloc.c</file>
 </files>
 
 <!-- configuration information -->
@@ -137,7 +138,7 @@
 <option name="useadddirectives" type="boolean" change-action="build">false</option>
 <option name="linkconfig" type="string" change-action="build">Standard</option>
 <option name="flashinfo" type="string" change-action="build">000000-0000FF</option>
-<option name="ram" type="string" change-action="build">0BC000-0BFFFF</option>
+<option name="ram" type="string" change-action="build">0B8000-0BFFFF</option>
 <option name="rom" type="string" change-action="build">000000-01FFFF</option>
 <option name="extio" type="string" change-action="build">000000-00FFFF</option>
 <option name="intio" type="string" change-action="build">000000-0000FF</option>

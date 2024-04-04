@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "umm_malloc.h"
 
 int strcasecmp(const char *s1, const char *s2)
 {
@@ -35,7 +36,7 @@ size_t mos_strnlen(const char *s, size_t maxlen) {
 
 //Alternative to missing strdup() in ZDS libraries
 char *mos_strdup(const char *s) {
-    char *d = malloc(strlen(s) + 1);  // Allocate memory
+    char *d = umm_malloc(strlen(s) + 1);  // Allocate memory
     if (d != NULL) strcpy(d, s);      // Copy the string
     return d;
 }
@@ -43,7 +44,7 @@ char *mos_strdup(const char *s) {
 //Alternative to missing strndup() in ZDS libraries
 char *mos_strndup(const char *s, size_t n) {
     size_t len = mos_strnlen(s, n);
-    char *d = malloc(len + 1);  // Allocate memory for length plus null terminator
+    char *d = umm_malloc(len + 1);  // Allocate memory for length plus null terminator
 
     if (d != NULL) {
         strncpy(d, s, len);  // Copy up to len characters

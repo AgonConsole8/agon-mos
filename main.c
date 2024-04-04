@@ -47,6 +47,7 @@
 #include "mos_editor.h"
 #include "mos.h"
 #include "i2c.h"
+#include "umm_malloc.h"
 
 extern BYTE scrcolours, scrpixelIndex;  // In globals.asm
 
@@ -144,11 +145,15 @@ void bootmsg(void) {
 	#endif
 }
 
+
+//extern UINT24 bottom;
+extern void _heapbot[];
+
 // The main loop
 //
 int main(void) {
 	UART 	pUART0;
-	void *  empty = NULL;
+	//void *  empty = NULL;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -167,11 +172,7 @@ int main(void) {
 		putch(12);									// Clear the screen
 	}
 
-	empty = malloc(4004);							// Allocate some memory to ensure the heap is initialised
-	free(empty);									// Free the memory
-	if (empty == NULL) {
-		printf("Memory allocation failed\n\r");
-	}
+	umm_init_heap((void*)_heapbot, 8192);
 
 	scrcolours = 0;
 	scrpixelIndex = 255;

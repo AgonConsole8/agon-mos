@@ -52,6 +52,7 @@
 #include "clock.h"
 #include "ff.h"
 #include "strings.h"
+#include "umm_malloc.h"
 
 char  	cmd[256];				// Array for the command line handler
 
@@ -488,7 +489,7 @@ int mos_cmdHOTKEY(char *ptr) {
 
 	if (strlen(mos_strtok_ptr) < 1) {		
 		if (hotkey_strings[fn_number - 1] != NULL) {
-			free(hotkey_strings[fn_number - 1]);
+			umm_free(hotkey_strings[fn_number - 1]);
 			hotkey_strings[fn_number - 1] = NULL;
 			printf("F%u cleared.\r\n", fn_number);
 		} else printf("F%u already clear, no hotkey command provided.\r\n", fn_number);
@@ -501,9 +502,9 @@ int mos_cmdHOTKEY(char *ptr) {
 		mos_strtok_ptr++;		
 	}
 
-	if (hotkey_strings[fn_number - 1] != NULL) free(hotkey_strings[fn_number - 1]);
+	if (hotkey_strings[fn_number - 1] != NULL) umm_free(hotkey_strings[fn_number - 1]);
 
-	hotkey_strings[fn_number - 1] = malloc((strlen(mos_strtok_ptr) + 1) * sizeof(char));
+	hotkey_strings[fn_number - 1] = umm_malloc((strlen(mos_strtok_ptr) + 1) * sizeof(char));
 	if (!hotkey_strings[fn_number - 1]) return FR_INT_ERR;
 	strncpy(hotkey_strings[fn_number - 1], mos_strtok_ptr, strlen(mos_strtok_ptr));
 	hotkey_strings[fn_number - 1][strlen(mos_strtok_ptr)] = '\0';
@@ -627,15 +628,15 @@ int mos_cmdDEL(char * ptr) {
 
 			pattern = mos_strdup(lastSeparator + 1);
 			if (!pattern) {
-				free(dirPath);
+				umm_free(dirPath);
 				return FR_INT_ERR;
 			}
         } else {
 			dirPath = mos_strdup(".");
 			pattern = mos_strdup(filename);
 			if (!dirPath || !pattern) {
-				if (dirPath) free(dirPath);
-				if (pattern) free(pattern);
+				if (dirPath) umm_free(dirPath);
+				if (pattern) umm_free(pattern);
 				return FR_INT_ERR;
 			}
         }
@@ -651,7 +652,7 @@ int mos_cmdDEL(char * ptr) {
 		fr = f_findfirst(&dir, &fno, dirPath, pattern);
 		while (fr == FR_OK && fno.fname[0] != '\0') {
 			size_t fullPathLen = strlen(dirPath) + strlen(fno.fname) + 2;
-			char *fullPath = malloc(fullPathLen);
+			char *fullPath = umm_malloc(fullPathLen);
 			if (!fullPath) {
 				fr = FR_INT_ERR;
 				break;
@@ -668,7 +669,7 @@ int mos_cmdDEL(char * ptr) {
 				if (retval == 13) {
 					if (strcasecmp(verify, "Cancel") == 0 || strcasecmp(verify, "C") == 0) {
 						printf("Cancelled.\r\n");
-						free(fullPath);
+						umm_free(fullPath);
 						break;
 					}
 					if (strcasecmp(verify, "Yes") == 0 || strcasecmp(verify, "Y") == 0) {
@@ -677,14 +678,14 @@ int mos_cmdDEL(char * ptr) {
 					}
 				} else {
 					printf("Cancelled.\r\n");
-					free(fullPath);
+					umm_free(fullPath);
 					break;
 				}
 			} else {
 				printf("Deleting %s\r\n", fullPath);
 				fr = f_unlink(fullPath);
 			}
-			free(fullPath);
+			umm_free(fullPath);
 
 			if (fr != FR_OK) break;
 			fr = f_findnext(&dir, &fno);
@@ -697,8 +698,8 @@ int mos_cmdDEL(char * ptr) {
 	}
 
 	cleanup:
-		if (dirPath) free(dirPath);
-		if (pattern) free(pattern);
+		if (dirPath) umm_free(dirPath);
+		if (pattern) umm_free(pattern);
 		return fr;
 }
 
@@ -1239,7 +1240,7 @@ typedef struct SmallFilInfo {
     WORD    fdate;   /* Modified date */
     WORD    ftime;   /* Modified time */
     BYTE    fattrib; /* File attribute */
-    char*   fname;   /* malloc'ed */
+    char*   fname;   /* umm_malloc'ed */
 } SmallFilInfo;
 
 static int cmp_filinfo(const SmallFilInfo* a, const SmallFilInfo* b) {
@@ -1436,7 +1437,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 			goto cleanup;
 		}
 
-		fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
+		fnos = umm_malloc(sizeof(SmallFilInfo) * num_dirents);
 		if (!fnos) {
 			fr = mos_DIRFallback(inputPath, longListing, TRUE);
 			goto cleanup;
@@ -1454,11 +1455,11 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             fnos[fno_num].ftime = filinfo.ftime;
             fnos[fno_num].fattrib = filinfo.fattrib;
             filenameLength = strlen(filinfo.fname) + 1;
-            fnos[fno_num].fname = malloc(filenameLength);
+            fnos[fno_num].fname = umm_malloc(filenameLength);
 			if (!fnos[fno_num].fname) {
 				fr = mos_DIRFallback(inputPath, longListing, TRUE);
 				while (fno_num > 0) {
-					free(fnos[--fno_num].fname);
+					umm_free(fnos[--fno_num].fname);
 				}
 				goto cleanup;
 			}
@@ -1516,22 +1517,22 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
                 }
                 col++;
             }
-            free(fno->fname);
+            umm_free(fno->fname);
         }
     }
 
     if (!longListing) {
         printf("\r\n");
     }
-    free(fnos);
+    umm_free(fnos);
 
     if (useColour) {
         printf("\x11%c", textFg);
     }
 
 cleanup:
-    if (pattern) free(pattern);
-    if (dirPath) free(dirPath);
+    if (pattern) umm_free(pattern);
+    if (dirPath) umm_free(dirPath);
     return fr;
 }
 
@@ -1615,13 +1616,13 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
         while (fr == FR_OK && fno.fname[0] != '\0') {
             size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
             size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-			fullSrcPath = malloc(srcPathLen);
-            fullDstPath = malloc(dstPathLen);
+			fullSrcPath = umm_malloc(srcPathLen);
+            fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
                 fr = FR_INT_ERR; // Out of memory
-                if (fullSrcPath) free(fullSrcPath);
-                if (fullDstPath) free(fullDstPath);
+                if (fullSrcPath) umm_free(fullSrcPath);
+                if (fullDstPath) umm_free(fullDstPath);
                 break;
             }
 
@@ -1630,8 +1631,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 
             if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
 			fr = f_rename(fullSrcPath, fullDstPath);
-            free(fullSrcPath);
-            free(fullDstPath);
+            umm_free(fullSrcPath);
+            umm_free(fullDstPath);
             fullSrcPath = NULL;
             fullDstPath = NULL;
 
@@ -1645,7 +1646,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 		if (isDirectory(dstPath)) {
 			// copy into a directory, keeping name
 			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-			fullDstPath = malloc(fullDstPathLen);
+			fullDstPath = umm_malloc(fullDstPathLen);
 			if (!fullDstPath) {
 				fr = FR_INT_ERR;
 				goto cleanup;
@@ -1655,7 +1656,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
 
 			fr = f_rename(srcPath, fullDstPath);
-			free(fullDstPath);
+			umm_free(fullDstPath);
 		} else {
 			fr = f_rename(srcPath, dstPath);
 		}
@@ -1663,8 +1664,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    if (srcDir) free(srcDir);
-    if (pattern) free(pattern);
+    if (srcDir) umm_free(srcDir);
+    if (pattern) umm_free(pattern);
     return fr;
 }
 
@@ -1735,8 +1736,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         while (fr == FR_OK && fno.fname[0] != '\0') {
             size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
             size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-            fullSrcPath = malloc(srcPathLen);
-            fullDstPath = malloc(dstPathLen);
+            fullSrcPath = umm_malloc(srcPathLen);
+            fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
                 fr = FR_INT_ERR;
@@ -1766,8 +1767,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             f_close(&fdst);
 
         file_cleanup:
-            if (fullSrcPath) free(fullSrcPath);
-            if (fullDstPath) free(fullDstPath);
+            if (fullSrcPath) umm_free(fullSrcPath);
+            if (fullDstPath) umm_free(fullDstPath);
             fullSrcPath = NULL;
             fullDstPath = NULL;
 
@@ -1778,7 +1779,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         f_closedir(&dir);
     } else {
         size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-        fullDstPath = malloc(fullDstPathLen);
+        fullDstPath = umm_malloc(fullDstPathLen);
         if (!fullDstPath) {
 			fr = FR_INT_ERR;
 			goto cleanup;
@@ -1814,10 +1815,10 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    if (srcDir) free(srcDir);
-    if (pattern) free(pattern);
-    if (fullSrcPath) free(fullSrcPath);
-    if (fullDstPath) free(fullDstPath);
+    if (srcDir) umm_free(srcDir);
+    if (pattern) umm_free(pattern);
+    if (fullSrcPath) umm_free(fullSrcPath);
+    if (fullDstPath) umm_free(fullDstPath);
     return fr;
 }
 
