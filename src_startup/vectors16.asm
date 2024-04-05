@@ -34,6 +34,7 @@
 			XDEF	__1st_jump_table
 			XDEF	__vector_table
 			
+			XREF	_on_crash
 			XREF	mos_api
 			XREF	UART0_serial_PUTCH 
 			XREF	SET_AHL24
@@ -84,8 +85,8 @@ _rst28:			RET
 _rst30:			RET
 			DS	7
 
-_rst38:			RET
-			DS 	%2D
+_rst38:			JP.LIL	__rst_38_handler
+			DS 	%29
 		
 _nmi:			JP.LIL	__default_nmi_handler
 
@@ -152,6 +153,9 @@ _rst_18_handler_1:	LD 	A, (HL)			; Fetch the character
 			CALL	UART0_serial_PUTCH	; Output
 			INC 	HL 			; Increment the buffer pointer
 			JR 	_rst_18_handler_1	; Loop
+
+; Crash handler
+__rst_38_handler:	JP	_on_crash
 
 ; Default Non-Maskable Interrupt handler
 ;
