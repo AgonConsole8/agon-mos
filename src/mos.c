@@ -142,6 +142,7 @@ static char * mos_errors[] = {
 	"Invalid executable",
 	"Out of memory",
 	"Not implemented",
+	"Load overlaps system area",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))
@@ -395,21 +396,28 @@ int mos_exec(char * buffer, BOOL in_mos) {
 				if (fr == FR_OK) {
 					return mos_runBin(MOS_starLoadAddress);
 				}
-
+				if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+					return fr;
+				}
+				
 				if (in_mos) {
 					sprintf(path, "%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
-					}				
-					
+					}
+					if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+						return fr;
+					}
 					sprintf(path, "/bin/%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
 					}
+					if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+						return fr;
+					}
 				}				
-
 				if (fr == FR_NO_FILE || fr == FR_NO_PATH) {
 					return FR_MOS_INVALID_COMMAND;
 				}
@@ -1120,7 +1128,12 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	fr = f_open(&fil, filename, FA_READ);
 	if(fr == FR_OK) {
 		fSize = f_size(&fil);
-		fr = f_read(&fil, (void *)address, fSize, &br);		
+		if((address <= MOS_externLastRAMaddress) && ((address + fSize) > MOS_systemAddress)) {
+			fr = FR_MOS_OVERLAPPING_SYSTEM;
+		}
+		else {
+			fr = f_read(&fil, (void *)address, fSize, &br);		
+		}		
 	}
 	f_close(&fil);	
 	return fr;
