@@ -1114,7 +1114,7 @@ int mos_cmdHELP(char *ptr) {
 // Parameters:
 // - filename: Path of file to load
 // - address: Address in RAM to load the file into
-// - size: Number of bytes to load
+// - size: Number of bytes to load, 0 for maximum file size
 // Returns:
 // - FatFS return code
 // 
@@ -1128,11 +1128,20 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	fr = f_open(&fil, filename, FA_READ);
 	if(fr == FR_OK) {
 		fSize = f_size(&fil);
-		if((address <= MOS_externLastRAMaddress) && ((address + fSize) > MOS_systemAddress)) {
+		if(size) {
+			// Maximize load according to size parameter
+			if(fSize < size) size = fSize;
+		}
+		else {
+			// Load the full file size
+			size = fSize;
+		}
+		// Check potential system area overlap
+		if((address <= MOS_externLastRAMaddress) && ((address + size) > MOS_systemAddress)) {
 			fr = FR_MOS_OVERLAPPING_SYSTEM;
 		}
 		else {
-			fr = f_read(&fil, (void *)address, fSize, &br);		
+			fr = f_read(&fil, (void *)address, size, &br);		
 		}		
 	}
 	f_close(&fil);	
