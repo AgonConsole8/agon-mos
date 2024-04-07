@@ -1846,9 +1846,6 @@ UINT24 mos_MKDIR(char * filename) {
 UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
 	FRESULT	fr;
 	FIL	   	fil;
-	UINT   	br;	
-	void * 	dest;
-	FSIZE_t fSize;
 	int     line =  0;
 	
 	fr = f_open(&fil, filename, FA_READ);
