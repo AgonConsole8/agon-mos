@@ -1162,9 +1162,9 @@ UINT24 mos_TYPE(char * filename) {
 	int	i;
 
 	fr = f_open(&fil, filename, FA_READ);
-	if(fr != FR_OK)
-		goto out1;
-
+	if(fr != FR_OK) {
+		return fr;
+	}
 	while (1) {
 		fr = f_read(&fil, (void *)buf, sizeof buf, &br);
 		if (br == 0)
@@ -1172,10 +1172,8 @@ UINT24 mos_TYPE(char * filename) {
 		for (i = 0; i < br; ++i)
 			putchar(buf[i]);
 	}
-
 	f_close(&fil);
-out1:
-	return fr;
+	return 0;
 }
 
 // Change directory
