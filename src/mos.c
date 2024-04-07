@@ -1057,7 +1057,6 @@ void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 //
 int mos_cmdHELP(char *ptr) {
 	int i;
-	int found = 0;
 	char *cmd;
 
 	BOOL hasCmd = mos_parseString(NULL, &cmd);
