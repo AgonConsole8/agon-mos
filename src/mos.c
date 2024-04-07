@@ -727,13 +727,10 @@ int mos_cmdJMP(char *ptr) {
 //
 int mos_cmdRUN(char *ptr) {
 	UINT24 	addr;
-	UINT8	mode;
-	void (* dest)(void) = 0;
 	
 	if(!mos_parseNumber(NULL, &addr)) {
 		addr = MOS_defaultLoadAddress;
 	}
-	mode = mos_execMode((UINT8 *)addr);
 	return mos_runBin(addr);
 }
 
