@@ -976,7 +976,6 @@ int mos_cmdCREDITS(char *ptr) {
 int mos_cmdTYPE(char * ptr) {
 	FRESULT	fr;
 	char *  filename;
-	UINT24 	addr;
 
 	if(!mos_parseString(NULL, &filename))
 		return FR_INVALID_PARAMETER;
