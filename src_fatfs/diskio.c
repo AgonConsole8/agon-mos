@@ -10,6 +10,7 @@
  * Modinfo:
  * 11/07/2023:		Tweaked to compile without ZDL enabled in project settings
  * 15/03/2023:		Added get_fattime
+ * 10/05/2024:		Fixed get_fattime for new RTC format.
  */
 
 #include "ff.h"			// Obtains integer types
@@ -108,16 +109,17 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff) {
 //
 DWORD get_fattime(void) {
 	DWORD	yr, mo, da, hr, mi, se;
-	BYTE *	p = &rtc;
-
+	vdp_time_t tstruct;
+	
 	rtc_update();
-
-	yr =  *(p+0)    << 25;
-	mo = (*(p+1)+1) << 21;
-	da =  *(p+2)    << 16;
-	hr =  *(p+5)    << 11;
-	mi =  *(p+6)    <<  5;
-	se =  *(p+7)    >>  1;
+	rtc_unpack(&rtc, &tstruct);
+	
+	yr =  (tstruct.year - EPOCH_YEAR) << 25;
+	mo =  (tstruct.month + 1) << 21;
+	da =  tstruct.day         << 16;
+	hr =  tstruct.hour        << 11;
+	mi =  tstruct.minute      <<  5;
+	se =  tstruct.second      >>  1;
 
 	return se | mi | hr | da | mo | yr;
 }
