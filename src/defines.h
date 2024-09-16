@@ -15,6 +15,19 @@
 
 #define	DEBUG					0			// Set to 0 for production, 1 for extra debug information
 
+// ZDS segment stuff
+extern void _heapbot[];
+extern void _heaptop[];
+extern void _stack[];
+extern void _low_data[];
+extern void _low_bss[];
+extern void _low_romdata[];
+extern int _len_data;
+
+
+#define SPL_STACK_SIZE				1024
+#define HEAP_LEN ((int)_stack - (int)_heapbot - SPL_STACK_SIZE)
+
 // VDP specific (for VDU 23,0,n commands)
 //
 #define VDP_gp			 		0x80

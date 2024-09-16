@@ -172,7 +172,7 @@ int main(void) {
 		putch(12);									// Clear the screen
 	}
 
-	umm_init_heap((void*)_heapbot, 8192);
+	umm_init_heap((void*)_heapbot, HEAP_LEN);
 
 	scrcolours = 0;
 	scrpixelIndex = 255;
