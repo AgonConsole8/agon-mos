@@ -124,7 +124,7 @@ static UINT16 umm_blocks(UINT24 size) {
      * a UINT16.
      */
 
-	bodysize = sizeof(UMM_BLOCK_BODY_SIZE - sizeof(struct umm_ptr_t));
+	bodysize = UMM_BLOCK_BODY_SIZE - sizeof(struct umm_ptr_t);
     if(sizeof(umm_ptr) > bodysize) {
         // Long live the ZDS C compiler for not supporting sizeof(union member in a struct)
         bodysize = sizeof(umm_ptr);
@@ -159,8 +159,8 @@ static UINT16 umm_blocks(UINT24 size) {
 
     blocks = (2 + ((size - 1) / (UMM_BLOCKSIZE)));
 
-    if (blocks > (65535)) {
-        blocks = 65535;
+    if (blocks > (32767)) {
+        blocks = 32767;
     }
 
     return (UINT16)blocks;
@@ -265,7 +265,7 @@ void umm_multi_init_heap(umm_heap *heap, void *ptr, UINT24 size) {
     /* init heap pointer and size, and memset it to 0 */
     heap->pheap = ptr;
     UMM_HEAPSIZE = size;
-    heap->heap_size = heap->heap_size / sizeof(umm_block); // ZDS wouldn't correctly process this with a macro 
+    UMM_NUMBLOCKS = (UMM_HEAPSIZE / UMM_BLOCKSIZE);
     memset(UMM_HEAP, 0x00, UMM_HEAPSIZE);
 
     /* setup initial blank heap structure */
