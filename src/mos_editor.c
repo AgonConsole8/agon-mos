@@ -26,6 +26,7 @@
 #include "uart.h"
 #include "timer.h"
 #include "mos_editor.h"
+#include "umm_malloc.h"
 
 extern volatile BYTE vpd_protocol_flags;		// In globals.asm
 extern volatile BYTE keyascii;					// In globals.asm
@@ -236,7 +237,7 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 				return 0;
 			}
 
-			result = malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
+			result = umm_malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
 			if (!result) {
 				// Memory allocation failed
 				return 0;
@@ -252,7 +253,7 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 			strcpy(buffer, result);
 			printf("%s", buffer);
 
-			free(result);
+			umm_free(result);
 		}
 		return 1;
 		// Key was present, so drop through to ASCII key handling
@@ -409,9 +410,9 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								
 								if (lastSlash == NULL && lastSpace == NULL) { //Try commands first before fatfs completion
 									
-									search_term = (char*) malloc(strlen(buffer) + 6);
+									search_term = (char*) umm_malloc(strlen(buffer) + 6);
 									if (!search_term) {
-										// malloc failed, so no tab completion for us today
+										// umm_malloc failed, so no tab completion for us today
 										break;
 									}
 									
@@ -426,7 +427,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 										strcat(buffer, " ");
 										len = strlen(buffer);
 										insertPos = strlen(buffer);										
-										free(search_term);										
+										umm_free(search_term);										
 										break;
 										
 									}
@@ -441,7 +442,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 										strcat(buffer, " ");
 										len = strlen(buffer);
 										insertPos = strlen(buffer);										
-										free(search_term);
+										umm_free(search_term);
 										break;
 										
 									}
@@ -454,7 +455,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 										strcat(buffer, " ");
 										len = strlen(buffer);
 										insertPos = strlen(buffer);										
-										free(search_term);
+										umm_free(search_term);
 										break;									
 									}									
 									
@@ -466,7 +467,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 										strcat(buffer, " ");
 										len = strlen(buffer);
 										insertPos = strlen(buffer);										
-										free(search_term);
+										umm_free(search_term);
 										break;									
 									}
 								}
@@ -482,7 +483,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 										pathLength = lastSlash - lastSpace;
 									}
 
-									path = (char*) malloc(pathLength + 1); // +1 for null terminator
+									path = (char*) umm_malloc(pathLength + 1); // +1 for null terminator
 									if (path == NULL) {
 										break;
 									}
@@ -494,20 +495,20 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 									if (lastSpace != NULL && lastSpace > lastSlash) {
 										searchTermStart = lastSpace + 1;
 									}
-									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
+									search_term = (char*) umm_malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
 								} else {
-									path = (char*) malloc(1);
+									path = (char*) umm_malloc(1);
 									if (path == NULL) {
 										break;
 									}
 									path[0] = '\0'; // Path is empty (current dir, essentially).
 
 									searchTermStart = lastSpace ? lastSpace + 1 : buffer;
-									search_term = (char*) malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
+									search_term = (char*) umm_malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
 								}
 
 								if (search_term == NULL) {
-									if (path) free(path);
+									if (path) umm_free(path);
 									break;
 								}
 
@@ -529,8 +530,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 
 								// Free the allocated memory
-								if (search_term) free(search_term);
-								if (path) free(path);
+								if (search_term) umm_free(search_term);
+								if (path) umm_free(path);
 							}
 							break;							
 							

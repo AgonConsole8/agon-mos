@@ -4,7 +4,7 @@
 /*------------------------------------------------------------------------*/
 
 #include "ff.h"
-
+#include "umm_malloc.h"
 
 #if FF_USE_LFN == 3	/* Dynamic memory allocation */
 
@@ -12,11 +12,11 @@
 /* Allocate a memory block                                                */
 /*------------------------------------------------------------------------*/
 
-void* ff_memalloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
+void* ff_meumm_malloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
 	UINT msize		/* Number of bytes to allocate */
 )
 {
-	return malloc(msize);	/* Allocate a new memory block with POSIX API */
+	return umm_malloc(msize);	/* Allocate a new memory block with POSIX API */
 }
 
 
@@ -24,11 +24,11 @@ void* ff_memalloc (	/* Returns pointer to the allocated memory block (null if no
 /* Free a memory block                                                    */
 /*------------------------------------------------------------------------*/
 
-void ff_memfree (
-	void* mblock	/* Pointer to the memory block to free (nothing to do if null) */
+void ff_memumm_free (
+	void* mblock	/* Pointer to the memory block to umm_free (nothing to do if null) */
 )
 {
-	free(mblock);	/* Free the memory block with POSIX API */
+	umm_free(mblock);	/* Free the memory block with POSIX API */
 }
 
 #endif
