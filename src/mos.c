@@ -70,6 +70,7 @@ static FATFS	fs;					// Handle for the file system
 static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 TCHAR cwd[256];						// Hold current working directory.
+BOOL sdcardDelay = FALSE;
 
 extern volatile BYTE history_no;
 
@@ -92,6 +93,7 @@ static t_mosCommand mosCommands[] = {
 	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
 	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "DISC",		&mos_cmdDISC,		NULL,		NULL },
 	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
@@ -99,6 +101,7 @@ static t_mosCommand mosCommands[] = {
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
     { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
+	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
 	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
@@ -443,6 +446,11 @@ UINT8 mos_execMode(UINT8 * ptr) {
 		return *(ptr+0x44);
 	}
 	return 0xFF;
+}
+
+int mos_cmdDISC(char *ptr) {
+	sdcardDelay = TRUE;
+	return 0;
 }
 
 // DIR command
@@ -963,6 +971,40 @@ int mos_cmdTIME(char *ptr) {
 	return 0;
 }
 
+extern void sysvars[];
+
+// MEM
+// Returns:
+// - MOS error code
+//
+int mos_cmdMEM(char * ptr) {
+	int try_len = HEAP_LEN;
+
+	printf("ROM      &000000-&01ffff     %2d%% used\r\n", ((int)_low_romdata) / 1311);
+	printf("USER:LO  &%06x-&%06x %6d bytes\r\n", 0x40000, (int)_low_data-1, (int)_low_data - 0x40000);
+	// data and bss together
+	printf("MOS:DATA &%06x-&%06x %6d bytes\r\n", _low_data, (int)_heapbot - 1, (int)_heapbot - (int)_low_data);
+	printf("MOS:HEAP &%06x-&%06x %6d bytes\r\n", _heapbot, (int)_stack - SPL_STACK_SIZE - 1, HEAP_LEN);
+	printf("STACK24  &%06x-&%06x %6d bytes\r\n", (int)_stack - SPL_STACK_SIZE, _stack, SPL_STACK_SIZE);
+	printf("USER:HI  &b7e000-&b7ffff   8192 bytes\r\n");
+	printf("\r\n");
+
+	// find largest kmalloc contiguous region
+	for (; try_len > 0; try_len-=8) {
+		void *p = umm_malloc(try_len);
+		if (p) {
+			umm_free(p);
+			break;
+		}
+	}
+
+	printf("Largest free umm_malloc fragment: %d bytes\r\n", try_len);
+	printf("Sysvars at &%06x\r\n", sysvars);
+	printf("\r\n");
+
+	return 0;
+}
+
 // CREDITS
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -972,6 +1014,7 @@ int mos_cmdTIME(char *ptr) {
 int mos_cmdCREDITS(char *ptr) {
 	printf("FabGL 1.0.8 (c) 2019-2022 by Fabrizio Di Vittorio\n\r");
 	printf("FatFS R0.14b (c) 2021 ChaN\n\r");
+	printf("umm_malloc Copyright (c) 2015 Ralph Hempel\n\r");
 	printf("\n\r");
 	return 0;
 }
@@ -1024,6 +1067,8 @@ int	mos_cmdMOUNT(char *ptr) {
 void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 	int aliases = 0;
 	int i;
+
+	if (cmd->help == NULL) return;
 
 	printf("%s", cmd->name);
 	if (cmd->args != NULL)
@@ -1083,7 +1128,8 @@ int mos_cmdHELP(char *ptr) {
 				int maxCol = scrcols;
 				printf("List of commands:\r\n");
 				for (i = 1; i < mosCommands_count; ++i) {
-					if (col + strlen(mosCommands[i].name) + 2 > maxCol) {
+					if (mosCommands[i].help == NULL) continue;
+					if (col + strlen(mosCommands[i].name) + 2 >= maxCol) {
 						printf("\r\n");
 						col = 0;
 					}

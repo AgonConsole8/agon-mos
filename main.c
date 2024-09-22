@@ -116,6 +116,10 @@ int quickrand(void) {
 
 void rainbow_msg(char* msg) {
 	BYTE i = quickrand() & (scrcolours - 1);
+	if (strcmp(msg, "Rainbow") != 0) {
+		printf("%s", msg);
+		return;
+	}
 	if (i == 0)
 		i++;
 	for (; *msg; msg++) {
@@ -126,7 +130,9 @@ void rainbow_msg(char* msg) {
 }
 
 void bootmsg(void) {
-	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+	printf("Agon ");
+	rainbow_msg(VERSION_VARIANT);
+	printf(" MOS Version %d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 	#if VERSION_CANDIDATE > 0
 		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
 	#endif
@@ -139,6 +145,7 @@ void bootmsg(void) {
 	#ifdef VERSION_BUILD
 		printf(" Build %s", VERSION_BUILD);
 	#endif
+
 	printf("\n\r\n\r");
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);

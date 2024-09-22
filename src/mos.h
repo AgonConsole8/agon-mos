@@ -68,6 +68,7 @@ BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
 
 int		mos_cmdDIR(char * ptr);
+int		mos_cmdDISC(char *ptr);
 int		mos_cmdLOAD(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdDEL(char * ptr);
@@ -87,6 +88,7 @@ int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
+int		mos_cmdMEM(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
@@ -119,6 +121,7 @@ UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
 
 extern TCHAR	cwd[256];
+extern BOOL	sdcardDelay;
 
 UINT8	fat_EOF(FIL * fp);
 
@@ -147,6 +150,8 @@ UINT8	fat_EOF(FIL * fp);
 							"If no `addr` parameter is passed it will" \
 							"default to &40000\r\n"
 #define HELP_LOAD_ARGS		"<filename> [<addr>]"
+
+#define HELP_MEM			"Output memory statistics\r\n"
 
 #define HELP_MKDIR			"Create a new folder on the SD card\r\n"
 #define HELP_MKDIR_ARGS		"<filename>"
