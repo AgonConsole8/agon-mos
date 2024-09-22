@@ -17,6 +17,6 @@
 #define MOS_maxOpenFiles 8					// Maximum number of files that mos_FOPEN can open at the same time
 #define MOS_defaultLoadAddress	0x040000	// Default load address for LOAD and RUN commands
 #define MOS_starLoadAddress 0xB0000			// Address for loading on-SD star commands
-#define MOS_systemAddress   0xB8000
+#define MOS_systemAddress   0xBC000
 #define MOS_externLastRAMaddress 0xBFFFF
 #endif CONFIG_H
