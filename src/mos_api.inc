@@ -123,7 +123,7 @@ ffs_getcwd:		EQU	9Eh
 ;
 ffs_mount:		EQU	9Fh
 ffs_mkfs:		EQU	A0h
-ffs_fdisk		EQU	A1h
+ffs_fdisk:		EQU	A1h
 ffs_getfree:		EQU	A2h
 ffs_getlabel:		EQU	A3h
 ffs_setlabel:		EQU	A4h
