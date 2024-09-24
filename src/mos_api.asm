@@ -89,6 +89,7 @@
 			XREF	_f_write
 			XREF	_f_stat 
 			XREF	_f_lseek
+			XREF	_f_truncate
 			XREF	_f_opendir
 			XREF	_f_closedir
 			XREF	_f_readdir
@@ -1060,11 +1061,29 @@ $$:			PUSH	BC 		; FSIZE_t ofs (msb)
 			POP	BC
 			RET 
 
+; Truncate a file
+; HLU: Pointer to a FIL struct
+; Returns:
+;   A: FRESULT
+;
+ffs_api_ftruncate:	
+			LD	A, MB
+			OR	A, A 
+			JR	Z, $F
+			CALL	GET_AHL24
+			OR 	A, A 
+			LD	A, MB
+			CALL	Z, SET_AHL24
+;
+$$:			PUSH	HL		; FIL * fp
+			CALL	_f_truncate 
+			LD	A, L
+			POP	HL		
+			RET 
+
 ;		
 ; Commands that have not been implemented yet
 ;
-ffs_api_ftruncate:	
-			JP mos_api_not_implemented
 ffs_api_fsync:		
 			JP mos_api_not_implemented
 ffs_api_fforward:	
