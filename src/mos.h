@@ -89,6 +89,7 @@ int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
 int		mos_cmdMEM(char *ptr);
+int		mos_cmdECHO(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
@@ -139,6 +140,8 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
 #define HELP_DELETE_ARGS	"[-f] <filename>"
+
+#define HELP_ECHO			"Echo the command argument string to the screen\r\n"
 
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"

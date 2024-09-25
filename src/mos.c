@@ -94,6 +94,7 @@ static t_mosCommand mosCommands[] = {
 	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "DISC",		&mos_cmdDISC,		NULL,		NULL },
+	{ "ECHO",		&mos_cmdECHO,		NULL,		HELP_ECHO },
 	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
@@ -474,6 +475,71 @@ int mos_cmdDIR(char * ptr) {
 		}
 	}
 	return mos_DIR(path, longListing);
+}
+
+// Assumes isxdigit(digit)
+static int xdigit_to_int(char digit) {
+	digit = toupper(digit);
+	if (digit < 'A') {
+		return digit - '0';
+	} else {
+		return digit - 55;
+	}
+}
+
+// ECHO command
+//
+int mos_cmdECHO(char *ptr) {
+	int c;
+	const char *p = mos_strtok_ptr;
+
+	while (*p) {
+		switch (*p) {
+			case '\\': {
+				// interpret escaped characters
+				p++;
+				if (*p == '\\') {
+					putch('\\');
+					p++;
+				} else if (*p == 'r') {
+					putch('\r');
+					p++;
+				} else if (*p == 'n') {
+					putch('\n');
+					p++;
+				} else if (*p == 'f') {
+					putch(12);
+					p++;
+				} else if (*p == 't') {
+					putch('\t');
+					p++;
+				} else if (*p == 'x') {
+					p++;
+					c = 0;
+					if (isxdigit(*p)) {
+						c = xdigit_to_int(*p);
+						p++;
+						if (isxdigit(*p)) {
+							c = c * 16 + xdigit_to_int(*p);
+							p++;
+						}
+					}
+					putch(c);
+				} else {
+					// invalid. skip it entirely
+					if (*p) p++;
+				}
+				break;
+			}
+			default:
+				putch(*p);
+				p++;
+				break;
+		}
+	}
+
+
+	return 0;
 }
 
 // HOTKEY command
