@@ -53,6 +53,9 @@
 #include "ff.h"
 #include "strings.h"
 #include "umm_malloc.h"
+#if DEBUG > 0
+# include "tests.h"
+#endif /* DEBUG */
 
 char  	cmd[256];				// Array for the command line handler
 
@@ -77,6 +80,7 @@ extern volatile BYTE history_no;
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
 
 BOOL	vdpSupportsTextPalette = FALSE;
+
 
 // Array of MOS commands and pointer to the C function to run
 // NB this list is iterated over, so the order is important
@@ -115,6 +119,9 @@ static t_mosCommand mosCommands[] = {
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
+#if DEBUG > 0
+	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		NULL,		"Run the MOS OS test suite" },
+#endif /* DEBUG */
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
