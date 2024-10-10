@@ -1058,7 +1058,7 @@ int mos_cmdMEM(char * ptr) {
 	// data and bss together
 	printf("MOS:DATA &%06x-&%06x %6d bytes\r\n", _low_data, (int)_heapbot - 1, (int)_heapbot - (int)_low_data);
 	printf("MOS:HEAP &%06x-&%06x %6d bytes\r\n", _heapbot, (int)_stack - SPL_STACK_SIZE - 1, HEAP_LEN);
-	printf("STACK24  &%06x-&%06x %6d bytes\r\n", (int)_stack - SPL_STACK_SIZE, _stack, SPL_STACK_SIZE);
+	printf("STACK24  &%06x-&%06x %6d bytes\r\n", (int)_stack - SPL_STACK_SIZE, _stack-1, SPL_STACK_SIZE);
 	printf("USER:HI  &b7e000-&b7ffff   8192 bytes\r\n");
 	printf("\r\n");
 
@@ -1071,7 +1071,7 @@ int mos_cmdMEM(char * ptr) {
 		}
 	}
 
-	printf("Largest free umm_malloc fragment: %d bytes\r\n", try_len);
+	printf("Largest free MOS:HEAP fragment: %d bytes\r\n", try_len);
 	printf("Sysvars at &%06x\r\n", sysvars);
 	printf("\r\n");
 
