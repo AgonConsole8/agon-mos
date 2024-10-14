@@ -149,49 +149,49 @@ $$:			AND	7Fh			; Else remove the top bit
 			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; And switch on this table
 
-mos_api_block2_start:	DW	ffs_api_fopen
-			DW	ffs_api_fclose
-			DW	ffs_api_fread
-			DW	ffs_api_fwrite
-			DW	ffs_api_flseek
-			DW	ffs_api_ftruncate
-			DW	ffs_api_fsync
-			DW	ffs_api_fforward
-			DW	ffs_api_fexpand
-			DW	ffs_api_fgets
-			DW	ffs_api_fputc
-			DW	ffs_api_fputs
-			DW	ffs_api_fprintf
-			DW	ffs_api_ftell
-			DW	ffs_api_feof
-			DW	ffs_api_fsize
-			DW	ffs_api_ferror
-			DW	ffs_api_dopen
-			DW	ffs_api_dclose
-			DW	ffs_api_dread
-			DW	ffs_api_dfindfirst
-			DW	ffs_api_dfindnext
-			DW	ffs_api_stat
-			DW	ffs_api_unlink
-			DW	ffs_api_rename
-			DW	ffs_api_chmod
-			DW	ffs_api_utime
-			DW	ffs_api_mkdir
-			DW	ffs_api_chdir
-			DW	ffs_api_chdrive
-			DW	ffs_api_getcwd
-			DW	ffs_api_mount
-			DW	ffs_api_mkfs
-			DW	ffs_api_fdisk		
-			DW	ffs_api_getfree
-			DW	ffs_api_getlabel
-			DW	ffs_api_setlabel
-			DW	ffs_api_setcp
+mos_api_block2_start:	DW	ffs_api_fopen		; 0x80
+			DW	ffs_api_fclose		; 0x81
+			DW	ffs_api_fread		; 0x82
+			DW	ffs_api_fwrite		; 0x83
+			DW	ffs_api_flseek		; 0x84
+			DW	ffs_api_ftruncate	; 0x85
+			DW	ffs_api_fsync		; 0x86
+			DW	ffs_api_fforward	; 0x87
+			DW	ffs_api_fexpand		; 0x88
+			DW	ffs_api_fgets		; 0x89
+			DW	ffs_api_fputc		; 0x8A
+			DW	ffs_api_fputs		; 0x8B
+			DW	ffs_api_fprintf		; 0x8C
+			DW	ffs_api_ftell		; 0x8D
+			DW	ffs_api_feof		; 0x8E
+			DW	ffs_api_fsize		; 0x8F
+			DW	ffs_api_ferror		; 0x90
+			DW	ffs_api_dopen		; 0x91
+			DW	ffs_api_dclose		; 0x92
+			DW	ffs_api_dread		; 0x93
+			DW	ffs_api_dfindfirst	; 0x94
+			DW	ffs_api_dfindnext	; 0x95
+			DW	ffs_api_stat		; 0x96
+			DW	ffs_api_unlink		; 0x97
+			DW	ffs_api_rename		; 0x98
+			DW	ffs_api_chmod		; 0x99
+			DW	ffs_api_utime		; 0x9A
+			DW	ffs_api_mkdir		; 0x9B
+			DW	ffs_api_chdir		; 0x9C
+			DW	ffs_api_chdrive		; 0x9D
+			DW	ffs_api_getcwd		; 0x9E
+			DW	ffs_api_mount		; 0x9F
+			DW	ffs_api_mkfs		; 0xA0
+			DW	ffs_api_fdisk		; 0xA1
+			DW	ffs_api_getfree		; 0xA2
+			DW	ffs_api_getlabel	; 0xA3
+			DW	ffs_api_setlabel	; 0xA4
+			DW	ffs_api_setcp		; 0xA5
 
 mos_api_block2_size:	EQU 	($ - mos_api_block2_start) / 2
 
 mos_api_not_implemented:
-			LD	HL, 23			; FR_MOS_NOT_IMPLEMENTED
+			LD	HL, 23			; MOS_NOT_IMPLEMENTED
 			RET
 
 ; Get keycode
