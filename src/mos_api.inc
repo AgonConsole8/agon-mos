@@ -123,7 +123,7 @@ ffs_getcwd:		EQU	9Eh
 ;
 ffs_mount:		EQU	9Fh
 ffs_mkfs:		EQU	A0h
-ffs_fdisk		EQU	A1h
+ffs_fdisk:		EQU	A1h
 ffs_getfree:		EQU	A2h
 ffs_getlabel:		EQU	A3h
 ffs_setlabel:		EQU	A4h
@@ -174,6 +174,7 @@ sysvar_mouseButtons:	EQU	2Dh	; 1: Mouse button state
 sysvar_mouseWheel:	EQU	2Eh	; 1: Mouse wheel delta
 sysvar_mouseXDelta:	EQU	2Fh	; 2: Mouse X delta
 sysvar_mouseYDelta:	EQU	31h	; 2: Mouse Y delta
+sysvar_gp:		EQU	37h	; 1: General poll packet data
 	
 ; Flags for the VPD protocol
 ;

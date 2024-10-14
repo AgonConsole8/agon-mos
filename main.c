@@ -47,6 +47,7 @@
 #include "mos_editor.h"
 #include "mos.h"
 #include "i2c.h"
+#include "umm_malloc.h"
 
 extern BYTE scrcolours, scrpixelIndex;  // In globals.asm
 
@@ -115,6 +116,10 @@ int quickrand(void) {
 
 void rainbow_msg(char* msg) {
 	BYTE i = quickrand() & (scrcolours - 1);
+	if (strcmp(msg, "Rainbow") != 0) {
+		printf("%s", msg);
+		return;
+	}
 	if (i == 0)
 		i++;
 	for (; *msg; msg++) {
@@ -125,7 +130,9 @@ void rainbow_msg(char* msg) {
 }
 
 void bootmsg(void) {
-	printf("Agon %s MOS Version %d.%d.%d", VERSION_VARIANT, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+	printf("Agon ");
+	rainbow_msg(VERSION_VARIANT);
+	printf(" MOS Version %d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 	#if VERSION_CANDIDATE > 0
 		printf(" %s%d", VERSION_TYPE, VERSION_CANDIDATE);
 	#endif
@@ -138,17 +145,22 @@ void bootmsg(void) {
 	#ifdef VERSION_BUILD
 		printf(" Build %s", VERSION_BUILD);
 	#endif
+
 	printf("\n\r\n\r");
 	#if	DEBUG > 0
 	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
 	#endif
 }
 
+
+//extern UINT24 bottom;
+extern void _heapbot[];
+
 // The main loop
 //
 int main(void) {
 	UART 	pUART0;
-	void *  empty = NULL;
+	//void *  empty = NULL;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -167,11 +179,7 @@ int main(void) {
 		putch(12);									// Clear the screen
 	}
 
-	empty = malloc(4004);							// Allocate some memory to ensure the heap is initialised
-	free(empty);									// Free the memory
-	if (empty == NULL) {
-		printf("Memory allocation failed\n\r");
-	}
+	umm_init_heap((void*)_heapbot, HEAP_LEN);
 
 	scrcolours = 0;
 	scrpixelIndex = 255;

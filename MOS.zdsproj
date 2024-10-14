@@ -1,4 +1,4 @@
-<project type="Executable" project-type="Standard" configuration="Debug" created-by="d:5.3.0:19052909" modified-by="d:5.3.0:23020901" ZDSII="ZDSII - eZ80Acclaim! 5.3.5 (Build 23020901)">
+<project type="Executable" project-type="Standard" configuration="Release" created-by="d:5.3.0:19052909" modified-by="d:5.3.0:19052909" ZDSII="ZDSII - eZ80Acclaim! 5.3.4 (Build 19112104)">
 <cpu>eZ80F92</cpu>
 
 <!-- file information -->
@@ -22,6 +22,7 @@
 <file filter-key="">src_fatfs\ffsystem.c</file>
 <file filter-key="">src_fatfs\ffunicode.c</file>
 <file filter-key="">src\uart.c</file>
+<file filter-key="">src\tests.c</file>
 <file filter-key="">src\serial.asm</file>
 <file filter-key="">src\gpio.asm</file>
 <file filter-key="">src_startup\cstartup.asm</file>
@@ -32,6 +33,8 @@
 <file filter-key="">src\defines.h</file>
 <file filter-key="">src\i2c.c</file>
 <file filter-key="">src\strings.c</file>
+<file filter-key="">src\crash.asm</file>
+<file filter-key="">src_umm_malloc\umm_malloc.c</file>
 </files>
 
 <!-- configuration information -->
@@ -65,7 +68,7 @@
 <option name="promote" type="boolean" change-action="compile">true</option>
 <option name="reduceopt" type="boolean" change-action="compile">false</option>
 <option name="stdinc" type="string" change-action="compile"></option>
-<option name="usrinc" type="string" change-action="compile">src;src_fatfs;src_startup</option>
+<option name="usrinc" type="string" change-action="compile">src;src_fatfs;src_startup;src_umm_malloc</option>
 <option name="watch" type="boolean" change-action="none">false</option>
 <option name="multithread" type="boolean" change-action="compile">false</option>
 </options>
@@ -185,7 +188,7 @@
 <option name="promote" type="boolean" change-action="compile">true</option>
 <option name="reduceopt" type="boolean" change-action="compile">false</option>
 <option name="stdinc" type="string" change-action="compile"></option>
-<option name="usrinc" type="string" change-action="compile">src;src_fatfs;src_startup</option>
+<option name="usrinc" type="string" change-action="compile">src;src_fatfs;src_startup;src_umm_malloc</option>
 <option name="watch" type="boolean" change-action="none">false</option>
 <option name="multithread" type="boolean" change-action="compile">false</option>
 </options>
