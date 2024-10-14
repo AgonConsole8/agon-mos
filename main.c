@@ -202,8 +202,7 @@ int main(void) {
 	mos_mount();									// Mount the SD card
 
 	putch(7);										// Startup beep
-	history_no = 0;
-	history_size = 0;
+	editHistoryInit();								// Initialise the command history
 
 	// Load the autoexec.bat config file
 	//

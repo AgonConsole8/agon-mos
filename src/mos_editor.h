@@ -19,6 +19,7 @@ UINT24	mos_EDITLINE(char * filename, int bufferLength, UINT8 clear);
 void getModeInformation();
 void readPalette(BYTE entry, BOOL wait);
 
+void editHistoryInit();
 void editHistoryPush(char *buffer);
 BOOL editHistoryUp(char *buffer, int insertPos, int len, int limit);
 BOOL editHistoryDown(char *buffer, int insertPos, int len, int limit);
