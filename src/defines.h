@@ -25,7 +25,7 @@ extern void _low_romdata[];
 extern int _len_data;
 
 
-#define SPL_STACK_SIZE				1024
+#define SPL_STACK_SIZE				1536
 #define HEAP_LEN ((int)_stack - (int)_heapbot - SPL_STACK_SIZE)
 
 // VDP specific (for VDU 23,0,n commands)
