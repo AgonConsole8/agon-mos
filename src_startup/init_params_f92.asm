@@ -151,19 +151,14 @@ __init:			ld a, %FF
 ; Setup Stack Pointer
 ;
 			ld sp, __stack
+
 ;
-; Detect warm or cold boot.
+; Detect preserved ram
 ;
 			ld de, __warmboot_magic	; If warm boot, __warmboot_magic (pushed by 'call _main') will
 			ld hl, (0bfffah)	; be the int24 at __stack-6 (ie 0bfffah)
 			or a
 			sbc hl,de
-			ld a, 1			; Set to 1 if cold boot
-			jr nz, $F
-			dec a			; Otherwise set to 0
-$$:			push af 		; Stack AF, will store later as __c_startup clears globals area
-
-			or a
 			jr z, __skip_memclr
 ; Cold boot: wipe external 512k RAM (initialize to $ff (rst $38))
 			ld hl, 40000h
@@ -178,6 +173,16 @@ $$:			push af 		; Stack AF, will store later as __c_startup clears globals area
 			ld (hl), 0ffh
 			ldir
 __skip_memclr:
+
+;
+; Detect hardware reset
+;
+			ld a, i			; Register I should be 0 on cold boot
+			or a, a		
+			ld a, 1			; Set to 1 if cold boot
+			jr z, $F
+			dec a			; Otherwise set to 0
+$$:			push af 		; Stack AF, will store later as __c_startup clears globals area
 
 ;
 ; Initialize the interrupt vector table
@@ -209,7 +214,6 @@ __skip_memclr:
 
 			pop af			; Pop the coldboot value
 			ld (_coldBoot), a	; And store
-
 
 __no_cstartup:		ld hl, 0                ; hl = NULL
 			push hl                 ; argv[0] = NULL
