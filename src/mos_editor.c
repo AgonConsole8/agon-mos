@@ -592,7 +592,14 @@ void editHistoryPush(char *buffer) {
 	int len = strlen(buffer);
 
 	if (len > 0) {		// If there is data in the buffer
-		char *newEntry = umm_malloc(len + 1);
+		char * newEntry = NULL;
+
+		// if the new entry is the same as the last entry, then don't save it
+		if (history_size > 0 && strcmp(buffer, cmd_history[history_size - 1]) == 0) {
+			return;
+		}
+
+		newEntry = umm_malloc(len + 1);
 		if (newEntry == NULL) {
 			// Memory allocation failed so we can't save history
 			return;
