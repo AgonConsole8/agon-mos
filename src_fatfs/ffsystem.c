@@ -12,7 +12,7 @@
 /* Allocate a memory block                                                */
 /*------------------------------------------------------------------------*/
 
-void* ff_meumm_malloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
+void* ff_memalloc (	/* Returns pointer to the allocated memory block (null if not enough core) */
 	UINT msize		/* Number of bytes to allocate */
 )
 {
@@ -24,7 +24,7 @@ void* ff_meumm_malloc (	/* Returns pointer to the allocated memory block (null i
 /* Free a memory block                                                    */
 /*------------------------------------------------------------------------*/
 
-void ff_memumm_free (
+void ff_memfree (
 	void* mblock	/* Pointer to the memory block to umm_free (nothing to do if null) */
 )
 {
