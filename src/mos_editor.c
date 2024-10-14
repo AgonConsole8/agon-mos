@@ -547,48 +547,23 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 		}
 
 		if (enableHistory) {
+			BOOL lineChanged = FALSE;
 			switch (historyAction) {
 				case 1: { // Push new item to stack
-					if (len > 0) {		// If there is data in the buffer
-						// If we're at the end of the history, then we need to shift all our entries up by one
-						if (history_size == (cmd_historyDepth - 1)) {
-							int i;
-							for(i = 0; i < history_size; i++) {
-								strncpy(cmd_history[i], cmd_history[i+1], cmd_historyWidth);
-							}
-							history_size--;
-						}
-						strncpy(cmd_history[history_size++], buffer, cmd_historyWidth);	// Save in the history
-						history_no = history_size;
-					}
+					editHistoryPush(buffer);
 				} break;
 				case 2: { // Move up in history
-					if (history_no > 0) {
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[--history_no], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					} else if (history_size > 0) {
-						// we're at the top of our history list
-						// replace current line (which may have been edited) with first entry
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[0], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					}
+					lineChanged = editHistoryUp(buffer, insertPos, len, limit);
 				} break;
 				case 3: { // Move down in history
-					if (history_no < history_size) {
-						// only replace line if we're not at the end of our history list
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[++history_no], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					}
+					lineChanged = editHistoryDown(buffer, insertPos, len, limit);
 				} break;
+			}
+
+			if (lineChanged) {
+				printf("%s", buffer);							// Output the buffer
+				insertPos = strlen(buffer);						// Set cursor to end of string
+				len = strlen(buffer);
 			}
 		}
 	}
@@ -601,4 +576,44 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
 	return keyr;					// Finally return the keycode
+}
+
+void editHistoryPush(char *buffer) {
+	if (strlen(buffer) > 0) {		// If there is data in the buffer
+		// If we're at the end of the history, then we need to shift all our entries up by one
+		if (history_size == (cmd_historyDepth - 1)) {
+			int i;
+			for(i = 0; i < history_size; i++) {
+				strncpy(cmd_history[i], cmd_history[i+1], cmd_historyWidth);
+			}
+			history_size--;
+		}
+		strncpy(cmd_history[history_size++], buffer, cmd_historyWidth);	// Save in the history
+		history_no = history_size;
+	}
+}
+
+BOOL editHistoryUp(char *buffer, int insertPos, int len, int limit) {
+	if (history_no > 0) {
+		removeEditLine(buffer, insertPos, len);
+		strncpy(buffer, cmd_history[--history_no], limit);	// Copy from the history to the buffer
+		return TRUE;
+	} else if (history_size > 0) {
+		// we're at the top of our history list
+		// replace current line (which may have been edited) with first entry
+		removeEditLine(buffer, insertPos, len);
+		strncpy(buffer, cmd_history[0], limit);			// Copy from the history to the buffer
+		return TRUE;
+	}
+	return FALSE;
+}
+
+BOOL editHistoryDown(char *buffer, int insertPos, int len, int limit) {
+	if (history_no < history_size) {
+		// only replace line if we're not at the end of our history list
+		removeEditLine(buffer, insertPos, len);
+		strncpy(buffer, cmd_history[++history_no], limit);	// Copy from the history to the buffer
+		return TRUE;
+	}
+	return FALSE;
 }
