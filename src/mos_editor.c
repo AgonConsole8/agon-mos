@@ -553,10 +553,10 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 					editHistoryPush(buffer);
 				} break;
 				case 2: { // Move up in history
-					lineChanged = editHistoryUp(buffer, insertPos, len);
+					lineChanged = editHistoryUp(buffer, insertPos, len, limit);
 				} break;
 				case 3: { // Move down in history
-					lineChanged = editHistoryDown(buffer, insertPos, len);
+					lineChanged = editHistoryDown(buffer, insertPos, len, limit);
 				} break;
 			}
 
@@ -613,31 +613,42 @@ void editHistoryPush(char *buffer) {
 	}
 }
 
-BOOL editHistoryUp(char *buffer, int insertPos, int len) {
+BOOL editHistoryUp(char *buffer, int insertPos, int len, int limit) {
+	int index = -1;
 	if (history_no > 0) {
-		removeEditLine(buffer, insertPos, len);
-		strcpy(buffer, cmd_history[--history_no]);	// Copy from the history to the buffer
-		return TRUE;
+		index = history_no - 1;
 	} else if (history_size > 0) {
 		// we're at the top of our history list
 		// replace current line (which may have been edited) with first entry
-		removeEditLine(buffer, insertPos, len);
-		strcpy(buffer, cmd_history[0]);			// Copy from the history to the buffer
-		return TRUE;
+		index = 0;
+	}
+	return editHistorySet(buffer, insertPos, len, limit, index);
+}
+
+BOOL editHistoryDown(char *buffer, int insertPos, int len, int limit) {
+	if (history_no < history_size) {
+		if (history_no == history_size - 1) {
+			// already at most recent entry - just leave an empty line
+			removeEditLine(buffer, insertPos, len);
+			history_no = history_size;
+			return TRUE;
+		}
+		return editHistorySet(buffer, insertPos, len, limit, ++history_no);
 	}
 	return FALSE;
 }
 
-BOOL editHistoryDown(char *buffer, int insertPos, int len) {
-	if (history_no < history_size) {
-		// only replace line if we're not at the end of our history list
+BOOL editHistorySet(char *buffer, int insertPos, int len, int limit, int index) {
+	if (index >= 0 && index < history_size) {
 		removeEditLine(buffer, insertPos, len);
-		if (history_no == history_size - 1) {
-			// we are at most recent entry, so can't go any further - so just leave an empty line
-			history_no = history_size;
-			return TRUE;
+		if (strlen(cmd_history[index]) > limit) {
+			// if the history entry is longer than the buffer, then we need to truncate it
+			strncpy(buffer, cmd_history[index], limit);
+			buffer[limit] = '\0';
+		} else {
+			strcpy(buffer, cmd_history[index]);			// Copy from the history to the buffer
 		}
-		strcpy(buffer, cmd_history[++history_no]);	// Copy from the history to the buffer
+		history_no = index;
 		return TRUE;
 	}
 	return FALSE;
