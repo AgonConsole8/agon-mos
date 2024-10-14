@@ -98,19 +98,20 @@ static t_mosCommand mosCommands[] = {
 	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "DISC",		&mos_cmdDISC,		NULL,		NULL },
-	{ "ECHO",		&mos_cmdECHO,		NULL,		HELP_ECHO },
+	{ "ECHO",		&mos_cmdECHO,		HELP_ECHO_ARGS,		HELP_ECHO },
 	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
+	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
 	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
     { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
 	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "MV",			&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "PRINTF",		&mos_cmdPRINTF,		HELP_PRINTF_ARGS,	HELP_PRINTF },
 	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
@@ -149,11 +150,13 @@ static char * mos_errors[] = {
 	"LFN working buffer could not be allocated",
 	"Too many open files",
 	"Invalid parameter",
+	// MOS-specific errors beyond this point (index 20+)
 	"Invalid command",
 	"Invalid executable",
 	"Out of memory",
 	"Not implemented",
 	"Load overlaps system area",
+	"Bad string",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))
@@ -366,7 +369,7 @@ int mos_runBin(UINT24 addr) {
 			return exec24(addr, mos_strtok_ptr);
 			break;	
 		default:	// Unrecognised header
-			return FR_MOS_INVALID_EXECUTABLE;
+			return MOS_INVALID_EXECUTABLE;
 			break;
 	}
 }
@@ -399,7 +402,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 		}
 		else {		
 			if (strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
-				return FR_MOS_INVALID_COMMAND;
+				return MOS_INVALID_COMMAND;
 			}
 			else {
 				sprintf(path, "/mos/%s.bin", ptr);
@@ -407,7 +410,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 				if (fr == FR_OK) {
 					return mos_runBin(MOS_starLoadAddress);
 				}
-				if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+				if (fr == MOS_OVERLAPPING_SYSTEM) {
 					return fr;
 				}
 				
@@ -417,7 +420,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
 					}
-					if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
 					}
 					sprintf(path, "/bin/%s.bin", ptr);
@@ -425,12 +428,12 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
 					}
-					if (fr == FR_MOS_OVERLAPPING_SYSTEM) {
+					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
 					}
 				}				
 				if (fr == FR_NO_FILE || fr == FR_NO_PATH) {
-					return FR_MOS_INVALID_COMMAND;
+					return MOS_INVALID_COMMAND;
 				}
 			}
 		}
@@ -502,6 +505,103 @@ int mos_cmdECHO(char *ptr) {
 
 	while (*p) {
 		switch (*p) {
+			case '|': {
+				// interpret pipe-escaped characters
+				p++;
+
+				if (*p == 0) {
+					// no more characters, so this is an error
+					return MOS_BAD_STRING;
+				} else if (*p == '?') {
+					// prints character 127
+					putch(0x7F);
+					p++;
+				} else if (*p == '!') {
+					// prints next character with top bit set
+					putch(*p | 0x80);
+					p++;
+				} else if (*p >= 0x40 && *p < 0x7F) {
+					// characters from &40-7F (letters and some punctuation)
+					// are printed as just their bottom 5 bits
+					// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
+					putch(*p & 0x1F);
+					p++;
+				} else {
+					// all other characters are passed thru
+					putch(*p);
+					p++;
+				}
+
+				break;
+			}
+
+			case '<': {
+				// possibly a number or variable
+				// so search for an end tag
+				char *end = p + 1;
+				while (*end && *end != '>') {
+					end++;
+				}
+				if (*end == '>' && end > p + 1) {
+					// we have one - so is this a number?
+					int number = 0;
+					int base = 10;
+					char *endptr;
+					p++;
+					*end = '\0';
+					// number can be decimal, &hex, or base_number
+					if (*p == '&') {
+						base = 16;
+						p++;
+					} else {
+						char *underscore = strchr(p, '_');
+						if (underscore != NULL && underscore > p) {
+							*underscore = '\0';
+							base = strtol(p, NULL, 10);
+							// Move p pointer to the number part
+							p = underscore + 1;
+						}
+					}
+
+					number = strtol(p, &endptr, base);
+
+					if (endptr != end) {
+						// we didn't consume whole string, so it was not a valid number
+						// we therefore should interpret it as a variable
+						// TODO
+						#if DEBUG > 0
+						printf("variable: '%.*s'\n\r", end - p, p);
+						#endif
+					} else {
+						putch(number & 0xFF);
+					}
+					p = end;
+				} else {
+					// no end tag, so just print the character
+					putch(*p);
+					p++;
+				}
+				break;
+			}
+			default:
+				putch(*p);
+				p++;
+				break;
+		}
+	}
+
+	printf("\r\n");
+	return FR_OK;
+}
+
+// PRINTF command
+//
+int mos_cmdPRINTF(char *ptr) {
+	int c;
+	const char *p = mos_strtok_ptr;
+
+	while (*p) {
+		switch (*p) {
 			case '\\': {
 				// interpret escaped characters
 				p++;
@@ -544,7 +644,6 @@ int mos_cmdECHO(char *ptr) {
 				break;
 		}
 	}
-
 
 	return 0;
 }
@@ -1257,7 +1356,7 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 		}
 		// Check potential system area overlap
 		if((address <= MOS_externLastRAMaddress) && ((address + size) > MOS_systemAddress)) {
-			fr = FR_MOS_OVERLAPPING_SYSTEM;
+			fr = MOS_OVERLAPPING_SYSTEM;
 		}
 		else {
 			fr = f_read(&fil, (void *)address, size, &br);		
