@@ -142,6 +142,105 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
 
+			DW  mos_api_not_implemented ; 0x23
+			DW  mos_api_not_implemented ; 0x24
+			DW  mos_api_not_implemented ; 0x25
+			DW  mos_api_not_implemented ; 0x26
+			DW  mos_api_not_implemented ; 0x27
+			DW  mos_api_not_implemented ; 0x28
+			DW  mos_api_not_implemented ; 0x29
+			DW  mos_api_not_implemented ; 0x2a
+			DW  mos_api_not_implemented ; 0x2b
+			DW  mos_api_not_implemented ; 0x2c
+			DW  mos_api_not_implemented ; 0x2d
+			DW  mos_api_not_implemented ; 0x2e
+			DW  mos_api_not_implemented ; 0x2f
+
+			DW  mos_api_not_implemented ; 0x30
+			DW  mos_api_not_implemented ; 0x31
+			DW  mos_api_not_implemented ; 0x32
+			DW  mos_api_not_implemented ; 0x33
+			DW  mos_api_not_implemented ; 0x34
+			DW  mos_api_not_implemented ; 0x35
+			DW  mos_api_not_implemented ; 0x36
+			DW  mos_api_not_implemented ; 0x37
+			DW  mos_api_not_implemented ; 0x38
+			DW  mos_api_not_implemented ; 0x39
+			DW  mos_api_not_implemented ; 0x3a
+			DW  mos_api_not_implemented ; 0x3b
+			DW  mos_api_not_implemented ; 0x3c
+			DW  mos_api_not_implemented ; 0x3d
+			DW  mos_api_not_implemented ; 0x3e
+			DW  mos_api_not_implemented ; 0x3f
+
+			DW  mos_api_not_implemented ; 0x40
+			DW  mos_api_not_implemented ; 0x41
+			DW  mos_api_not_implemented ; 0x42
+			DW  mos_api_not_implemented ; 0x43
+			DW  mos_api_not_implemented ; 0x44
+			DW  mos_api_not_implemented ; 0x45
+			DW  mos_api_not_implemented ; 0x46
+			DW  mos_api_not_implemented ; 0x47
+			DW  mos_api_not_implemented ; 0x48
+			DW  mos_api_not_implemented ; 0x49
+			DW  mos_api_not_implemented ; 0x4a
+			DW  mos_api_not_implemented ; 0x4b
+			DW  mos_api_not_implemented ; 0x4c
+			DW  mos_api_not_implemented ; 0x4d
+			DW  mos_api_not_implemented ; 0x4e
+			DW  mos_api_not_implemented ; 0x4f
+
+			DW  mos_api_not_implemented ; 0x50
+			DW  mos_api_not_implemented ; 0x51
+			DW  mos_api_not_implemented ; 0x52
+			DW  mos_api_not_implemented ; 0x53
+			DW  mos_api_not_implemented ; 0x54
+			DW  mos_api_not_implemented ; 0x55
+			DW  mos_api_not_implemented ; 0x56
+			DW  mos_api_not_implemented ; 0x57
+			DW  mos_api_not_implemented ; 0x58
+			DW  mos_api_not_implemented ; 0x59
+			DW  mos_api_not_implemented ; 0x5a
+			DW  mos_api_not_implemented ; 0x5b
+			DW  mos_api_not_implemented ; 0x5c
+			DW  mos_api_not_implemented ; 0x5d
+			DW  mos_api_not_implemented ; 0x5e
+			DW  mos_api_not_implemented ; 0x5f
+
+			DW  mos_api_not_implemented ; 0x60
+			DW  mos_api_not_implemented ; 0x61
+			DW  mos_api_not_implemented ; 0x62
+			DW  mos_api_not_implemented ; 0x63
+			DW  mos_api_not_implemented ; 0x64
+			DW  mos_api_not_implemented ; 0x65
+			DW  mos_api_not_implemented ; 0x66
+			DW  mos_api_not_implemented ; 0x67
+			DW  mos_api_not_implemented ; 0x68
+			DW  mos_api_not_implemented ; 0x69
+			DW  mos_api_not_implemented ; 0x6a
+			DW  mos_api_not_implemented ; 0x6b
+			DW  mos_api_not_implemented ; 0x6c
+			DW  mos_api_not_implemented ; 0x6d
+			DW  mos_api_not_implemented ; 0x6e
+			DW  mos_api_not_implemented ; 0x6f
+
+			DW  mos_api_not_implemented ; 0x70
+			DW  mos_api_not_implemented ; 0x71
+			DW  mos_api_not_implemented ; 0x72
+			DW  mos_api_not_implemented ; 0x73
+			DW  mos_api_not_implemented ; 0x74
+			DW  mos_api_not_implemented ; 0x75
+			DW  mos_api_not_implemented ; 0x76
+			DW  mos_api_not_implemented ; 0x77
+			DW  mos_api_not_implemented ; 0x78
+			DW  mos_api_not_implemented ; 0x79
+			DW  mos_api_not_implemented ; 0x7a
+			DW  mos_api_not_implemented ; 0x7b
+			DW  mos_api_not_implemented ; 0x7c
+			DW  mos_api_not_implemented ; 0x7d
+			DW  mos_api_not_implemented ; 0x7e
+			DW  mos_api_not_implemented ; 0x7f
+
 mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
 $$:			AND	7Fh			; Else remove the top bit
