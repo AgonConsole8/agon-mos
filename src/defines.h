@@ -13,7 +13,36 @@
 #ifndef MOS_DEFINES_H
 #define MOS_DEFINES_H
 
+// Zilog's funny types
+#include <defines.h>
+
+/* Just for sanity */
+typedef UINT32 uint32_t;
+typedef INT32 int32_t;
+typedef UINT24 uint24_t;
+typedef INT24 int24_t;
+typedef UINT16 uint16_t;
+typedef INT16 int16_t;
+typedef UINT8 uint8_t;
+typedef INT8 int8_t;
+typedef BOOL bool;
+#define false FALSE
+#define true TRUE
+
 #define	DEBUG					0			// Set to 0 for production, 1 for extra debug information
+
+// ZDS segment stuff
+extern void _heapbot[];
+extern void _heaptop[];
+extern void _stack[];
+extern void _low_data[];
+extern void _low_bss[];
+extern void _low_romdata[];
+extern int _len_data;
+
+
+#define SPL_STACK_SIZE				1536
+#define HEAP_LEN ((int)_stack - (int)_heapbot - SPL_STACK_SIZE)
 
 // VDP specific (for VDU 23,0,n commands)
 //

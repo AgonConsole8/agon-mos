@@ -50,6 +50,19 @@ typedef struct {
 	FIL		fileObject;
 } t_mosFileObject;
 
+/**
+ * MOS-specific return codes
+ * These extend the FatFS return codes FRESULT
+ */
+typedef enum {
+	MOS_INVALID_COMMAND = 20,	/* (20) Command could not be understood */
+	MOS_INVALID_EXECUTABLE, 	/* (21) Executable file format not recognised */
+	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error NB this is currently unused */
+	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
+	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
+	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
+} MOSRESULT;
+
 void 	mos_error(int error);
 
 BYTE	mos_getkey(void);
@@ -68,6 +81,7 @@ BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
 
 int		mos_cmdDIR(char * ptr);
+int		mos_cmdDISC(char *ptr);
 int		mos_cmdLOAD(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdDEL(char * ptr);
@@ -87,6 +101,9 @@ int		mos_cmdCLS(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
+int		mos_cmdMEM(char *ptr);
+int		mos_cmdECHO(char *ptr);
+int		mos_cmdPRINTF(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
@@ -119,6 +136,7 @@ UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
 
 extern TCHAR	cwd[256];
+extern BOOL	sdcardDelay;
 
 UINT8	fat_EOF(FIL * fp);
 
@@ -137,6 +155,9 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
 #define HELP_DELETE_ARGS	"[-f] <filename>"
 
+#define HELP_ECHO			"Echo sends a string to the VDU, after transformation\r\n"
+#define HELP_ECHO_ARGS		"<string>"
+
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"
 
@@ -148,8 +169,13 @@ UINT8	fat_EOF(FIL * fp);
 							"default to &40000\r\n"
 #define HELP_LOAD_ARGS		"<filename> [<addr>]"
 
+#define HELP_MEM			"Output memory statistics\r\n"
+
 #define HELP_MKDIR			"Create a new folder on the SD card\r\n"
 #define HELP_MKDIR_ARGS		"<filename>"
+
+#define HELP_PRINTF			"Print a string to the VDU, with common unix-style escapes\r\n"
+#define HELP_PRINTF_ARGS	"<string>"
 
 #define HELP_RENAME			"Rename a file in the same folder\r\n"
 #define HELP_RENAME_ARGS	"<filename1> <filename2>"

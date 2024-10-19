@@ -52,6 +52,10 @@
 #include "clock.h"
 #include "ff.h"
 #include "strings.h"
+#include "umm_malloc.h"
+#if DEBUG > 0
+# include "tests.h"
+#endif /* DEBUG */
 
 char  	cmd[256];				// Array for the command line handler
 
@@ -69,12 +73,14 @@ static FATFS	fs;					// Handle for the file system
 static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 TCHAR cwd[256];						// Hold current working directory.
+BOOL sdcardDelay = FALSE;
 
 extern volatile BYTE history_no;
 
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
 
 BOOL	vdpSupportsTextPalette = FALSE;
+
 
 // Array of MOS commands and pointer to the C function to run
 // NB this list is iterated over, so the order is important
@@ -91,17 +97,21 @@ static t_mosCommand mosCommands[] = {
 	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
 	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "DISC",		&mos_cmdDISC,		NULL,		NULL },
+	{ "ECHO",		&mos_cmdECHO,		HELP_ECHO_ARGS,		HELP_ECHO },
 	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
 	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
+	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
 	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
     { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
+	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
 	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "MV",			&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "PRINTF",		&mos_cmdPRINTF,		HELP_PRINTF_ARGS,	HELP_PRINTF },
 	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
@@ -110,6 +120,9 @@ static t_mosCommand mosCommands[] = {
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
+#if DEBUG > 0
+	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		NULL,		"Run the MOS OS test suite" },
+#endif /* DEBUG */
 };
 
 #define mosCommands_count (sizeof(mosCommands)/sizeof(t_mosCommand))
@@ -137,10 +150,13 @@ static char * mos_errors[] = {
 	"LFN working buffer could not be allocated",
 	"Too many open files",
 	"Invalid parameter",
+	// MOS-specific errors beyond this point (index 20+)
 	"Invalid command",
 	"Invalid executable",
 	"Out of memory",
 	"Not implemented",
+	"Load overlaps system area",
+	"Bad string",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))
@@ -353,7 +369,7 @@ int mos_runBin(UINT24 addr) {
 			return exec24(addr, mos_strtok_ptr);
 			break;	
 		default:	// Unrecognised header
-			return FR_MOS_INVALID_EXECUTABLE;
+			return MOS_INVALID_EXECUTABLE;
 			break;
 	}
 }
@@ -386,7 +402,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 		}
 		else {		
 			if (strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
-				return FR_MOS_INVALID_COMMAND;
+				return MOS_INVALID_COMMAND;
 			}
 			else {
 				sprintf(path, "/mos/%s.bin", ptr);
@@ -394,23 +410,30 @@ int mos_exec(char * buffer, BOOL in_mos) {
 				if (fr == FR_OK) {
 					return mos_runBin(MOS_starLoadAddress);
 				}
-
+				if (fr == MOS_OVERLAPPING_SYSTEM) {
+					return fr;
+				}
+				
 				if (in_mos) {
 					sprintf(path, "%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
-					}				
-					
+					}
+					if (fr == MOS_OVERLAPPING_SYSTEM) {
+						return fr;
+					}
 					sprintf(path, "/bin/%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
 						return mos_runBin(MOS_defaultLoadAddress);
 					}
+					if (fr == MOS_OVERLAPPING_SYSTEM) {
+						return fr;
+					}
 				}				
-
 				if (fr == FR_NO_FILE || fr == FR_NO_PATH) {
-					return FR_MOS_INVALID_COMMAND;
+					return MOS_INVALID_COMMAND;
 				}
 			}
 		}
@@ -436,6 +459,11 @@ UINT8 mos_execMode(UINT8 * ptr) {
 	return 0xFF;
 }
 
+int mos_cmdDISC(char *ptr) {
+	sdcardDelay = TRUE;
+	return 0;
+}
+
 // DIR command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -457,6 +485,167 @@ int mos_cmdDIR(char * ptr) {
 		}
 	}
 	return mos_DIR(path, longListing);
+}
+
+// Assumes isxdigit(digit)
+static int xdigit_to_int(char digit) {
+	digit = toupper(digit);
+	if (digit < 'A') {
+		return digit - '0';
+	} else {
+		return digit - 55;
+	}
+}
+
+// ECHO command
+//
+int mos_cmdECHO(char *ptr) {
+	int c;
+	const char *p = mos_strtok_ptr;
+
+	while (*p) {
+		switch (*p) {
+			case '|': {
+				// interpret pipe-escaped characters
+				p++;
+
+				if (*p == 0) {
+					// no more characters, so this is an error
+					return MOS_BAD_STRING;
+				} else if (*p == '?') {
+					// prints character 127
+					putch(0x7F);
+					p++;
+				} else if (*p == '!') {
+					// prints next character with top bit set
+					putch(*p | 0x80);
+					p++;
+				} else if (*p >= 0x40 && *p < 0x7F) {
+					// characters from &40-7F (letters and some punctuation)
+					// are printed as just their bottom 5 bits
+					// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
+					putch(*p & 0x1F);
+					p++;
+				} else {
+					// all other characters are passed thru
+					putch(*p);
+					p++;
+				}
+
+				break;
+			}
+
+			case '<': {
+				// possibly a number or variable
+				// so search for an end tag
+				char *end = p + 1;
+				while (*end && *end != '>') {
+					end++;
+				}
+				if (*end == '>' && end > p + 1) {
+					// we have one - so is this a number?
+					int number = 0;
+					int base = 10;
+					char *endptr;
+					p++;
+					*end = '\0';
+					// number can be decimal, &hex, or base_number
+					if (*p == '&') {
+						base = 16;
+						p++;
+					} else {
+						char *underscore = strchr(p, '_');
+						if (underscore != NULL && underscore > p) {
+							*underscore = '\0';
+							base = strtol(p, NULL, 10);
+							// Move p pointer to the number part
+							p = underscore + 1;
+						}
+					}
+
+					number = strtol(p, &endptr, base);
+
+					if (endptr != end) {
+						// we didn't consume whole string, so it was not a valid number
+						// we therefore should interpret it as a variable
+						// TODO
+						#if DEBUG > 0
+						printf("variable: '%.*s'\n\r", end - p, p);
+						#endif
+					} else {
+						putch(number & 0xFF);
+					}
+					p = end;
+				} else {
+					// no end tag, so just print the character
+					putch(*p);
+					p++;
+				}
+				break;
+			}
+			default:
+				putch(*p);
+				p++;
+				break;
+		}
+	}
+
+	printf("\r\n");
+	return FR_OK;
+}
+
+// PRINTF command
+//
+int mos_cmdPRINTF(char *ptr) {
+	int c;
+	const char *p = mos_strtok_ptr;
+
+	while (*p) {
+		switch (*p) {
+			case '\\': {
+				// interpret escaped characters
+				p++;
+				if (*p == '\\') {
+					putch('\\');
+					p++;
+				} else if (*p == 'r') {
+					putch('\r');
+					p++;
+				} else if (*p == 'n') {
+					putch('\n');
+					p++;
+				} else if (*p == 'f') {
+					putch(12);
+					p++;
+				} else if (*p == 't') {
+					putch('\t');
+					p++;
+				} else if (*p == 'x') {
+					p++;
+					c = 0;
+					if (isxdigit(*p)) {
+						c = xdigit_to_int(*p);
+						p++;
+						if (isxdigit(*p)) {
+							c = c * 16 + xdigit_to_int(*p);
+							p++;
+						}
+					}
+					putch(c);
+				} else {
+					// invalid. skip it entirely
+					if (*p) p++;
+				}
+				break;
+			}
+			default:
+				putch(*p);
+				p++;
+				break;
+		}
+	}
+
+	return 0;
 }
 
 // HOTKEY command
@@ -488,7 +677,7 @@ int mos_cmdHOTKEY(char *ptr) {
 
 	if (strlen(mos_strtok_ptr) < 1) {		
 		if (hotkey_strings[fn_number - 1] != NULL) {
-			free(hotkey_strings[fn_number - 1]);
+			umm_free(hotkey_strings[fn_number - 1]);
 			hotkey_strings[fn_number - 1] = NULL;
 			printf("F%u cleared.\r\n", fn_number);
 		} else printf("F%u already clear, no hotkey command provided.\r\n", fn_number);
@@ -501,9 +690,9 @@ int mos_cmdHOTKEY(char *ptr) {
 		mos_strtok_ptr++;		
 	}
 
-	if (hotkey_strings[fn_number - 1] != NULL) free(hotkey_strings[fn_number - 1]);
+	if (hotkey_strings[fn_number - 1] != NULL) umm_free(hotkey_strings[fn_number - 1]);
 
-	hotkey_strings[fn_number - 1] = malloc((strlen(mos_strtok_ptr) + 1) * sizeof(char));
+	hotkey_strings[fn_number - 1] = umm_malloc((strlen(mos_strtok_ptr) + 1) * sizeof(char));
 	if (!hotkey_strings[fn_number - 1]) return FR_INT_ERR;
 	strncpy(hotkey_strings[fn_number - 1], mos_strtok_ptr, strlen(mos_strtok_ptr));
 	hotkey_strings[fn_number - 1][strlen(mos_strtok_ptr)] = '\0';
@@ -627,15 +816,15 @@ int mos_cmdDEL(char * ptr) {
 
 			pattern = mos_strdup(lastSeparator + 1);
 			if (!pattern) {
-				free(dirPath);
+				umm_free(dirPath);
 				return FR_INT_ERR;
 			}
         } else {
 			dirPath = mos_strdup(".");
 			pattern = mos_strdup(filename);
 			if (!dirPath || !pattern) {
-				if (dirPath) free(dirPath);
-				if (pattern) free(pattern);
+				if (dirPath) umm_free(dirPath);
+				if (pattern) umm_free(pattern);
 				return FR_INT_ERR;
 			}
         }
@@ -651,7 +840,7 @@ int mos_cmdDEL(char * ptr) {
 		fr = f_findfirst(&dir, &fno, dirPath, pattern);
 		while (fr == FR_OK && fno.fname[0] != '\0') {
 			size_t fullPathLen = strlen(dirPath) + strlen(fno.fname) + 2;
-			char *fullPath = malloc(fullPathLen);
+			char *fullPath = umm_malloc(fullPathLen);
 			if (!fullPath) {
 				fr = FR_INT_ERR;
 				break;
@@ -668,7 +857,7 @@ int mos_cmdDEL(char * ptr) {
 				if (retval == 13) {
 					if (strcasecmp(verify, "Cancel") == 0 || strcasecmp(verify, "C") == 0) {
 						printf("Cancelled.\r\n");
-						free(fullPath);
+						umm_free(fullPath);
 						break;
 					}
 					if (strcasecmp(verify, "Yes") == 0 || strcasecmp(verify, "Y") == 0) {
@@ -677,14 +866,14 @@ int mos_cmdDEL(char * ptr) {
 					}
 				} else {
 					printf("Cancelled.\r\n");
-					free(fullPath);
+					umm_free(fullPath);
 					break;
 				}
 			} else {
 				printf("Deleting %s\r\n", fullPath);
 				fr = f_unlink(fullPath);
 			}
-			free(fullPath);
+			umm_free(fullPath);
 
 			if (fr != FR_OK) break;
 			fr = f_findnext(&dir, &fno);
@@ -697,8 +886,8 @@ int mos_cmdDEL(char * ptr) {
 	}
 
 	cleanup:
-		if (dirPath) free(dirPath);
-		if (pattern) free(pattern);
+		if (dirPath) umm_free(dirPath);
+		if (pattern) umm_free(pattern);
 		return fr;
 }
 
@@ -954,6 +1143,40 @@ int mos_cmdTIME(char *ptr) {
 	return 0;
 }
 
+extern void sysvars[];
+
+// MEM
+// Returns:
+// - MOS error code
+//
+int mos_cmdMEM(char * ptr) {
+	int try_len = HEAP_LEN;
+
+	printf("ROM      &000000-&01ffff     %2d%% used\r\n", ((int)_low_romdata) / 1311);
+	printf("USER:LO  &%06x-&%06x %6d bytes\r\n", 0x40000, (int)_low_data-1, (int)_low_data - 0x40000);
+	// data and bss together
+	printf("MOS:DATA &%06x-&%06x %6d bytes\r\n", _low_data, (int)_heapbot - 1, (int)_heapbot - (int)_low_data);
+	printf("MOS:HEAP &%06x-&%06x %6d bytes\r\n", _heapbot, (int)_stack - SPL_STACK_SIZE - 1, HEAP_LEN);
+	printf("STACK24  &%06x-&%06x %6d bytes\r\n", (int)_stack - SPL_STACK_SIZE, _stack-1, SPL_STACK_SIZE);
+	printf("USER:HI  &b7e000-&b7ffff   8192 bytes\r\n");
+	printf("\r\n");
+
+	// find largest kmalloc contiguous region
+	for (; try_len > 0; try_len-=8) {
+		void *p = umm_malloc(try_len);
+		if (p) {
+			umm_free(p);
+			break;
+		}
+	}
+
+	printf("Largest free MOS:HEAP fragment: %d bytes\r\n", try_len);
+	printf("Sysvars at &%06x\r\n", sysvars);
+	printf("\r\n");
+
+	return 0;
+}
+
 // CREDITS
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -963,6 +1186,7 @@ int mos_cmdTIME(char *ptr) {
 int mos_cmdCREDITS(char *ptr) {
 	printf("FabGL 1.0.8 (c) 2019-2022 by Fabrizio Di Vittorio\n\r");
 	printf("FatFS R0.14b (c) 2021 ChaN\n\r");
+	printf("umm_malloc Copyright (c) 2015 Ralph Hempel\n\r");
 	printf("\n\r");
 	return 0;
 }
@@ -1015,6 +1239,8 @@ int	mos_cmdMOUNT(char *ptr) {
 void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 	int aliases = 0;
 	int i;
+
+	if (cmd->help == NULL) return;
 
 	printf("%s", cmd->name);
 	if (cmd->args != NULL)
@@ -1074,7 +1300,8 @@ int mos_cmdHELP(char *ptr) {
 				int maxCol = scrcols;
 				printf("List of commands:\r\n");
 				for (i = 1; i < mosCommands_count; ++i) {
-					if (col + strlen(mosCommands[i].name) + 2 > maxCol) {
+					if (mosCommands[i].help == NULL) continue;
+					if (col + strlen(mosCommands[i].name) + 2 >= maxCol) {
 						printf("\r\n");
 						col = 0;
 					}
@@ -1105,7 +1332,7 @@ int mos_cmdHELP(char *ptr) {
 // Parameters:
 // - filename: Path of file to load
 // - address: Address in RAM to load the file into
-// - size: Number of bytes to load
+// - size: Number of bytes to load, 0 for maximum file size
 // Returns:
 // - FatFS return code
 // 
@@ -1119,7 +1346,21 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	fr = f_open(&fil, filename, FA_READ);
 	if(fr == FR_OK) {
 		fSize = f_size(&fil);
-		fr = f_read(&fil, (void *)address, fSize, &br);		
+		if(size) {
+			// Maximize load according to size parameter
+			if(fSize < size) size = fSize;
+		}
+		else {
+			// Load the full file size
+			size = fSize;
+		}
+		// Check potential system area overlap
+		if((address <= MOS_externLastRAMaddress) && ((address + size) > MOS_systemAddress)) {
+			fr = MOS_OVERLAPPING_SYSTEM;
+		}
+		else {
+			fr = f_read(&fil, (void *)address, size, &br);		
+		}		
 	}
 	f_close(&fil);	
 	return fr;
@@ -1239,7 +1480,7 @@ typedef struct SmallFilInfo {
     WORD    fdate;   /* Modified date */
     WORD    ftime;   /* Modified time */
     BYTE    fattrib; /* File attribute */
-    char*   fname;   /* malloc'ed */
+    char*   fname;   /* umm_malloc'ed */
 } SmallFilInfo;
 
 static int cmp_filinfo(const SmallFilInfo* a, const SmallFilInfo* b) {
@@ -1436,7 +1677,7 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
 			goto cleanup;
 		}
 
-		fnos = malloc(sizeof(SmallFilInfo) * num_dirents);
+		fnos = umm_malloc(sizeof(SmallFilInfo) * num_dirents);
 		if (!fnos) {
 			fr = mos_DIRFallback(inputPath, longListing, TRUE);
 			goto cleanup;
@@ -1454,11 +1695,11 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
             fnos[fno_num].ftime = filinfo.ftime;
             fnos[fno_num].fattrib = filinfo.fattrib;
             filenameLength = strlen(filinfo.fname) + 1;
-            fnos[fno_num].fname = malloc(filenameLength);
+            fnos[fno_num].fname = umm_malloc(filenameLength);
 			if (!fnos[fno_num].fname) {
 				fr = mos_DIRFallback(inputPath, longListing, TRUE);
 				while (fno_num > 0) {
-					free(fnos[--fno_num].fname);
+					umm_free(fnos[--fno_num].fname);
 				}
 				goto cleanup;
 			}
@@ -1516,22 +1757,22 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
                 }
                 col++;
             }
-            free(fno->fname);
+            umm_free(fno->fname);
         }
     }
 
     if (!longListing) {
         printf("\r\n");
     }
-    free(fnos);
+    umm_free(fnos);
 
     if (useColour) {
         printf("\x11%c", textFg);
     }
 
 cleanup:
-    if (pattern) free(pattern);
-    if (dirPath) free(dirPath);
+    if (pattern) umm_free(pattern);
+    if (dirPath) umm_free(dirPath);
     return fr;
 }
 
@@ -1615,13 +1856,13 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
         while (fr == FR_OK && fno.fname[0] != '\0') {
             size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
             size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-			fullSrcPath = malloc(srcPathLen);
-            fullDstPath = malloc(dstPathLen);
+			fullSrcPath = umm_malloc(srcPathLen);
+            fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
                 fr = FR_INT_ERR; // Out of memory
-                if (fullSrcPath) free(fullSrcPath);
-                if (fullDstPath) free(fullDstPath);
+                if (fullSrcPath) umm_free(fullSrcPath);
+                if (fullDstPath) umm_free(fullDstPath);
                 break;
             }
 
@@ -1630,8 +1871,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 
             if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
 			fr = f_rename(fullSrcPath, fullDstPath);
-            free(fullSrcPath);
-            free(fullDstPath);
+            umm_free(fullSrcPath);
+            umm_free(fullDstPath);
             fullSrcPath = NULL;
             fullDstPath = NULL;
 
@@ -1645,7 +1886,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 		if (isDirectory(dstPath)) {
 			// copy into a directory, keeping name
 			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-			fullDstPath = malloc(fullDstPathLen);
+			fullDstPath = umm_malloc(fullDstPathLen);
 			if (!fullDstPath) {
 				fr = FR_INT_ERR;
 				goto cleanup;
@@ -1655,7 +1896,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
 
 			fr = f_rename(srcPath, fullDstPath);
-			free(fullDstPath);
+			umm_free(fullDstPath);
 		} else {
 			fr = f_rename(srcPath, dstPath);
 		}
@@ -1663,8 +1904,8 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    if (srcDir) free(srcDir);
-    if (pattern) free(pattern);
+    if (srcDir) umm_free(srcDir);
+    if (pattern) umm_free(pattern);
     return fr;
 }
 
@@ -1735,8 +1976,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         while (fr == FR_OK && fno.fname[0] != '\0') {
             size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
             size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-            fullSrcPath = malloc(srcPathLen);
-            fullDstPath = malloc(dstPathLen);
+            fullSrcPath = umm_malloc(srcPathLen);
+            fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
                 fr = FR_INT_ERR;
@@ -1766,8 +2007,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             f_close(&fdst);
 
         file_cleanup:
-            if (fullSrcPath) free(fullSrcPath);
-            if (fullDstPath) free(fullDstPath);
+            if (fullSrcPath) umm_free(fullSrcPath);
+            if (fullDstPath) umm_free(fullDstPath);
             fullSrcPath = NULL;
             fullDstPath = NULL;
 
@@ -1778,7 +2019,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         f_closedir(&dir);
     } else {
         size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-        fullDstPath = malloc(fullDstPathLen);
+        fullDstPath = umm_malloc(fullDstPathLen);
         if (!fullDstPath) {
 			fr = FR_INT_ERR;
 			goto cleanup;
@@ -1814,10 +2055,10 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     }
 
 cleanup:
-    if (srcDir) free(srcDir);
-    if (pattern) free(pattern);
-    if (fullSrcPath) free(fullSrcPath);
-    if (fullDstPath) free(fullDstPath);
+    if (srcDir) umm_free(srcDir);
+    if (pattern) umm_free(pattern);
+    if (fullSrcPath) umm_free(fullSrcPath);
+    if (fullDstPath) umm_free(fullDstPath);
     return fr;
 }
 

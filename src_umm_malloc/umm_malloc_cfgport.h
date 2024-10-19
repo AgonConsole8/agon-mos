@@ -1,0 +1,4 @@
+#define UMM_BLOCK_BODY_SIZE 8
+#define UMM_NUM_HEAPS 1
+#define UMM_BEST_FIT
+

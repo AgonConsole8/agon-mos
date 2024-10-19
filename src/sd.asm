@@ -39,6 +39,7 @@ SD_CMD_LEN	.equ	6
 		XREF		_spi_read_one
 		XREF		_spi_read
 		XREF		_spi_write
+		XREF		_sdcardDelay
 
 		.ASSUME ADL = 1
 
@@ -182,6 +183,26 @@ $exit:		LD		SP,IX
 $err_exit:	LD		A,SD_ERROR
 		JR		$exit
 
+; Delay by 30ms. Roughly how long an old 5.25" disk takes to read 512 bytes
+SD_delayDisc:
+		LD		A, (_sdcardDelay)
+		OR		A
+		RET		Z
+
+		PUSH	HL
+		PUSH	DE
+
+		LD		DE, 1
+		LD		HL, 81000
+		; 81000 * 6 cycles per loop
+$loop4:	AND		A
+		SBC		HL, DE
+		JR		NZ, $loop4
+
+		POP		DE
+		POP		HL
+		RET
+
 
 ; SD_readSingleBlock
 
@@ -193,6 +214,7 @@ $err_exit:	LD		A,SD_ERROR
 		SCOPE
 
 SD_readSingleBlock:
+		CALL	SD_delayDisc
 		LD		(IX-3),CMD17     | %40
 		LD		(IX-2),CMD17_CRC | %01
 		
@@ -309,6 +331,7 @@ $err_exit:	LD		A,SD_ERROR
 		SCOPE
 
 SD_writeSingleBlock:
+		CALL	SD_delayDisc
 		LD		(IX-3),CMD24     | %40
 		LD		(IX-2),CMD24_CRC | %01
 		
