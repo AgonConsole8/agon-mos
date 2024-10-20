@@ -43,7 +43,7 @@ extern BYTE scrcols;
 
 // Storage for the command history
 //
-static char	cmd_history[cmd_historyDepth][cmd_historyWidth + 1];
+static char	* cmd_history[cmd_historyDepth];
 
 char *hotkey_strings[12] = NULL; 
 
@@ -547,48 +547,23 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 		}
 
 		if (enableHistory) {
+			BOOL lineChanged = FALSE;
 			switch (historyAction) {
 				case 1: { // Push new item to stack
-					if (len > 0) {		// If there is data in the buffer
-						// If we're at the end of the history, then we need to shift all our entries up by one
-						if (history_size == (cmd_historyDepth - 1)) {
-							int i;
-							for(i = 0; i < history_size; i++) {
-								strncpy(cmd_history[i], cmd_history[i+1], cmd_historyWidth);
-							}
-							history_size--;
-						}
-						strncpy(cmd_history[history_size++], buffer, cmd_historyWidth);	// Save in the history
-						history_no = history_size;
-					}
+					editHistoryPush(buffer);
 				} break;
 				case 2: { // Move up in history
-					if (history_no > 0) {
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[--history_no], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					} else if (history_size > 0) {
-						// we're at the top of our history list
-						// replace current line (which may have been edited) with first entry
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[0], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					}
+					lineChanged = editHistoryUp(buffer, insertPos, len, limit);
 				} break;
 				case 3: { // Move down in history
-					if (history_no < history_size) {
-						// only replace line if we're not at the end of our history list
-						removeEditLine(buffer, insertPos, len);
-						strncpy(buffer, cmd_history[++history_no], limit);			// Copy from the history to the buffer
-						printf("%s", buffer);							// Output the buffer
-						insertPos = strlen(buffer);						// Set cursor to end of string
-						len = strlen(buffer);
-					}
+					lineChanged = editHistoryDown(buffer, insertPos, len, limit);
 				} break;
+			}
+
+			if (lineChanged) {
+				printf("%s", buffer);							// Output the buffer
+				insertPos = strlen(buffer);						// Set cursor to end of string
+				len = strlen(buffer);
 			}
 		}
 	}
@@ -601,4 +576,87 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
 	return keyr;					// Finally return the keycode
+}
+
+void editHistoryInit() {
+	int i;
+	history_no = 0;
+	history_size = 0;
+
+	for (i = 0; i < cmd_historyDepth; i++) {
+		cmd_history[i] = NULL;
+	}
+}
+
+void editHistoryPush(char *buffer) {
+	int len = strlen(buffer);
+
+	if (len > 0) {		// If there is data in the buffer
+		char * newEntry = NULL;
+
+		// if the new entry is the same as the last entry, then don't save it
+		if (history_size > 0 && strcmp(buffer, cmd_history[history_size - 1]) == 0) {
+			return;
+		}
+
+		newEntry = umm_malloc(len + 1);
+		if (newEntry == NULL) {
+			// Memory allocation failed so we can't save history
+			return;
+		}
+		strcpy(newEntry, buffer);
+
+		// If we're at the end of the history, then we need to shift all our entries up by one
+		if (history_size == cmd_historyDepth) {
+			int i;
+			umm_free(cmd_history[0]);
+			for (i = 1; i < history_size; i++) {
+				cmd_history[i - 1] = cmd_history[i];
+			}
+			history_size--;
+		}
+		cmd_history[history_size++] = newEntry;
+		history_no = history_size;
+	}
+}
+
+BOOL editHistoryUp(char *buffer, int insertPos, int len, int limit) {
+	int index = -1;
+	if (history_no > 0) {
+		index = history_no - 1;
+	} else if (history_size > 0) {
+		// we're at the top of our history list
+		// replace current line (which may have been edited) with first entry
+		index = 0;
+	}
+	return editHistorySet(buffer, insertPos, len, limit, index);
+}
+
+BOOL editHistoryDown(char *buffer, int insertPos, int len, int limit) {
+	if (history_no < history_size) {
+		if (history_no == history_size - 1) {
+			// already at most recent entry - just leave an empty line
+			removeEditLine(buffer, insertPos, len);
+			history_no = history_size;
+			return TRUE;
+		}
+		return editHistorySet(buffer, insertPos, len, limit, ++history_no);
+	}
+	return FALSE;
+}
+
+BOOL editHistorySet(char *buffer, int insertPos, int len, int limit, int index) {
+	if (index >= 0 && index < history_size) {
+		removeEditLine(buffer, insertPos, len);
+		if (strlen(cmd_history[index]) > limit) {
+			// if the history entry is longer than the buffer, then we need to truncate it
+			strncpy(buffer, cmd_history[index], limit);
+			buffer[limit] = '\0';
+		} else {
+			strcpy(buffer, cmd_history[index]);			// Copy from the history to the buffer
+		}
+		history_no = index;
+		return TRUE;
+	}
+	return FALSE;
 }
