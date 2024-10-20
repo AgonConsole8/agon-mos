@@ -916,13 +916,10 @@ int mos_cmdJMP(char *ptr) {
 //
 int mos_cmdRUN(char *ptr) {
 	UINT24 	addr;
-	UINT8	mode;
-	void (* dest)(void) = 0;
 	
 	if(!mos_parseNumber(NULL, &addr)) {
 		addr = MOS_defaultLoadAddress;
 	}
-	mode = mos_execMode((UINT8 *)addr);
 	return mos_runBin(addr);
 }
 
@@ -1200,7 +1197,6 @@ int mos_cmdCREDITS(char *ptr) {
 int mos_cmdTYPE(char * ptr) {
 	FRESULT	fr;
 	char *  filename;
-	UINT24 	addr;
 
 	if(!mos_parseString(NULL, &filename))
 		return FR_INVALID_PARAMETER;
@@ -1283,7 +1279,6 @@ void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 //
 int mos_cmdHELP(char *ptr) {
 	int i;
-	int found = 0;
 	char *cmd;
 
 	BOOL hasCmd = mos_parseString(NULL, &cmd);
@@ -1340,7 +1335,6 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	FRESULT	fr;
 	FIL	   	fil;
 	UINT   	br;	
-	void * 	dest;
 	FSIZE_t fSize;
 	
 	fr = f_open(&fil, filename, FA_READ);
@@ -1395,16 +1389,15 @@ UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size) {
 //
 UINT24 mos_TYPE(char * filename) {
 	FRESULT	fr;
-	FIL	fil;
+	FIL		fil;
 	UINT   	br;
-	void * 	dest;
-	FSIZE_t fSize;
 	char	buf[512];
-	int	i;
+	int		i;
 
 	fr = f_open(&fil, filename, FA_READ);
-	if(fr != FR_OK)
-		goto out1;
+	if (fr != FR_OK) {
+		return fr;
+	}
 
 	while (1) {
 		fr = f_read(&fil, (void *)buf, sizeof buf, &br);
@@ -1415,8 +1408,7 @@ UINT24 mos_TYPE(char * filename) {
 	}
 
 	f_close(&fil);
-out1:
-	return fr;
+	return FR_OK;
 }
 
 // Change directory
@@ -2087,14 +2079,11 @@ UINT24 mos_MKDIR(char * filename) {
 UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
 	FRESULT	fr;
 	FIL	   	fil;
-	UINT   	br;	
-	void * 	dest;
-	FSIZE_t fSize;
 	int     line =  0;
 	
 	fr = f_open(&fil, filename, FA_READ);
-	if(fr == FR_OK) {
-		while(!f_eof(&fil)) {
+	if (fr == FR_OK) {
+		while (!f_eof(&fil)) {
 			line++;
 			f_gets(buffer, size, &fil);
 			fr = mos_exec(buffer, TRUE);
