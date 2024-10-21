@@ -518,8 +518,12 @@ int mos_cmdECHO(char *ptr) {
 					p++;
 				} else if (*p == '!') {
 					// prints next character with top bit set
-					putch(*p | 0x80);
 					p++;
+					if (*p == 0) {
+						// no more characters, so this is an error
+						return MOS_BAD_STRING;
+					}
+					putch(*p++ | 0x80);
 				} else if (*p >= 0x40 && *p < 0x7F) {
 					// characters from &40-7F (letters and some punctuation)
 					// are printed as just their bottom 5 bits
