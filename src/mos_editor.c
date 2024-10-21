@@ -281,7 +281,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 	int  limit = bufferLength - 1;	// Max # of characters that can be entered
 	int	 insertPos;					// The insert position
 	int  len = 0;					// Length of current input
-	
+	history_no = history_size;		// Ensure our current "history" is the end of the list
+
 	getModeInformation();			// Get the current screen dimensions
 	
 	if (clear) {					// Clear the buffer as required
@@ -616,7 +617,6 @@ void editHistoryPush(char *buffer) {
 			history_size--;
 		}
 		cmd_history[history_size++] = newEntry;
-		history_no = history_size;
 	}
 }
 
