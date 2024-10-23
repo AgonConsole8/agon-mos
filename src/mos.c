@@ -57,7 +57,7 @@
 # include "tests.h"
 #endif /* DEBUG */
 
-char  	cmd[256];				// Array for the command line handler
+char	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -78,6 +78,8 @@ BOOL sdcardDelay = FALSE;
 extern volatile BYTE history_no;
 
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
+
+t_mosSystemVariable * mosSystemVariables = NULL;
 
 BOOL	vdpSupportsTextPalette = FALSE;
 
@@ -573,9 +575,14 @@ int mos_cmdECHO(char *ptr) {
 						// we didn't consume whole string, so it was not a valid number
 						// we therefore should interpret it as a variable
 						// TODO
-						#if DEBUG > 0
-						printf("variable: '%.*s'\n\r", end - p, p);
-						#endif
+						t_mosSystemVariable * var;
+						*end = '\0';
+						p = start;
+						if (mos_getSystemVariable(p, &var) == 0) {
+							// variable found
+							printf("%s", (char*)var->value);
+						}
+						*end = '>';
 					} else {
 						putch(number & 0xFF);
 					}
@@ -1028,31 +1035,162 @@ int mos_cmdMKDIR(char * ptr) {
 // - MOS error code
 //
 int mos_cmdSET(char * ptr) {
-	char *	command;
+	char *	token;
+	t_mosSystemVariable * var = NULL;
 	UINT24 	value;
-	
-	if(
-		!mos_parseString(NULL, &command) ||
-		!mos_parseNumber(NULL, &value)
-	) {
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
 		return FR_INVALID_PARAMETER;
 	}
-	if(strcasecmp(command, "KEYBOARD") == 0) {
+	// "token" is first parameter, which is a string
+
+	// TODO replace KEYBOARD and CONSOLE with code type system variables
+	if (strcasecmp(token, "KEYBOARD") == 0) {
+		if (!mos_parseNumber(NULL, &value)) {
+			return FR_INVALID_PARAMETER;
+		}
 		putch(23);
 		putch(0);
 		putch(VDP_keycode);
 		putch(value & 0xFF);
 		return 0;
-	}
-	if(strcasecmp(command, "CONSOLE") == 0 && value <= 1) {
+	} else if (strcasecmp(token, "CONSOLE") == 0) {
+		if (!mos_parseNumber(NULL, &value)) {
+			return FR_INVALID_PARAMETER;
+		}
 		putch(23);
 		putch(0);
 		putch(VDP_consolemode);
 		putch(value & 0xFF);
 		return 0;
 	}
+
+	// we are setting a variable
+	// make sure we have a value
+
+	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
+	if (*mos_strtok_ptr == '\0') {
+		return FR_INVALID_PARAMETER;
+	}
+
+	// search for our token in the system variables
+	searchResult = mos_getSystemVariable(token, &var);
+
+	// at this point var will either point to the variable we want,
+	// or the last variable in the list before our token
+
+	if (searchResult == 0) {
+		// we have found a matching variable, so replace it
+		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+	} else if (searchResult < 0) {
+		// we have not found a matching variable
+		if (var == NULL) {
+			// no variable returned, so we need to insert at the start
+			t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
+			char * newLabel = mos_strdup(token);
+			char * newValue = mos_strdup(mos_strtok_ptr);
+			if (newVar == NULL || newLabel == NULL || newValue == NULL) {
+				if (newVar) umm_free(newVar);
+				if (newLabel) umm_free(newLabel);
+				if (newValue) umm_free(newValue);
+				return FR_INT_ERR;
+			}
+			newVar->label = newLabel;
+			newVar->value = newValue;
+			newVar->type = MOS_VAR_STRING;
+
+			newVar->next = mosSystemVariables;
+			mosSystemVariables = newVar;
+
+			return FR_OK;
+		} else {
+			// insert after var
+			// we need to insert after the last entry
+			t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
+			char * newLabel = mos_strdup(token);
+			char * newValue = mos_strdup(mos_strtok_ptr);
+			if (newVar == NULL || newLabel == NULL || newValue == NULL) {
+				if (newVar) umm_free(newVar);
+				if (newLabel) umm_free(newLabel);
+				if (newValue) umm_free(newValue);
+				return FR_INT_ERR;
+			}
+			newVar->label = newLabel;
+			newVar->value = newValue;
+			newVar->type = MOS_VAR_STRING;
+
+			newVar->next = var->next;
+			var->next = newVar;
+			
+			return FR_OK;
+		}
+	} else {
+		// not a match, but must insert
+		t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
+		char * newLabel = mos_strdup(token);
+		char * newValue = mos_strdup(mos_strtok_ptr);
+		if (newVar == NULL || newLabel == NULL || newValue == NULL) {
+			if (newVar) umm_free(newVar);
+			if (newLabel) umm_free(newLabel);
+			if (newValue) umm_free(newValue);
+			return FR_INT_ERR;
+		}
+		newVar->label = newLabel;
+		newVar->value = newValue;
+		newVar->type = MOS_VAR_STRING;
+
+		newVar->next = var->next;
+		var->next = newVar;
+		
+		return FR_OK;
+	}
+	printf("Value is %s\r\n", mos_strtok_ptr);
+
 	return FR_INVALID_PARAMETER;
 }
+
+int mos_getSystemVariable(char *pattern, t_mosSystemVariable **var) {
+	t_mosSystemVariable *current = mosSystemVariables;
+	int matchResult = -1;
+	*var = NULL;
+
+	while (current != NULL) {
+		matchResult = pmatch(pattern, current->label, MATCH_CASE_INSENSITIVE);
+		if (matchResult <= 0) {
+			*var = current;
+		}
+		if (matchResult == 0) {
+			break;
+		}
+		if (matchResult > 0) {
+			// Since the list is sorted, we can stop searching
+			break;
+		}
+		current = (t_mosSystemVariable *)current->next;
+	}
+
+	if (*var != NULL) {
+		// *var = lastMatchedVar;
+		return matchResult;
+	} else {
+		// *var = NULL;
+		return -1; // Token/pattern not found
+	}
+}
+
+int mos_cmdSHOW(char * ptr) {
+	// Simplistic show - iterate over all system variables and show their values
+	t_mosSystemVariable *current = mosSystemVariables;
+
+	while (current != NULL) {
+		printf("%s = %s\r\n", current->label, current->value);
+		current = (t_mosSystemVariable *)current->next;
+	}
+
+	return 0;
+}
+
 
 // VDU <char1> <char2> ... <charN>
 // Parameters:

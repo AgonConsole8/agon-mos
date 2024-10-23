@@ -35,6 +35,7 @@
 #define MOS_H
 
 #include "ff.h"
+#include "defines.h"
 
 extern char  	cmd[256];				// Array for the command line handler
 
@@ -49,6 +50,30 @@ typedef struct {
 	UINT8	free;
 	FIL		fileObject;
 } t_mosFileObject;
+
+typedef struct {
+	void * source;		// Pointer to current position in source string
+	void * embedded;	// Pointer to embedded variable string (t_mosTransInfo object) we are inserting
+} t_mosTransInfo;
+
+/**
+ * MOS system variable types
+ */
+typedef enum {
+	MOS_VAR_STRING = 0,	// String, which will be GSTrans'd before being stored
+	MOS_VAR_NUMBER,		// Integer (24-bit, as we're on an eZ80)
+	MOS_VAR_MACRO,		// String that will be GSTrans'd each time it is used
+	MOS_VAR_EXPANDED,	// Expression which will be evaluated before being stored
+	MOS_VAR_LITERAL,	// Literal string, no GSTrans
+	MOS_VAR_CODE = 16,	// Code block, with offset 0 pointing to read, offset 4 to write
+} MOSVARTYPE;
+
+typedef struct {
+	char * label;
+	MOSVARTYPE type;
+	void * value;
+	void * next;
+} t_mosSystemVariable;
 
 /**
  * MOS-specific return codes
@@ -80,30 +105,33 @@ int		mos_mount(void);
 BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
 
+int		mos_getSystemVariable(char * token, t_mosSystemVariable ** var);
+
+int		mos_cmdCD(char * ptr);
+int		mos_cmdCLS(char *ptr);
+int		mos_cmdCOPY(char *ptr);
+int		mos_cmdCREDITS(char *ptr);
+int		mos_cmdDEL(char * ptr);
 int		mos_cmdDIR(char * ptr);
 int		mos_cmdDISC(char *ptr);
-int		mos_cmdLOAD(char * ptr);
-int		mos_cmdSAVE(char *ptr);
-int		mos_cmdDEL(char * ptr);
-int		mos_cmdJMP(char * ptr);
-int		mos_cmdRUN(char * ptr);
-int		mos_cmdCD(char * ptr);
-int		mos_cmdREN(char *ptr);
-int		mos_cmdCOPY(char *ptr);
-int		mos_cmdMKDIR(char *ptr);
-int		mos_cmdSET(char *ptr);
-int		mos_cmdVDU(char *ptr);
-int		mos_cmdTIME(char *ptr);
-int		mos_cmdCREDITS(char *ptr);
+int		mos_cmdECHO(char *ptr);
 int		mos_cmdEXEC(char * ptr);
-int		mos_cmdTYPE(char *ptr);
-int		mos_cmdCLS(char *ptr);
-int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
+int		mos_cmdJMP(char * ptr);
+int		mos_cmdLOAD(char * ptr);
 int		mos_cmdMEM(char *ptr);
-int		mos_cmdECHO(char *ptr);
+int		mos_cmdMKDIR(char *ptr);
+int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdPRINTF(char *ptr);
+int		mos_cmdREN(char *ptr);
+int		mos_cmdRUN(char * ptr);
+int		mos_cmdSAVE(char *ptr);
+int		mos_cmdSET(char *ptr);
+int		mos_cmdSHOW(char *ptr);
+int		mos_cmdTIME(char *ptr);
+int		mos_cmdTYPE(char *ptr);
+int		mos_cmdVDU(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);

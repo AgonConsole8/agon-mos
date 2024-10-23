@@ -10,6 +10,14 @@
 #ifndef STRINGS_H
 #define STRINGS_H
 
+#include <ctype.h>
+
+#define MATCH_CASE_INSENSITIVE 0x01
+#define MATCH_DISABLE_STAR     0x02
+#define MATCH_DISABLE_HASH     0x04
+#define MATCH_DOT_AS_STAR      0x08
+#define MATCH_BEGINS_WITH      0x10
+
 extern int strcasecmp(const char *s1, const char *s2);
 
 size_t mos_strnlen(const char *s, size_t maxlen);
@@ -19,5 +27,7 @@ char *mos_strdup(const char *s);
 
 //Alternative to missing strndup() in ZDS libraries
 char *mos_strndup(const char *s, size_t n);
+
+int pmatch(const char *pattern, const char *string, uint8_t flags);
 
 #endif // STRINGS_H

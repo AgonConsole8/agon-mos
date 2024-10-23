@@ -7,6 +7,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
+#include "defines.h"
+#include "strings.h"
 #include "umm_malloc.h"
 
 int strcasecmp(const char *s1, const char *s2) {
@@ -55,4 +57,42 @@ char * mos_strndup(const char *s, size_t n) {
 	}
 
 	return d;
+}
+
+int pmatch(const char *pattern, const char *string, uint8_t flags) {
+	bool caseInsensitive = flags & MATCH_CASE_INSENSITIVE;
+	bool disableStar = flags & MATCH_DISABLE_STAR;
+	bool disableHash = flags & MATCH_DISABLE_HASH;
+	bool dotAsStar = flags & MATCH_DOT_AS_STAR;
+	bool beginsWith = flags & MATCH_BEGINS_WITH;
+
+	if (*pattern == '\0') {
+		// if the pattern has been exhausted
+		// return success if the string has also been exhausted, or we are doing a beginsWith test
+		if (beginsWith) {
+			return 0; // Match if beginsWith is set
+		}
+		return *string == '\0' ? 0 : -1;
+	} else if (
+		(*pattern == '*' && !disableStar) ||
+		(*pattern == '.' && dotAsStar && *(pattern + 1) == '\0')
+	) {
+		// Skip the globbed wildcard and try to match the rest of the pattern with the current string
+		// or skip one character in the string and try to match again
+		if (pmatch(pattern + 1, string, flags) == 0 || (*string && pmatch(pattern, string + 1, flags) == 0)) {
+			return 0;
+		}
+		return -1;
+	} else {
+		// Handle the '#' wildcard or exact character match
+		char patternChar = caseInsensitive ? tolower(*pattern) : *pattern;
+		char stringChar = caseInsensitive ? tolower(*string) : *string;
+
+		if ((*pattern == '#' && !disableHash) || patternChar == stringChar) {
+			return pmatch(pattern + 1, string + 1, flags);
+		}
+
+		// If the current characters don't match and it's not a wildcard, return the difference
+		return stringChar - patternChar;
+	}
 }
