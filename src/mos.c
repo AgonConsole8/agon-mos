@@ -105,7 +105,7 @@ static t_mosCommand mosCommands[] = {
 	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
 	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-    { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
+	{ "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
@@ -117,6 +117,7 @@ static t_mosCommand mosCommands[] = {
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
+	{ "SHOW",		&mos_cmdSHOW,		HELP_SET_ARGS,		HELP_SET },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
@@ -487,16 +488,6 @@ int mos_cmdDIR(char * ptr) {
 	return mos_DIR(path, longListing);
 }
 
-// Assumes isxdigit(digit)
-static int xdigit_to_int(char digit) {
-	digit = toupper(digit);
-	if (digit < 'A') {
-		return digit - '0';
-	} else {
-		return digit - 55;
-	}
-}
-
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
@@ -550,7 +541,8 @@ int mos_cmdECHO(char *ptr) {
 					// we have one - so is this a number?
 					int number = 0;
 					int base = 10;
-					char *endptr;
+					char *endptr = NULL;
+					char *start = p + 1;
 					p++;
 					*end = '\0';
 					// number can be decimal, &hex, or base_number
@@ -560,14 +552,22 @@ int mos_cmdECHO(char *ptr) {
 					} else {
 						char *underscore = strchr(p, '_');
 						if (underscore != NULL && underscore > p) {
+							char *baseEnd;
 							*underscore = '\0';
-							base = strtol(p, NULL, 10);
+							base = strtol(p, &baseEnd, 10);
+							if (baseEnd != underscore) {
+								// we didn't use all chars before underscore, so invalid base
+								base = -1;
+							}
 							// Move p pointer to the number part
 							p = underscore + 1;
+							*underscore = '_';
 						}
 					}
 
-					number = strtol(p, &endptr, base);
+					if (base > 1 && base <= 36) {
+						number = strtol(p, &endptr, base);
+					}
 
 					if (endptr != end) {
 						// we didn't consume whole string, so it was not a valid number
@@ -579,7 +579,8 @@ int mos_cmdECHO(char *ptr) {
 					} else {
 						putch(number & 0xFF);
 					}
-					p = end;
+					*end = '>';
+					p = end + 1;
 				} else {
 					// no end tag, so just print the character
 					putch(*p);
@@ -596,6 +597,16 @@ int mos_cmdECHO(char *ptr) {
 
 	printf("\r\n");
 	return FR_OK;
+}
+
+// Assumes isxdigit(digit)
+static int xdigit_to_int(char digit) {
+	digit = toupper(digit);
+	if (digit < 'A') {
+		return digit - '0';
+	} else {
+		return digit - 55;
+	}
 }
 
 // PRINTF command
