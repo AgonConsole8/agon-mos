@@ -51,11 +51,6 @@ typedef struct {
 	FIL		fileObject;
 } t_mosFileObject;
 
-typedef struct {
-	void * source;		// Pointer to current position in source string
-	void * embedded;	// Pointer to embedded variable string (t_mosTransInfo object) we are inserting
-} t_mosTransInfo;
-
 /**
  * MOS system variable types
  */
@@ -74,6 +69,18 @@ typedef struct {
 	void * value;
 	void * next;
 } t_mosSystemVariable;
+
+/**
+ * Structure to hold information for gs string transformation operations
+ * Keeps a pointer to the current source string position, and the parent trans info object
+ * Also keeps track of the type of variable we are inserting from
+ * Variables that are numbers will be temporarily transformed to a string pointed to by source
+ */
+typedef struct {
+	char * source;		// Pointer to current position in source string
+	void * parent;		// Pointer to parent trans object (t_mosTransInfo object) we are inserting
+	MOSVARTYPE type;	// Type of variable we are inserting from
+} t_mosTransInfo;
 
 /**
  * MOS-specific return codes

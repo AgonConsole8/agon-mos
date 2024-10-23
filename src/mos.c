@@ -490,116 +490,205 @@ int mos_cmdDIR(char * ptr) {
 	return mos_DIR(path, longListing);
 }
 
+t_mosTransInfo * gsInit(void * source, void * parent) {
+	// TODO store pointer to most recent transInfo object
+	// so we can delete all objects in the chain if a new init is called
+	// as an aborted read sequence may leave us with a chain of objects
+
+	// Set up a t_mosTransInfo object
+	t_mosTransInfo * transInfo = umm_malloc(sizeof(t_mosTransInfo));
+	transInfo->source = source;
+	transInfo->parent = parent;
+	transInfo->type = MOS_VAR_MACRO;
+
+	return transInfo;
+}
+
+int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
+	// read next char from our source,
+	// which should either be of type MOS_VAR_STRING, MOS_VAR_NUMBER, or MOS_VAR_MACRO
+	// our source will always be some kind of string, we just need to interpret it
+	// a MOS_VAR_NUMBER variable will have a string allocated with the number
+	// when appropriate, we need to dispose of the string, and/or transInfo object
+	t_mosTransInfo * current = *transInfo;
+	int result = FR_OK;
+
+	if (current == NULL) {
+		// We have reached the end of the chain
+		return FR_OK;
+	}
+
+	*read = *current->source++;
+
+	// Do transformation based on type, if we need to
+	switch (current->type) {
+		case MOS_VAR_LITERAL:
+		case MOS_VAR_STRING: {
+			if (*read == '\0') {
+				// end of the string so dispose of this transInfo object
+				// and move back to the parent
+				*transInfo = current->parent;
+				umm_free(current);
+				// return next read from parent
+				result = gsRead(transInfo, read);
+			}
+			break;
+		}
+		case MOS_VAR_NUMBER: {
+			if (*read == '\0') {
+				// end of the number so dispose of this transInfo object
+				// and move back to the parent
+				umm_free(current->source);
+				*transInfo = current->parent;
+				umm_free(current);
+				// return next read from parent
+				result = gsRead(transInfo, read);
+			}
+			break;
+		}
+		case MOS_VAR_MACRO: {
+			switch (*read) {
+				case '\0': {
+					// end of the macro - move back to the parent
+					*transInfo = current->parent; 
+					umm_free(current);
+					result = gsRead(transInfo, read);
+					break;
+				}
+				case '|': {
+					// interpret pipe-escaped characters
+					if (*current->source == '\0') {
+						// no more characters, so this is an error
+						*read = '\0';
+						return MOS_BAD_STRING;
+					} else if (*current->source == '?') {
+						// prints character 127
+						*read = 0x7F;
+						current->source++;
+					} else if (*current->source == '!') {
+						// prints next character with top bit set
+						current->source++;
+						if (*current->source == '\0') {
+							// no more characters, so this is an error
+							*read = '\0';
+							return MOS_BAD_STRING;
+						}
+						*read = *current->source | 0x80;
+						current->source++;
+					} else if (*current->source >= 0x40 && *current->source < 0x7F) {
+						// characters from &40-7F (letters and some punctuation)
+						// are printed as just their bottom 5 bits
+						// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
+						*read = *current->source & 0x1F;
+						current->source++;
+					} else {
+						// all other characters are passed thru
+						*read = *current->source;
+						current->source++;
+					}
+					break;
+				}
+
+				case '<': {
+					// possibly a number or variable
+					// so search for an end tag
+					char *end = current->source;
+					while (*end && *end != '>') {
+						end++;
+					}
+					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
+					if (*end == '>' && end > current->source) {
+						// is this a number?
+						int number = 0;
+						int base = 10;
+						char *endptr = NULL;
+						char *start = current->source;
+						*end = '\0';
+						// number can be decimal, &hex, or base_number
+						if (*current->source == '&') {
+							base = 16;
+							current->source++;
+						} else {
+							char *underscore = strchr(current->source, '_');
+							if (underscore != NULL && underscore > current->source) {
+								char *baseEnd;
+								*underscore = '\0';
+								base = strtol(current->source, &baseEnd, 10);
+								if (baseEnd != underscore) {
+									// we didn't use all chars before underscore, so invalid base
+									base = -1;
+								}
+								// Move source pointer to the number part
+								current->source = underscore + 1;
+								*underscore = '_';
+							}
+						}
+
+						if (base > 1 && base <= 36) {
+							number = strtol(current->source, &endptr, base);
+						}
+
+						if (endptr != end) {
+							// we didn't consume whole string, so it was not a valid number
+							// we therefore should interpret it as a variable
+							t_mosSystemVariable * var;
+							*end = '\0';
+							current->source = start;
+							if (mos_getSystemVariable(current->source, &var) == 0) {
+								// variable found
+								// Set up a new transInfo object
+								t_mosTransInfo * newTransInfo = umm_malloc(sizeof(t_mosTransInfo));
+								if (newTransInfo == NULL) {
+									result = FR_INT_ERR;
+								} else {
+									newTransInfo->source = var->value;
+									newTransInfo->parent = current;
+									// TODO - deal with different variable types
+									// if variable is a number we need to strigify it
+									// if var is code we need to execute it with a suitable buffer to get the value
+									// if var is an expression, we will need to evaluate it (when we can)
+									newTransInfo->type = var->type;
+									*transInfo = newTransInfo;
+									*end = '>';
+									result = gsRead(transInfo, read);
+								}
+							} else {
+								// variable was not found, so we need to move on to next char
+								*end = '>';
+								current->source = end + 1;
+								return gsRead(transInfo, read);
+							}
+						} else {
+							*read = number & 0xFF;
+						}
+						*end = '>';
+						current->source = end + 1;
+					}
+					break;
+				}
+			}
+		}
+	}
+	return result;
+}
+
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
-	int c;
 	const char *p = mos_strtok_ptr;
+	unsigned char read;
+	int result;
+	t_mosTransInfo * transInfo = gsInit(p, NULL);
 
-	while (*p) {
-		switch (*p) {
-			case '|': {
-				// interpret pipe-escaped characters
-				p++;
-
-				if (*p == 0) {
-					// no more characters, so this is an error
-					return MOS_BAD_STRING;
-				} else if (*p == '?') {
-					// prints character 127
-					putch(0x7F);
-					p++;
-				} else if (*p == '!') {
-					// prints next character with top bit set
-					p++;
-					if (*p == 0) {
-						// no more characters, so this is an error
-						return MOS_BAD_STRING;
-					}
-					putch(*p++ | 0x80);
-				} else if (*p >= 0x40 && *p < 0x7F) {
-					// characters from &40-7F (letters and some punctuation)
-					// are printed as just their bottom 5 bits
-					// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
-					putch(*p & 0x1F);
-					p++;
-				} else {
-					// all other characters are passed thru
-					putch(*p);
-					p++;
-				}
-
-				break;
-			}
-
-			case '<': {
-				// possibly a number or variable
-				// so search for an end tag
-				char *end = p + 1;
-				while (*end && *end != '>') {
-					end++;
-				}
-				if (*end == '>' && end > p + 1) {
-					// we have one - so is this a number?
-					int number = 0;
-					int base = 10;
-					char *endptr = NULL;
-					char *start = p + 1;
-					p++;
-					*end = '\0';
-					// number can be decimal, &hex, or base_number
-					if (*p == '&') {
-						base = 16;
-						p++;
-					} else {
-						char *underscore = strchr(p, '_');
-						if (underscore != NULL && underscore > p) {
-							char *baseEnd;
-							*underscore = '\0';
-							base = strtol(p, &baseEnd, 10);
-							if (baseEnd != underscore) {
-								// we didn't use all chars before underscore, so invalid base
-								base = -1;
-							}
-							// Move p pointer to the number part
-							p = underscore + 1;
-							*underscore = '_';
-						}
-					}
-
-					if (base > 1 && base <= 36) {
-						number = strtol(p, &endptr, base);
-					}
-
-					if (endptr != end) {
-						// we didn't consume whole string, so it was not a valid number
-						// we therefore should interpret it as a variable
-						// TODO
-						t_mosSystemVariable * var;
-						*end = '\0';
-						p = start;
-						if (mos_getSystemVariable(p, &var) == 0) {
-							// variable found
-							printf("%s", (char*)var->value);
-						}
-						*end = '>';
-					} else {
-						putch(number & 0xFF);
-					}
-					*end = '>';
-					p = end + 1;
-				} else {
-					// no end tag, so just print the character
-					putch(*p);
-					p++;
-				}
-				break;
-			}
-			default:
-				putch(*p);
-				p++;
-				break;
+	while (transInfo != NULL) {
+		result = gsRead(&transInfo, &read);
+		if (result != FR_OK) {
+			return result;
 		}
+		if (transInfo == NULL) {
+			break;
+		}
+		putch(read);
 	}
 
 	printf("\r\n");
