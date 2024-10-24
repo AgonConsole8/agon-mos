@@ -593,6 +593,11 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 					// possibly a number or variable
 					// so search for an end tag
 					char *end = current->source;
+					if (*end == ' ') {
+						// leading space means this isn't a variable or number
+						// so we skip on, letting the `<` drop thru
+						break;
+					}
 					while (*end && *end != '>') {
 						end++;
 					}
