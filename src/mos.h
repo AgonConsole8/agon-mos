@@ -36,6 +36,7 @@
 
 #include "ff.h"
 #include "defines.h"
+#include "mos_sysvars.h"
 
 extern char  	cmd[256];				// Array for the command line handler
 
@@ -50,50 +51,6 @@ typedef struct {
 	UINT8	free;
 	FIL		fileObject;
 } t_mosFileObject;
-
-/**
- * MOS system variable types
- */
-typedef enum {
-	MOS_VAR_STRING = 0,	// String, which will be GSTrans'd before being stored
-	MOS_VAR_NUMBER,		// Integer (24-bit, as we're on an eZ80)
-	MOS_VAR_MACRO,		// String that will be GSTrans'd each time it is used
-	MOS_VAR_EXPANDED,	// Expression which will be evaluated before being stored
-	MOS_VAR_LITERAL,	// Literal string, no GSTrans
-	MOS_VAR_CODE = 16,	// Code block, with offset 0 pointing to read, offset 4 to write
-} MOSVARTYPE;
-
-typedef struct {
-	char * label;
-	MOSVARTYPE type;
-	void * value;
-	void * next;
-} t_mosSystemVariable;
-
-/**
- * Structure to hold information for gs string transformation operations
- * Keeps a pointer to the current source string position, and the parent trans info object
- * Also keeps track of the type of variable we are inserting from
- * Variables that are numbers will be temporarily transformed to a string pointed to by source
- */
-typedef struct {
-	char * source;		// Pointer to current position in source string
-	void * parent;		// Pointer to parent trans object (t_mosTransInfo object) we are inserting
-	MOSVARTYPE type;	// Type of variable we are inserting from
-} t_mosTransInfo;
-
-/**
- * MOS-specific return codes
- * These extend the FatFS return codes FRESULT
- */
-typedef enum {
-	MOS_INVALID_COMMAND = 20,	/* (20) Command could not be understood */
-	MOS_INVALID_EXECUTABLE, 	/* (21) Executable file format not recognised */
-	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error NB this is currently unused */
-	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
-	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
-	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
-} MOSRESULT;
 
 void 	mos_error(int error);
 
@@ -111,8 +68,6 @@ int		mos_mount(void);
 
 BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
-
-int		mos_getSystemVariable(char * token, t_mosSystemVariable ** var);
 
 int		mos_cmdCD(char * ptr);
 int		mos_cmdCLS(char *ptr);
@@ -135,6 +90,7 @@ int		mos_cmdREN(char *ptr);
 int		mos_cmdRUN(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdSET(char *ptr);
+int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
 int		mos_cmdTIME(char *ptr);
 int		mos_cmdTYPE(char *ptr);
@@ -223,7 +179,7 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_SAVE			"Save a block of memory to the SD card\r\n"
 #define HELP_SAVE_ARGS		"<filename> <addr> <size>"
 
-#define HELP_SET			"Set a system option\r\n\r\n" \
+#define HELP_SET			"Set assigns a string value to a system variable, or system option (via special variables)\r\n\r\n" \
 							"Keyboard Layout\r\n" \
 							"SET KEYBOARD n: Set the keyboard layout\r\n" \
 							"    0: UK (default)\r\n" \
@@ -249,7 +205,13 @@ UINT8	fat_EOF(FIL * fp);
 							"SET CONSOLE n: Serial console\r\n" \
 							"    0: Console off (default)\r\n" \
 							"    1: Console on\r\n"
-#define HELP_SET_ARGS		"<option> <value>"
+#define HELP_SET_ARGS		"<varname> <value>"
+
+#define HELP_SETMACRO		"SetMacro assigns a macro value to a system variable, which will be expanded each time it is used\r\n"
+#define HELP_SETMACRO_ARGS	"<varname> <value>"
+
+#define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified.\r\n"
+#define HELP_SHOW_ARGS		"[<variablespec>]"
 
 #define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"

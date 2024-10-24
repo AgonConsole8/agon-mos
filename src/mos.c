@@ -53,6 +53,7 @@
 #include "ff.h"
 #include "strings.h"
 #include "umm_malloc.h"
+#include "mos_sysvars.h"
 #if DEBUG > 0
 # include "tests.h"
 #endif /* DEBUG */
@@ -78,8 +79,6 @@ BOOL sdcardDelay = FALSE;
 extern volatile BYTE history_no;
 
 t_mosFileObject	mosFileObjects[MOS_maxOpenFiles];
-
-t_mosSystemVariable * mosSystemVariables = NULL;
 
 BOOL	vdpSupportsTextPalette = FALSE;
 
@@ -119,7 +118,8 @@ static t_mosCommand mosCommands[] = {
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
-	{ "SHOW",		&mos_cmdSHOW,		HELP_SET_ARGS,		HELP_SET },
+	{ "SETMACRO",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,		HELP_SETMACRO },
+	{ "SHOW",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
@@ -135,7 +135,7 @@ static t_mosCommand mosCommands[] = {
 static char * mos_errors[] = {
 	"OK",
 	"Error accessing SD card",
-	"Assertion failed",
+	"Internal error",
 	"SD card failure",
 	"Could not find file",
 	"Could not find path",
@@ -490,216 +490,20 @@ int mos_cmdDIR(char * ptr) {
 	return mos_DIR(path, longListing);
 }
 
-t_mosTransInfo * gsInit(void * source, void * parent) {
-	// TODO store pointer to most recent transInfo object
-	// so we can delete all objects in the chain if a new init is called
-	// as an aborted read sequence may leave us with a chain of objects
-
-	// Set up a t_mosTransInfo object
-	t_mosTransInfo * transInfo = umm_malloc(sizeof(t_mosTransInfo));
-	transInfo->source = source;
-	transInfo->parent = parent;
-	transInfo->type = MOS_VAR_MACRO;
-
-	return transInfo;
-}
-
-int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
-	// read next char from our source,
-	// which should either be of type MOS_VAR_STRING, MOS_VAR_NUMBER, or MOS_VAR_MACRO
-	// our info may have metadata to help us read the next char, such as MOS_VAR_NUMBER
-	// on reaching end of current item, we need to dispose of it and move back to the parent
-	t_mosTransInfo * current = *transInfo;
-	int result = FR_OK;
-
-	if (current == NULL) {
-		// We have reached the end of the chain
-		return FR_OK;
-	}
-
-	*read = '\0';
-
-	// Do transformation based on type, if we need to
-	switch (current->type) {
-		case MOS_VAR_LITERAL:
-		case MOS_VAR_STRING: {
-			*read = *current->source++;
-			if (*read == '\0') {
-				// end of the string so dispose of this transInfo object
-				// and move back to the parent
-				*transInfo = current->parent;
-				umm_free(current);
-				// return next read from parent
-				result = gsRead(transInfo, read);
-			}
-			break;
-		}
-
-		case MOS_VAR_NUMBER: {
-			// TODO insert logic here for producing next digit of number
-			// this will need to use metadata on the current transinfo object
-			// to determine which digit we are showing, and how many digits are left
-			// algorithm will need to print one character at a time,
-			// including potential leading `-` sign
-			if (*read == '\0') {
-				// end of the number so dispose of this transInfo object
-				// and move back to the parent
-				*transInfo = current->parent;
-				umm_free(current);
-				// return next read from parent
-				result = gsRead(transInfo, read);
-			}
-			break;
-		}
-
-		case MOS_VAR_MACRO: {
-			*read = *current->source++;
-			switch (*read) {
-				case '\0': {
-					// end of the macro - move back to the parent
-					*transInfo = current->parent; 
-					umm_free(current);
-					result = gsRead(transInfo, read);
-					break;
-				}
-
-				case '|': {
-					// interpret pipe-escaped characters
-					if (*current->source == '\0') {
-						// no more characters, so this is an error
-						*read = '\0';
-						return MOS_BAD_STRING;
-					} else if (*current->source == '?') {
-						// prints character 127
-						*read = 0x7F;
-						current->source++;
-					} else if (*current->source == '!') {
-						// prints next character with top bit set
-						current->source++;
-						if (*current->source == '\0') {
-							// no more characters, so this is an error
-							*read = '\0';
-							return MOS_BAD_STRING;
-						}
-						*read = *current->source | 0x80;
-						current->source++;
-					} else if (*current->source >= 0x40 && *current->source < 0x7F) {
-						// characters from &40-7F (letters and some punctuation)
-						// are printed as just their bottom 5 bits
-						// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
-						*read = *current->source & 0x1F;
-						current->source++;
-					} else {
-						// all other characters are passed thru
-						*read = *current->source;
-						current->source++;
-					}
-					break;
-				}
-
-				case '<': {
-					// possibly a number or variable
-					// so search for an end tag
-					char *end = current->source;
-					if (*end == ' ') {
-						// leading space means this isn't a variable or number
-						// so we skip on, letting the `<` drop thru
-						break;
-					}
-					while (*end && *end != '>') {
-						end++;
-					}
-					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
-					if (*end == '>' && end > current->source) {
-						// TODO extract number logic into a function, and add an API for it
-						// is this a number?
-						int number = 0;
-						int base = 10;
-						char *endptr = NULL;
-						char *start = current->source;
-						*end = '\0';
-						// number can be decimal, &hex, or base_number
-						if (*current->source == '&') {
-							base = 16;
-							current->source++;
-						} else {
-							char *underscore = strchr(current->source, '_');
-							if (underscore != NULL && underscore > current->source) {
-								char *baseEnd;
-								*underscore = '\0';
-								base = strtol(current->source, &baseEnd, 10);
-								if (baseEnd != underscore) {
-									// we didn't use all chars before underscore, so invalid base
-									base = -1;
-								}
-								// Move source pointer to the number part
-								current->source = underscore + 1;
-								*underscore = '_';
-							}
-						}
-
-						if (base > 1 && base <= 36) {
-							number = strtol(current->source, &endptr, base);
-						}
-
-						if (endptr != end) {
-							// we didn't consume whole string, so it was not a valid number
-							// we therefore should interpret it as a variable
-							t_mosSystemVariable * var;
-							*end = '\0';
-							current->source = start;
-							if (mos_getSystemVariable(current->source, &var) == 0) {
-								// variable found
-								// Set up a new transInfo object
-								t_mosTransInfo * newTransInfo = umm_malloc(sizeof(t_mosTransInfo));
-								if (newTransInfo == NULL) {
-									result = FR_INT_ERR;
-								} else {
-									newTransInfo->source = var->value;
-									newTransInfo->parent = current;
-									// TODO - deal with different variable types
-									// if variable is a number will need to store some metadata
-									// if var is code we need to execute it with a suitable buffer to get the value
-									// if var is an expression, we will need to evaluate it (when we can)
-									newTransInfo->type = var->type;
-									*transInfo = newTransInfo;
-									*end = '>';
-									result = gsRead(transInfo, read);
-								}
-							} else {
-								// variable was not found, so we need to move on to next char
-								*end = '>';
-								current->source = end + 1;
-								return gsRead(transInfo, read);
-							}
-						} else {
-							*read = number & 0xFF;
-						}
-						*end = '>';
-						current->source = end + 1;
-					}
-					break;
-				}
-			}
-		}
-		case MOS_VAR_EXPANDED: {
-			// This is used for variable lookup/evaluation
-		}
-	}
-	return result;
-}
-
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
 	const char *p = mos_strtok_ptr;
-	unsigned char read;
+	char read;
 	int result;
 	t_mosTransInfo * transInfo = gsInit(p, NULL);
 
 	while (transInfo != NULL) {
 		result = gsRead(&transInfo, &read);
 		if (result != FR_OK) {
+			if (transInfo != NULL) {
+				umm_free(transInfo);
+			}
 			return result;
 		}
 		if (transInfo == NULL) {
@@ -1181,7 +985,7 @@ int mos_cmdSET(char * ptr) {
 	}
 
 	// search for our token in the system variables
-	searchResult = mos_getSystemVariable(token, &var);
+	searchResult = getSystemVariable(token, &var);
 
 	// at this point var will either point to the variable we want,
 	// or the last variable in the list before our token
@@ -1189,66 +993,19 @@ int mos_cmdSET(char * ptr) {
 	if (searchResult == 0) {
 		// we have found a matching variable, so replace it
 		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
-	} else if (searchResult < 0) {
+	} else  {
 		// we have not found a matching variable
-		if (var == NULL) {
-			// no variable returned, so we need to insert at the start
-			t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
-			char * newLabel = mos_strdup(token);
-			char * newValue = mos_strdup(mos_strtok_ptr);
-			if (newVar == NULL || newLabel == NULL || newValue == NULL) {
-				if (newVar) umm_free(newVar);
-				if (newLabel) umm_free(newLabel);
-				if (newValue) umm_free(newValue);
-				return FR_INT_ERR;
-			}
-			newVar->label = newLabel;
-			newVar->value = newValue;
-			newVar->type = MOS_VAR_STRING;
-
-			newVar->next = mosSystemVariables;
-			mosSystemVariables = newVar;
-
-			return FR_OK;
-		} else {
-			// insert after var
-			// we need to insert after the last entry
-			t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
-			char * newLabel = mos_strdup(token);
-			char * newValue = mos_strdup(mos_strtok_ptr);
-			if (newVar == NULL || newLabel == NULL || newValue == NULL) {
-				if (newVar) umm_free(newVar);
-				if (newLabel) umm_free(newLabel);
-				if (newValue) umm_free(newValue);
-				return FR_INT_ERR;
-			}
-			newVar->label = newLabel;
-			newVar->value = newValue;
-			newVar->type = MOS_VAR_STRING;
-
-			newVar->next = var->next;
-			var->next = newVar;
-			
-			return FR_OK;
-		}
-	} else {
-		// not a match, but must insert
-		t_mosSystemVariable * newVar = umm_malloc(sizeof(t_mosSystemVariable));
-		char * newLabel = mos_strdup(token);
-		char * newValue = mos_strdup(mos_strtok_ptr);
-		if (newVar == NULL || newLabel == NULL || newValue == NULL) {
-			if (newVar) umm_free(newVar);
-			if (newLabel) umm_free(newLabel);
+		char * newValue;
+		t_mosSystemVariable *newVar;
+		newValue = expandMacro(mos_strtok_ptr);
+		newVar = createSystemVariable(token, MOS_VAR_STRING, newValue);
+		if (newVar == NULL || newValue == NULL) {
 			if (newValue) umm_free(newValue);
+			if (newVar) umm_free(newVar);
 			return FR_INT_ERR;
 		}
-		newVar->label = newLabel;
-		newVar->value = newValue;
-		newVar->type = MOS_VAR_STRING;
+		insertSystemVariable(newVar, var);
 
-		newVar->next = var->next;
-		var->next = newVar;
-		
 		return FR_OK;
 	}
 	printf("Value is %s\r\n", mos_strtok_ptr);
@@ -1256,50 +1013,48 @@ int mos_cmdSET(char * ptr) {
 	return FR_INVALID_PARAMETER;
 }
 
-// Get a system variable
-// Parameters:
-// - pattern: The pattern to search for
-// - var: Pointer to the variable to return
-// if on entry var is NULL, the search will start from the beginning of the list
-// otherwise it will return the first variable after the one pointed to by var
-// Returns:
-// - var will be updated to point to the variable found, or the variable before the first match
-// - 0 if a match was found
-// - 1 if no match was found
-// - pattern match score if a partial match was found
-// 
-int mos_getSystemVariable(char *pattern, t_mosSystemVariable **var) {
-	t_mosSystemVariable *current;
-	int matchResult = -1;
+// SETMACRO <macro> <value> command
+//
+int mos_cmdSETMACRO(char * ptr) {
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	UINT24 	value;
+	int searchResult;
 
-	if (*var == NULL) {
-		current = mosSystemVariables;
-	} else {
-		current = (t_mosSystemVariable *)(*var)->next;
+	if (!mos_parseString(NULL, &token)) {
+		return FR_INVALID_PARAMETER;
 	}
-	*var = NULL;
+	// "token" is first parameter, which is a string
 
-	while (current != NULL) {
-		// We match up to the first space in pattern (or end of pattern if no spaces), case insensitive
-		matchResult = pmatch(pattern, current->label, MATCH_CASE_INSENSITIVE | MATCH_UP_TO_SPACE);
-		if (matchResult <= 0) {
-			*var = current;
-		}
-		if (matchResult == 0) {
-			break;
-		}
-		if (matchResult > 0) {
-			// Since the list is sorted, we can stop searching
-			break;
-		}
-		current = (t_mosSystemVariable *)current->next;
+	// make sure we have a value
+	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
+	if (*mos_strtok_ptr == '\0') {
+		return FR_INVALID_PARAMETER;
 	}
 
-	if (*var != NULL) {
-		return matchResult;
-	} else {
-		return -1; // Token/pattern not found
+	// search for our token in the system variables
+	searchResult = getSystemVariable(token, &var);
+
+	if (searchResult == 0) {
+		// we have found a matching variable, so replace it
+		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+	} else  {
+		// we have not found a matching variable
+		char * newValue;
+		t_mosSystemVariable *newVar;
+		newValue = mos_strdup(mos_strtok_ptr);
+		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
+		if (newVar == NULL || newValue == NULL) {
+			if (newValue) umm_free(newValue);
+			if (newVar) umm_free(newVar);
+			return FR_INT_ERR;
+		}
+		insertSystemVariable(newVar, var);
+
+		return FR_OK;
 	}
+
+	return MOS_NOT_IMPLEMENTED;
 }
 
 // SHOW [<pattern>] command
@@ -1316,7 +1071,7 @@ int mos_cmdSHOW(char * ptr) {
 		token = "*";
 	}
 
-	while (mos_getSystemVariable(token, &var) == 0) {
+	while (getSystemVariable(token, &var) == 0) {
 		printf("%s", var->label);
 		switch (var->type) {
 			case MOS_VAR_MACRO:
