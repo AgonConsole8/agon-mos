@@ -1250,7 +1250,8 @@ int mos_getSystemVariable(char *pattern, t_mosSystemVariable **var) {
 	*var = NULL;
 
 	while (current != NULL) {
-		matchResult = pmatch(pattern, current->label, MATCH_CASE_INSENSITIVE);
+		// We match up to the first space in pattern (or end of pattern if no spaces), case insensitive
+		matchResult = pmatch(pattern, current->label, MATCH_CASE_INSENSITIVE | MATCH_UP_TO_SPACE);
 		if (matchResult <= 0) {
 			*var = current;
 		}
