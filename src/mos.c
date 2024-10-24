@@ -507,9 +507,8 @@ t_mosTransInfo * gsInit(void * source, void * parent) {
 int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 	// read next char from our source,
 	// which should either be of type MOS_VAR_STRING, MOS_VAR_NUMBER, or MOS_VAR_MACRO
-	// our source will always be some kind of string, we just need to interpret it
-	// a MOS_VAR_NUMBER variable will have a string allocated with the number
-	// when appropriate, we need to dispose of the string, and/or transInfo object
+	// our info may have metadata to help us read the next char, such as MOS_VAR_NUMBER
+	// on reaching end of current item, we need to dispose of it and move back to the parent
 	t_mosTransInfo * current = *transInfo;
 	int result = FR_OK;
 
@@ -518,12 +517,13 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 		return FR_OK;
 	}
 
-	*read = *current->source++;
+	*read = '\0';
 
 	// Do transformation based on type, if we need to
 	switch (current->type) {
 		case MOS_VAR_LITERAL:
 		case MOS_VAR_STRING: {
+			*read = *current->source++;
 			if (*read == '\0') {
 				// end of the string so dispose of this transInfo object
 				// and move back to the parent
@@ -534,11 +534,16 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 			}
 			break;
 		}
+
 		case MOS_VAR_NUMBER: {
+			// TODO insert logic here for producing next digit of number
+			// this will need to use metadata on the current transinfo object
+			// to determine which digit we are showing, and how many digits are left
+			// algorithm will need to print one character at a time,
+			// including potential leading `-` sign
 			if (*read == '\0') {
 				// end of the number so dispose of this transInfo object
 				// and move back to the parent
-				umm_free(current->source);
 				*transInfo = current->parent;
 				umm_free(current);
 				// return next read from parent
@@ -546,7 +551,9 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 			}
 			break;
 		}
+
 		case MOS_VAR_MACRO: {
+			*read = *current->source++;
 			switch (*read) {
 				case '\0': {
 					// end of the macro - move back to the parent
@@ -555,6 +562,7 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 					result = gsRead(transInfo, read);
 					break;
 				}
+
 				case '|': {
 					// interpret pipe-escaped characters
 					if (*current->source == '\0') {
@@ -603,6 +611,7 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 					}
 					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
 					if (*end == '>' && end > current->source) {
+						// TODO extract number logic into a function, and add an API for it
 						// is this a number?
 						int number = 0;
 						int base = 10;
@@ -649,7 +658,7 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 									newTransInfo->source = var->value;
 									newTransInfo->parent = current;
 									// TODO - deal with different variable types
-									// if variable is a number we need to strigify it
+									// if variable is a number will need to store some metadata
 									// if var is code we need to execute it with a suitable buffer to get the value
 									// if var is an expression, we will need to evaluate it (when we can)
 									newTransInfo->type = var->type;
@@ -672,6 +681,9 @@ int gsRead(t_mosTransInfo ** transInfo, unsigned char * read) {
 					break;
 				}
 			}
+		}
+		case MOS_VAR_EXPANDED: {
+			// This is used for variable lookup/evaluation
 		}
 	}
 	return result;
@@ -1244,9 +1256,27 @@ int mos_cmdSET(char * ptr) {
 	return FR_INVALID_PARAMETER;
 }
 
+// Get a system variable
+// Parameters:
+// - pattern: The pattern to search for
+// - var: Pointer to the variable to return
+// if on entry var is NULL, the search will start from the beginning of the list
+// otherwise it will return the first variable after the one pointed to by var
+// Returns:
+// - var will be updated to point to the variable found, or the variable before the first match
+// - 0 if a match was found
+// - 1 if no match was found
+// - pattern match score if a partial match was found
+// 
 int mos_getSystemVariable(char *pattern, t_mosSystemVariable **var) {
-	t_mosSystemVariable *current = mosSystemVariables;
+	t_mosSystemVariable *current;
 	int matchResult = -1;
+
+	if (*var == NULL) {
+		current = mosSystemVariables;
+	} else {
+		current = (t_mosSystemVariable *)(*var)->next;
+	}
 	*var = NULL;
 
 	while (current != NULL) {
@@ -1266,21 +1296,40 @@ int mos_getSystemVariable(char *pattern, t_mosSystemVariable **var) {
 	}
 
 	if (*var != NULL) {
-		// *var = lastMatchedVar;
 		return matchResult;
 	} else {
-		// *var = NULL;
 		return -1; // Token/pattern not found
 	}
 }
 
+// SHOW [<pattern>] command
+// Will show all system variables if no pattern is provided
+// or only those variables that match the given pattern
+//
 int mos_cmdSHOW(char * ptr) {
-	// Simplistic show - iterate over all system variables and show their values
-	t_mosSystemVariable *current = mosSystemVariables;
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	int searchResult;
 
-	while (current != NULL) {
-		printf("%s = %s\r\n", current->label, current->value);
-		current = (t_mosSystemVariable *)current->next;
+	if (!mos_parseString(NULL, &token)) {
+		// Show all variables
+		token = "*";
+	}
+
+	while (mos_getSystemVariable(token, &var) == 0) {
+		printf("%s", var->label);
+		switch (var->type) {
+			case MOS_VAR_MACRO:
+				printf("(Macro) : %s\r\n", var->value);
+				break;
+			case MOS_VAR_NUMBER:
+				printf("(Number) : %d\r\n", var->value);
+				break;
+			default:
+				// Assume all other types are strings
+				printf(" : %s\r\n", var->value);
+				break;
+		}
 	}
 
 	return 0;
