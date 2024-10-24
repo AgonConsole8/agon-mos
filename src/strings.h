@@ -17,6 +17,7 @@
 #define MATCH_DISABLE_HASH     0x04
 #define MATCH_DOT_AS_STAR      0x08
 #define MATCH_BEGINS_WITH      0x10
+#define MATCH_UP_TO_SPACE      0x20
 
 extern int strcasecmp(const char *s1, const char *s2);
 

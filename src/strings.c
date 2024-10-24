@@ -65,8 +65,9 @@ int pmatch(const char *pattern, const char *string, uint8_t flags) {
 	bool disableHash = flags & MATCH_DISABLE_HASH;
 	bool dotAsStar = flags & MATCH_DOT_AS_STAR;
 	bool beginsWith = flags & MATCH_BEGINS_WITH;
+	bool upToSpace = flags & MATCH_UP_TO_SPACE;
 
-	if (*pattern == '\0') {
+	if (*pattern == '\0' || (upToSpace && *pattern == ' ')) {
 		// if the pattern has been exhausted
 		// return success if the string has also been exhausted, or we are doing a beginsWith test
 		if (beginsWith) {
