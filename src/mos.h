@@ -35,6 +35,8 @@
 #define MOS_H
 
 #include "ff.h"
+#include "defines.h"
+#include "mos_sysvars.h"
 
 extern char  	cmd[256];				// Array for the command line handler
 
@@ -49,19 +51,6 @@ typedef struct {
 	UINT8	free;
 	FIL		fileObject;
 } t_mosFileObject;
-
-/**
- * MOS-specific return codes
- * These extend the FatFS return codes FRESULT
- */
-typedef enum {
-	MOS_INVALID_COMMAND = 20,	/* (20) Command could not be understood */
-	MOS_INVALID_EXECUTABLE, 	/* (21) Executable file format not recognised */
-	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error NB this is currently unused */
-	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
-	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
-	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
-} MOSRESULT;
 
 void 	mos_error(int error);
 
@@ -80,30 +69,32 @@ int		mos_mount(void);
 BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
 
+int		mos_cmdCD(char * ptr);
+int		mos_cmdCLS(char *ptr);
+int		mos_cmdCOPY(char *ptr);
+int		mos_cmdCREDITS(char *ptr);
+int		mos_cmdDEL(char * ptr);
 int		mos_cmdDIR(char * ptr);
 int		mos_cmdDISC(char *ptr);
-int		mos_cmdLOAD(char * ptr);
-int		mos_cmdSAVE(char *ptr);
-int		mos_cmdDEL(char * ptr);
-int		mos_cmdJMP(char * ptr);
-int		mos_cmdRUN(char * ptr);
-int		mos_cmdCD(char * ptr);
-int		mos_cmdREN(char *ptr);
-int		mos_cmdCOPY(char *ptr);
-int		mos_cmdMKDIR(char *ptr);
-int		mos_cmdSET(char *ptr);
-int		mos_cmdVDU(char *ptr);
-int		mos_cmdTIME(char *ptr);
-int		mos_cmdCREDITS(char *ptr);
+int		mos_cmdECHO(char *ptr);
 int		mos_cmdEXEC(char * ptr);
-int		mos_cmdTYPE(char *ptr);
-int		mos_cmdCLS(char *ptr);
-int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
+int		mos_cmdJMP(char * ptr);
+int		mos_cmdLOAD(char * ptr);
 int		mos_cmdMEM(char *ptr);
-int		mos_cmdECHO(char *ptr);
+int		mos_cmdMKDIR(char *ptr);
+int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdPRINTF(char *ptr);
+int		mos_cmdREN(char *ptr);
+int		mos_cmdRUN(char * ptr);
+int		mos_cmdSAVE(char *ptr);
+int		mos_cmdSET(char *ptr);
+int		mos_cmdSETMACRO(char *ptr);
+int		mos_cmdSHOW(char *ptr);
+int		mos_cmdTIME(char *ptr);
+int		mos_cmdTYPE(char *ptr);
+int		mos_cmdVDU(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
@@ -188,7 +179,7 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_SAVE			"Save a block of memory to the SD card\r\n"
 #define HELP_SAVE_ARGS		"<filename> <addr> <size>"
 
-#define HELP_SET			"Set a system option\r\n\r\n" \
+#define HELP_SET			"Set assigns a string value to a system variable, or system option (via special variables)\r\n\r\n" \
 							"Keyboard Layout\r\n" \
 							"SET KEYBOARD n: Set the keyboard layout\r\n" \
 							"    0: UK (default)\r\n" \
@@ -214,7 +205,13 @@ UINT8	fat_EOF(FIL * fp);
 							"SET CONSOLE n: Serial console\r\n" \
 							"    0: Console off (default)\r\n" \
 							"    1: Console on\r\n"
-#define HELP_SET_ARGS		"<option> <value>"
+#define HELP_SET_ARGS		"<varname> <value>"
+
+#define HELP_SETMACRO		"SetMacro assigns a macro value to a system variable, which will be expanded each time it is used\r\n"
+#define HELP_SETMACRO_ARGS	"<varname> <value>"
+
+#define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified.\r\n"
+#define HELP_SHOW_ARGS		"[<variablespec>]"
 
 #define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"

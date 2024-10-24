@@ -53,11 +53,12 @@
 #include "ff.h"
 #include "strings.h"
 #include "umm_malloc.h"
+#include "mos_sysvars.h"
 #if DEBUG > 0
 # include "tests.h"
 #endif /* DEBUG */
 
-char  	cmd[256];				// Array for the command line handler
+char	cmd[256];				// Array for the command line handler
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));	// In vectors16.asm
 
@@ -105,7 +106,7 @@ static t_mosCommand mosCommands[] = {
 	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
 	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-    { "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
+	{ "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
 	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
 	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
@@ -117,6 +118,8 @@ static t_mosCommand mosCommands[] = {
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
+	{ "SETMACRO",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,		HELP_SETMACRO },
+	{ "SHOW",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
@@ -132,7 +135,7 @@ static t_mosCommand mosCommands[] = {
 static char * mos_errors[] = {
 	"OK",
 	"Error accessing SD card",
-	"Assertion failed",
+	"Internal error",
 	"SD card failure",
 	"Could not find file",
 	"Could not find path",
@@ -487,6 +490,32 @@ int mos_cmdDIR(char * ptr) {
 	return mos_DIR(path, longListing);
 }
 
+// ECHO command
+//
+int mos_cmdECHO(char *ptr) {
+	const char *p = mos_strtok_ptr;
+	char read;
+	int result;
+	t_mosTransInfo * transInfo = gsInit(p, NULL);
+
+	while (transInfo != NULL) {
+		result = gsRead(&transInfo, &read);
+		if (result != FR_OK) {
+			if (transInfo != NULL) {
+				umm_free(transInfo);
+			}
+			return result;
+		}
+		if (transInfo == NULL) {
+			break;
+		}
+		putch(read);
+	}
+
+	printf("\r\n");
+	return FR_OK;
+}
+
 // Assumes isxdigit(digit)
 static int xdigit_to_int(char digit) {
 	digit = toupper(digit);
@@ -495,107 +524,6 @@ static int xdigit_to_int(char digit) {
 	} else {
 		return digit - 55;
 	}
-}
-
-// ECHO command
-//
-int mos_cmdECHO(char *ptr) {
-	int c;
-	const char *p = mos_strtok_ptr;
-
-	while (*p) {
-		switch (*p) {
-			case '|': {
-				// interpret pipe-escaped characters
-				p++;
-
-				if (*p == 0) {
-					// no more characters, so this is an error
-					return MOS_BAD_STRING;
-				} else if (*p == '?') {
-					// prints character 127
-					putch(0x7F);
-					p++;
-				} else if (*p == '!') {
-					// prints next character with top bit set
-					p++;
-					if (*p == 0) {
-						// no more characters, so this is an error
-						return MOS_BAD_STRING;
-					}
-					putch(*p++ | 0x80);
-				} else if (*p >= 0x40 && *p < 0x7F) {
-					// characters from &40-7F (letters and some punctuation)
-					// are printed as just their bottom 5 bits
-					// (which Acorn documents as CTRL( ASCII(uppercase(char) – 64))
-					putch(*p & 0x1F);
-					p++;
-				} else {
-					// all other characters are passed thru
-					putch(*p);
-					p++;
-				}
-
-				break;
-			}
-
-			case '<': {
-				// possibly a number or variable
-				// so search for an end tag
-				char *end = p + 1;
-				while (*end && *end != '>') {
-					end++;
-				}
-				if (*end == '>' && end > p + 1) {
-					// we have one - so is this a number?
-					int number = 0;
-					int base = 10;
-					char *endptr;
-					p++;
-					*end = '\0';
-					// number can be decimal, &hex, or base_number
-					if (*p == '&') {
-						base = 16;
-						p++;
-					} else {
-						char *underscore = strchr(p, '_');
-						if (underscore != NULL && underscore > p) {
-							*underscore = '\0';
-							base = strtol(p, NULL, 10);
-							// Move p pointer to the number part
-							p = underscore + 1;
-						}
-					}
-
-					number = strtol(p, &endptr, base);
-
-					if (endptr != end) {
-						// we didn't consume whole string, so it was not a valid number
-						// we therefore should interpret it as a variable
-						// TODO
-						#if DEBUG > 0
-						printf("variable: '%.*s'\n\r", end - p, p);
-						#endif
-					} else {
-						putch(number & 0xFF);
-					}
-					p = end;
-				} else {
-					// no end tag, so just print the character
-					putch(*p);
-					p++;
-				}
-				break;
-			}
-			default:
-				putch(*p);
-				p++;
-				break;
-		}
-	}
-
-	printf("\r\n");
-	return FR_OK;
 }
 
 // PRINTF command
@@ -1017,31 +945,151 @@ int mos_cmdMKDIR(char * ptr) {
 // - MOS error code
 //
 int mos_cmdSET(char * ptr) {
-	char *	command;
+	char *	token;
+	t_mosSystemVariable * var = NULL;
 	UINT24 	value;
-	
-	if(
-		!mos_parseString(NULL, &command) ||
-		!mos_parseNumber(NULL, &value)
-	) {
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
 		return FR_INVALID_PARAMETER;
 	}
-	if(strcasecmp(command, "KEYBOARD") == 0) {
+	// "token" is first parameter, which is a string
+
+	// TODO replace KEYBOARD and CONSOLE with code type system variables
+	if (strcasecmp(token, "KEYBOARD") == 0) {
+		if (!mos_parseNumber(NULL, &value)) {
+			return FR_INVALID_PARAMETER;
+		}
 		putch(23);
 		putch(0);
 		putch(VDP_keycode);
 		putch(value & 0xFF);
 		return 0;
-	}
-	if(strcasecmp(command, "CONSOLE") == 0 && value <= 1) {
+	} else if (strcasecmp(token, "CONSOLE") == 0) {
+		if (!mos_parseNumber(NULL, &value)) {
+			return FR_INVALID_PARAMETER;
+		}
 		putch(23);
 		putch(0);
 		putch(VDP_consolemode);
 		putch(value & 0xFF);
 		return 0;
 	}
+
+	// we are setting a variable
+	// make sure we have a value
+
+	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
+	if (*mos_strtok_ptr == '\0') {
+		return FR_INVALID_PARAMETER;
+	}
+
+	// search for our token in the system variables
+	searchResult = getSystemVariable(token, &var);
+
+	// at this point var will either point to the variable we want,
+	// or the last variable in the list before our token
+
+	if (searchResult == 0) {
+		// we have found a matching variable, so replace it
+		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+	} else  {
+		// we have not found a matching variable
+		char * newValue;
+		t_mosSystemVariable *newVar;
+		newValue = expandMacro(mos_strtok_ptr);
+		newVar = createSystemVariable(token, MOS_VAR_STRING, newValue);
+		if (newVar == NULL || newValue == NULL) {
+			if (newValue) umm_free(newValue);
+			if (newVar) umm_free(newVar);
+			return FR_INT_ERR;
+		}
+		insertSystemVariable(newVar, var);
+
+		return FR_OK;
+	}
+	printf("Value is %s\r\n", mos_strtok_ptr);
+
 	return FR_INVALID_PARAMETER;
 }
+
+// SETMACRO <macro> <value> command
+//
+int mos_cmdSETMACRO(char * ptr) {
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	UINT24 	value;
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
+		return FR_INVALID_PARAMETER;
+	}
+	// "token" is first parameter, which is a string
+
+	// make sure we have a value
+	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
+	if (*mos_strtok_ptr == '\0') {
+		return FR_INVALID_PARAMETER;
+	}
+
+	// search for our token in the system variables
+	searchResult = getSystemVariable(token, &var);
+
+	if (searchResult == 0) {
+		// we have found a matching variable, so replace it
+		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+	} else  {
+		// we have not found a matching variable
+		char * newValue;
+		t_mosSystemVariable *newVar;
+		newValue = mos_strdup(mos_strtok_ptr);
+		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
+		if (newVar == NULL || newValue == NULL) {
+			if (newValue) umm_free(newValue);
+			if (newVar) umm_free(newVar);
+			return FR_INT_ERR;
+		}
+		insertSystemVariable(newVar, var);
+
+		return FR_OK;
+	}
+
+	return MOS_NOT_IMPLEMENTED;
+}
+
+// SHOW [<pattern>] command
+// Will show all system variables if no pattern is provided
+// or only those variables that match the given pattern
+//
+int mos_cmdSHOW(char * ptr) {
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
+		// Show all variables
+		token = "*";
+	}
+
+	while (getSystemVariable(token, &var) == 0) {
+		printf("%s", var->label);
+		switch (var->type) {
+			case MOS_VAR_MACRO:
+				printf("(Macro) : %s\r\n", var->value);
+				break;
+			case MOS_VAR_NUMBER:
+				printf("(Number) : %d\r\n", var->value);
+				break;
+			default:
+				// Assume all other types are strings
+				printf(" : %s\r\n", var->value);
+				break;
+		}
+	}
+
+	return 0;
+}
+
 
 // VDU <char1> <char2> ... <charN>
 // Parameters:
