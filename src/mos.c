@@ -208,40 +208,18 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 // Parameters:
 // - ptr: Pointer to the MOS command in the line edit buffer
 // Returns:
-// - Function pointer, or 0 if command not found
+// - Command pointer, or 0 if command not found
 //
 t_mosCommand *mos_getCommand(char * ptr) {
-	int	   i;
-	t_mosCommand * cmd;	
-	for(i = 0; i < mosCommands_count; i++) {
+	int i;
+	t_mosCommand * cmd;
+	for (i = 0; i < mosCommands_count; i++) {
 		cmd = &mosCommands[i];
-		if(mos_cmp(cmd->name, ptr) == 0) {
-			//return cmd->func;
+		if (pmatch(ptr, cmd->name, MATCH_COMMANDS) == 0) {
 			return cmd;
 		}
 	}
 	return NULL;
-}
-
-// Case insensitive commpare with abbreviations
-// Parameters:
-// - p1: The command to be compared against
-// - p2: The inputted command
-//
-BOOL mos_cmp(const char *p1, const char *p2) {
-	char c1;
-	char c2;	
-	do {		
-		c1 = toupper(*p1++);
-		c2 = toupper(*p2++);
-		if(c2 == '.') {
-			c1 = 0;
-			c2 = 0;
-		}
-		if(c1 < 0x20) c1 = 0;
-		if(c2 < 0x20) c2 = 0;
-	} while(c1 && c2 && c1 == c2);
-	return (const unsigned char*)c1 - (const unsigned char*)c2;
 }
 
 // String trim function
@@ -399,6 +377,8 @@ int mos_exec(char * buffer, BOOL in_mos) {
 
 	ptr = mos_strtok(ptr, " ");
 	if (ptr != NULL) {
+		// TODO - handle command aliases
+		// which will mean looking up aliases, and then doing string replacement
 		cmd = mos_getCommand(ptr);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
@@ -1382,40 +1362,45 @@ int mos_cmdHELP(char *ptr) {
 		cmd = "help";
 	}
 
-	for (i = 0; i < mosCommands_count; ++i) {
-		if (strcasecmp(cmd, mosCommands[i].name) == 0) {
-			printCommandInfo(&mosCommands[i], TRUE);
-			if (!hasCmd) {
-				// must be showing "help" command with no args, so show list of all commands
-				int col = 0;
-				int maxCol = scrcols;
-				printf("List of commands:\r\n");
-				for (i = 1; i < mosCommands_count; ++i) {
-					if (mosCommands[i].help == NULL) continue;
-					if (col + strlen(mosCommands[i].name) + 2 >= maxCol) {
-						printf("\r\n");
-						col = 0;
-					}
-					printf("%s", mosCommands[i].name);
-					if (i < mosCommands_count - 1) {
-						printf(", ");
-					}
-					col += strlen(mosCommands[i].name) + 2;
-				}
-				printf("\r\n");
-			}
-			return 0;
-		}
-	}
-
-	if (hasCmd && strcasecmp(cmd, "all") == 0) {
+	if (strcasecmp(cmd, "all") == 0) {
 		for (i = 0; i < mosCommands_count; ++i) {
 			printCommandInfo(&mosCommands[i], FALSE);
 		}
 		return 0;
 	}
 
-	printf("Command not found: %s\r\n", cmd);
+	do {
+		BOOL found = false;
+		for (i = 0; i < mosCommands_count; ++i) {
+			if (pmatch(cmd, mosCommands[i].name, MATCH_COMMANDS) == 0) {
+				found = true;
+				printCommandInfo(&mosCommands[i], TRUE);
+				if (!hasCmd) {
+					// must be showing "help" command with no args, so show list of all commands
+					int col = 0;
+					int maxCol = scrcols;
+					printf("List of commands:\r\n");
+					for (i = 1; i < mosCommands_count; ++i) {
+						if (mosCommands[i].help == NULL) continue;
+						if (col + strlen(mosCommands[i].name) + 2 >= maxCol) {
+							printf("\r\n");
+							col = 0;
+						}
+						printf("%s", mosCommands[i].name);
+						if (i < mosCommands_count - 1) {
+							printf(", ");
+						}
+						col += strlen(mosCommands[i].name) + 2;
+					}
+					printf("\r\n");
+				}
+			}
+		}
+		if (!found) {
+			printf("Command not found: %s\r\n", cmd);
+		}
+	} while (mos_parseString(NULL, &cmd));
+
 	return 0;
 }
 

@@ -76,7 +76,7 @@ int pmatch(const char *pattern, const char *string, uint8_t flags) {
 		return *string == '\0' ? 0 : -1;
 	} else if (
 		(*pattern == '*' && !disableStar) ||
-		(*pattern == '.' && dotAsStar && *(pattern + 1) == '\0')
+		(*pattern == '.' && dotAsStar && *(pattern + 1) <= ' ')
 	) {
 		// Skip the globbed wildcard and try to match the rest of the pattern with the current string
 		// or skip one character in the string and try to match again

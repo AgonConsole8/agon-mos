@@ -420,6 +420,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 									strcpy(search_term, buffer);
 									strcat(search_term, ".");
 									
+									// TODO add support for expansion of aliases
 									cmd = mos_getCommand(search_term);
 									if (cmd != NULL) { //First try internal MOS commands
 										
