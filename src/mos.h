@@ -94,6 +94,7 @@ int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
 int		mos_cmdTIME(char *ptr);
 int		mos_cmdTYPE(char *ptr);
+int		mos_cmdUNSET(char *ptr);
 int		mos_cmdVDU(char *ptr);
 
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
@@ -215,6 +216,9 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"
+
+#define HELP_UNSET			"Unset deletes a system variable\r\n"
+#define HELP_UNSET_ARGS		"<varname>"
 
 #define HELP_VDU			"Write a stream of characters to the VDP\r\n" \
 							"Character values are converted to bytes before sending\r\n"

@@ -48,10 +48,9 @@ void	insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * befor
 // update system variable object
 void	updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value);
 // delete system variable object
-// int		deleteSystemVariable(t_mosSystemVariable * var);
-// find parent system variable object
-// t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var);
-
+void	removeSystemVariable(t_mosSystemVariable * var);
+// find parent system variable object (used for deleting)
+t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var);
 
 t_mosTransInfo * gsInit(void * source, void * parent);
 int		gsRead(t_mosTransInfo ** transInfo, char * read);

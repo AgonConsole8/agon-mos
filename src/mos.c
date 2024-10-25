@@ -122,6 +122,7 @@ static t_mosCommand mosCommands[] = {
 	{ "SHOW",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
+	{ "UNSET",		&mos_cmdUNSET,		HELP_UNSET_ARGS,	HELP_UNSET },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
 #if DEBUG > 0
 	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		NULL,		"Run the MOS OS test suite" },
@@ -1102,6 +1103,35 @@ int mos_cmdSHOW(char * ptr) {
 	}
 
 	return 0;
+}
+
+// UNSET <varname> command
+// Removes variables matching the varname pattern
+// NB "code" variables cannot be removed via this command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdUNSET(char * ptr) {
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
+		return FR_INVALID_PARAMETER;
+	}
+
+	searchResult = getSystemVariable(token, &var);
+
+	while (searchResult == 0) {
+		if (var->type != MOS_VAR_CODE) {
+			removeSystemVariable(var);
+		}
+		searchResult = getSystemVariable(token, &var);
+	}
+
+	return FR_OK;
 }
 
 

@@ -95,6 +95,38 @@ void updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * val
 	var->value = value;
 }
 
+// delete system variable object
+void removeSystemVariable(t_mosSystemVariable * var) {
+	t_mosSystemVariable * parent = findParentSystemVariable(var);
+	if (parent == NULL) {
+		// we are deleting the first item in the list
+		mosSystemVariables = (t_mosSystemVariable *)var->next;
+	} else {
+		parent->next = (t_mosSystemVariable *)var->next;
+	}
+	umm_free(var->label);
+	if (var->type == MOS_VAR_MACRO || var->type == MOS_VAR_STRING) {
+		umm_free(var->value);
+	}
+	umm_free(var);
+}
+
+// find parent system variable object (used for deleting)
+t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var) {
+	t_mosSystemVariable * current = mosSystemVariables;
+	t_mosSystemVariable * parent = NULL;
+
+	while (current != NULL) {
+		if (current == var) {
+			return parent;
+		}
+		parent = current;
+		current = (t_mosSystemVariable *)current->next;
+	}
+
+	return NULL;
+}
+
 
 t_mosTransInfo * gsInit(void * source, void * parent) {
 	// TODO store pointer to most recent transInfo object
