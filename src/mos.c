@@ -1057,6 +1057,18 @@ int mos_cmdSETMACRO(char * ptr) {
 	return MOS_NOT_IMPLEMENTED;
 }
 
+void printEscapedString(char * value) {
+	while (*value) {
+		if ((unsigned char)*value < 0x20) {
+			putch('|');
+			putch(*value + 0x40);
+		} else {
+			putch(*value);
+		}
+		value++;
+	}
+}
+
 // SHOW [<pattern>] command
 // Will show all system variables if no pattern is provided
 // or only those variables that match the given pattern
@@ -1075,15 +1087,22 @@ int mos_cmdSHOW(char * ptr) {
 		printf("%s", var->label);
 		switch (var->type) {
 			case MOS_VAR_MACRO:
-				printf("(Macro) : %s\r\n", var->value);
+				printf("(Macro) : ");
+				// Macros set via SETMACRO shouldn't contain characters that need to be escaped
+				// but as they could be set via API, they potentially can, so we will escape them
+				printEscapedString(var->value);
+				printf("\r\n");
 				break;
 			case MOS_VAR_NUMBER:
 				printf("(Number) : %d\r\n", var->value);
 				break;
-			default:
+			default: {
 				// Assume all other types are strings
-				printf(" : %s\r\n", var->value);
+				printf(" : ");
+				printEscapedString(var->value);
+				printf("\r\n");
 				break;
+			}
 		}
 	}
 
