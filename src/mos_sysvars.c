@@ -81,6 +81,21 @@ void insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * befor
 	}
 }
 
+void updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value) {
+	if (var->type == MOS_VAR_MACRO || var->type == MOS_VAR_STRING) {
+		umm_free(var->value);
+	}
+
+	if (var->type == MOS_VAR_CODE) {
+		// Call setter function
+		return;
+	}
+
+	var->type = type;
+	var->value = value;
+}
+
+
 t_mosTransInfo * gsInit(void * source, void * parent) {
 	// TODO store pointer to most recent transInfo object
 	// so we can delete all objects in the chain if a new init is called

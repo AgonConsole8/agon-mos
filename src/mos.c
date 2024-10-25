@@ -946,6 +946,7 @@ int mos_cmdMKDIR(char * ptr) {
 //
 int mos_cmdSET(char * ptr) {
 	char *	token;
+	char *	newValue;
 	t_mosSystemVariable * var = NULL;
 	UINT24 	value;
 	int searchResult;
@@ -984,6 +985,8 @@ int mos_cmdSET(char * ptr) {
 		return FR_INVALID_PARAMETER;
 	}
 
+	newValue = expandMacro(mos_strtok_ptr);
+
 	// search for our token in the system variables
 	searchResult = getSystemVariable(token, &var);
 
@@ -991,13 +994,10 @@ int mos_cmdSET(char * ptr) {
 	// or the last variable in the list before our token
 
 	if (searchResult == 0) {
-		// we have found a matching variable, so replace it
-		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+		updateSystemVariable(var, MOS_VAR_STRING, newValue);
 	} else  {
 		// we have not found a matching variable
-		char * newValue;
 		t_mosSystemVariable *newVar;
-		newValue = expandMacro(mos_strtok_ptr);
 		newVar = createSystemVariable(token, MOS_VAR_STRING, newValue);
 		if (newVar == NULL || newValue == NULL) {
 			if (newValue) umm_free(newValue);
@@ -1005,18 +1005,16 @@ int mos_cmdSET(char * ptr) {
 			return FR_INT_ERR;
 		}
 		insertSystemVariable(newVar, var);
-
-		return FR_OK;
 	}
-	printf("Value is %s\r\n", mos_strtok_ptr);
 
-	return FR_INVALID_PARAMETER;
+	return FR_OK;
 }
 
 // SETMACRO <macro> <value> command
 //
 int mos_cmdSETMACRO(char * ptr) {
 	char *	token;
+	char *	newValue;
 	t_mosSystemVariable * var = NULL;
 	UINT24 	value;
 	int searchResult;
@@ -1032,17 +1030,16 @@ int mos_cmdSETMACRO(char * ptr) {
 		return FR_INVALID_PARAMETER;
 	}
 
+	newValue = mos_strdup(mos_strtok_ptr);
+
 	// search for our token in the system variables
 	searchResult = getSystemVariable(token, &var);
 
 	if (searchResult == 0) {
-		// we have found a matching variable, so replace it
-		printf("Updating %s to %s\r\n", var->label, mos_strtok_ptr);
+		updateSystemVariable(var, MOS_VAR_MACRO, newValue);
 	} else  {
 		// we have not found a matching variable
-		char * newValue;
 		t_mosSystemVariable *newVar;
-		newValue = mos_strdup(mos_strtok_ptr);
 		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
 		if (newVar == NULL || newValue == NULL) {
 			if (newValue) umm_free(newValue);
@@ -1050,11 +1047,9 @@ int mos_cmdSETMACRO(char * ptr) {
 			return FR_INT_ERR;
 		}
 		insertSystemVariable(newVar, var);
-
-		return FR_OK;
 	}
 
-	return MOS_NOT_IMPLEMENTED;
+	return FR_OK;
 }
 
 void printEscapedString(char * value) {
