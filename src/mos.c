@@ -117,8 +117,9 @@ static t_mosCommand mosCommands[] = {
 	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
-	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
-	{ "SETMACRO",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,		HELP_SETMACRO },
+	{ "Set",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
+	{ "SetEval",	&mos_cmdSETEVAL,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
+	{ "SetMacro",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
 	{ "SHOW",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
@@ -919,7 +920,7 @@ int mos_cmdMKDIR(char * ptr) {
 	return fr;
 }
 
-// SET <option> <value> command
+// SET <varname> <value> command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
@@ -967,6 +968,7 @@ int mos_cmdSET(char * ptr) {
 	}
 
 	newValue = expandMacro(mos_strtok_ptr);
+	if (!newValue) return FR_INT_ERR;
 
 	// search for our token in the system variables
 	searchResult = getSystemVariable(token, &var);
@@ -991,13 +993,65 @@ int mos_cmdSET(char * ptr) {
 	return FR_OK;
 }
 
-// SETMACRO <macro> <value> command
+// SetEval <varname> <expression> command
+//
+int mos_cmdSETEVAL(char * ptr) {
+	char *	token;
+	t_mosSystemVariable * var = NULL;
+	t_mosEvalResult * evaluation = NULL;
+	int searchResult;
+
+	if (!mos_parseString(NULL, &token)) {
+		return FR_INVALID_PARAMETER;
+	}
+	// "token" is first parameter, which is a string
+
+	// make sure we have a value
+	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
+	if (*mos_strtok_ptr == '\0') {
+		return FR_INVALID_PARAMETER;
+	}
+
+	// we need to work out the value of the expression at mos_strtok_ptr
+	// and what type it is
+	evaluation = evaluateExpression(mos_strtok_ptr);
+
+	if (evaluation == NULL) {
+		return FR_INT_ERR;
+	}
+	if (evaluation->status != FR_OK) {
+		searchResult = evaluation->status;
+		umm_free(evaluation);
+		return searchResult;
+	}
+
+	// search for our token in the system variables
+	searchResult = getSystemVariable(token, &var);
+
+	if (searchResult == 0) {
+		updateSystemVariable(var, evaluation->type, evaluation->result);
+	} else  {
+		// we have not found a matching variable
+		t_mosSystemVariable *newVar;
+		newVar = createSystemVariable(token, evaluation->type, evaluation->result);
+		if (newVar == NULL) {
+			umm_free(evaluation);
+			return FR_INT_ERR;
+		}
+		insertSystemVariable(newVar, var);
+	}
+
+	umm_free(evaluation);
+
+	return FR_OK;
+}
+
+// SETMACRO <varname> <value> command
 //
 int mos_cmdSETMACRO(char * ptr) {
 	char *	token;
 	char *	newValue;
 	t_mosSystemVariable * var = NULL;
-	UINT24 	value;
 	int searchResult;
 
 	if (!mos_parseString(NULL, &token)) {
@@ -1012,6 +1066,7 @@ int mos_cmdSETMACRO(char * ptr) {
 	}
 
 	newValue = mos_strdup(mos_strtok_ptr);
+	if (!newValue) return FR_INT_ERR;
 
 	// search for our token in the system variables
 	searchResult = getSystemVariable(token, &var);
@@ -1022,9 +1077,8 @@ int mos_cmdSETMACRO(char * ptr) {
 		// we have not found a matching variable
 		t_mosSystemVariable *newVar;
 		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
-		if (newVar == NULL || newValue == NULL) {
+		if (newVar == NULL) {
 			if (newValue) umm_free(newValue);
-			if (newVar) umm_free(newVar);
 			return FR_INT_ERR;
 		}
 		insertSystemVariable(newVar, var);

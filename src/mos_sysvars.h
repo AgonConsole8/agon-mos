@@ -36,8 +36,15 @@ typedef struct {
 typedef struct {
 	char * source;		// Pointer to current position in source string
 	void * parent;		// Pointer to parent trans object (t_mosTransInfo object) we are inserting
+	void * extraData;	// Extra for the current object, as required
 	MOSVARTYPE type;	// Type of variable we are inserting from
 } t_mosTransInfo;
+
+typedef struct {
+	void * result;
+	MOSVARTYPE type;
+	int status;
+} t_mosEvalResult;
 
 // Utility functions for managing system variables
 int		getSystemVariable(char * token, t_mosSystemVariable ** var);
@@ -56,6 +63,10 @@ t_mosTransInfo * gsInit(void * source, void * parent);
 int		gsRead(t_mosTransInfo ** transInfo, char * read);
 int		gsTrans(char * source, char * dest, int destLen, int * read);
 
+int		extractNumber(char * source, char * end, int * number);
+
 char *	expandMacro(char * source);
+
+t_mosEvalResult * evaluateExpression(char * source);
 
 #endif MOS_SYSVARS_H

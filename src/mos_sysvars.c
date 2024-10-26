@@ -174,19 +174,23 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 		}
 
 		case MOS_VAR_NUMBER: {
-			// TODO insert logic here for producing next digit of number
-			// this will need to use metadata on the current transinfo object
-			// to determine which digit we are showing, and how many digits are left
-			// algorithm will need to print one character at a time,
-			// including potential leading `-` sign
-			if (*read == '\0') {
-				// end of the number so dispose of this transInfo object
-				// and move back to the parent
+			// our transInfo object will contain the number as "source"
+			// and extraData is the current divisor
+			// we modify the source to be the remainder each time around
+
+			// If our divisor is 0, then we have finished
+			if ((int)current->extraData == 0) {
+				*read = '\0';
 				*transInfo = current->parent;
 				umm_free(current);
 				// return next read from parent
 				result = gsRead(transInfo, read);
+				break;
 			}
+
+			*read = '0' + ((int)current->source / (int)current->extraData);
+			current->source = (void *)((int)current->source % (int)current->extraData);
+			current->extraData = (void *)((int)current->extraData / 10);
 			break;
 		}
 
@@ -249,60 +253,52 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 					}
 					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
 					if (*end == '>' && end > current->source) {
-						// TODO extract number logic into a function, and add an API for it
-						// is this a number?
 						int number = 0;
-						int base = 10;
-						char *endptr = NULL;
-						char *start = current->source;
-						*end = '\0';
-						// number can be decimal, &hex, or base_number
-						if (*current->source == '&') {
-							base = 16;
-							current->source++;
-						} else {
-							char *underscore = strchr(current->source, '_');
-							if (underscore != NULL && underscore > current->source) {
-								char *baseEnd;
-								*underscore = '\0';
-								base = strtol(current->source, &baseEnd, 10);
-								if (baseEnd != underscore) {
-									// we didn't use all chars before underscore, so invalid base
-									base = -1;
-								}
-								// Move source pointer to the number part
-								current->source = underscore + 1;
-								*underscore = '_';
-							}
-						}
-
-						if (base > 1 && base <= 36) {
-							number = strtol(current->source, &endptr, base);
-						}
-
-						if (endptr != end) {
-							// we didn't consume whole string, so it was not a valid number
+						if (extractNumber(current->source, end, &number) != FR_OK) {
+							// value up to end is not a number
 							// we therefore should interpret it as a variable
 							t_mosSystemVariable * var = NULL;
 							*end = '\0';
-							current->source = start;
 							if (getSystemVariable(current->source, &var) == 0) {
 								// variable found
 								// Set up a new transInfo object
 								t_mosTransInfo * newTransInfo = umm_malloc(sizeof(t_mosTransInfo));
+								*end = '>';
 								if (newTransInfo == NULL) {
 									result = FR_INT_ERR;
 								} else {
 									newTransInfo->source = var->value;
 									newTransInfo->parent = current;
-									// TODO - deal with different variable types
-									// if variable is a number will need to store some metadata
-									// if var is code we need to execute it with a suitable buffer to get the value
-									// if var is an expression, we will need to evaluate it (when we can)
 									newTransInfo->type = var->type;
 									*transInfo = newTransInfo;
 									*end = '>';
-									result = gsRead(transInfo, read);
+									switch (var->type) {
+										case MOS_VAR_NUMBER: {
+											// extraData will track the highest power of 10 divisor
+											newTransInfo->extraData = (void *)(int)1;	// Assume 1 digit
+											if ((int)var->value < 0) {
+												// Negative number, so we need to output a `-` sign
+												newTransInfo->source = (char *)(-(int)var->value);
+												*read = '-';
+											}
+											// Work out how many digits we have
+											while (((int)newTransInfo->extraData * 10) <= (int)newTransInfo->source) {
+												newTransInfo->extraData = (void *)((int)newTransInfo->extraData * 10);
+											}
+											*transInfo = newTransInfo;
+											if ((int)var->value >= 0) {
+												// Positive number, so we need to output the first digit
+												result = gsRead(transInfo, read);
+											}
+											break;
+										}
+										case MOS_VAR_CODE: {
+											// TODO - execute read code block and cache result
+											break;
+										}
+										default:
+											result = gsRead(transInfo, read);
+									}
 								}
 							} else {
 								// variable was not found, so we need to move on to next char
@@ -321,7 +317,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 			}
 		}
 		case MOS_VAR_EXPANDED: {
-			// This is used for variable lookup/evaluation
+			// This is used for variable lookup/evaluation???
 		}
 	}
 	return result;
@@ -373,6 +369,52 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 	return FR_OK;
 }
 
+int extractNumber(char * source, char * end, int * number) {
+	int base = 10;
+	char *endptr = NULL;
+	char *start = source;
+	char lastChar = '\0';
+	if (end == NULL) {
+		end = source + strlen(source);
+	} else {
+		lastChar = *end;
+		*end = '\0';
+	}
+	// number can be decimal, &hex, or base_number
+	if (*source == '&') {
+		base = 16;
+		source++;
+	} else {
+		char *underscore = strchr(source, '_');
+		if (underscore != NULL && underscore > source) {
+			char *baseEnd;
+			*underscore = '\0';
+			base = strtol(source, &baseEnd, 10);
+			if (baseEnd != underscore) {
+				// we didn't use all chars before underscore, so invalid base
+				base = -1;
+			}
+			// Move source pointer to the number part
+			source = underscore + 1;
+			*underscore = '_';
+		}
+	}
+
+	if (base > 1 && base <= 36) {
+		*number = strtol(source, &endptr, base);
+	}
+	if (lastChar != '\0') {
+		*end = lastChar;
+	}
+
+	if (endptr != end) {
+		// we didn't consume whole string, so (for now) it's not considered a valid number
+		return FR_INVALID_PARAMETER;
+	}
+
+	return FR_OK;
+}
+
 // Expand a macro string
 // Parameters:
 // - source: The source string
@@ -401,4 +443,69 @@ char * expandMacro(char * source) {
 	}
 	dest[read] = '\0';
 	return dest;
+}
+
+t_mosEvalResult * evaluateExpression(char * source) {
+	t_mosSystemVariable * var = NULL;
+	int number = 0;
+	t_mosEvalResult * result = umm_malloc(sizeof(t_mosEvalResult));
+	if (result == NULL) {
+		return NULL;
+	}
+
+	result->result = NULL;
+	result->status = FR_OK;
+
+	// Preliminary evaluate
+	// this will not attempt to evaluate the expression
+	// instead it will first attempt to interpret source as a number
+	// and if that fails, it will attempt to interpret it as a variable
+	// expanding any macros to strings
+	// it will return the type of the result, and a copy of the result itself
+
+	// First try to interpret source as a number
+	if (extractNumber(source, NULL, &number) == FR_OK) {
+		result->type = MOS_VAR_NUMBER;
+		result->result = (void *)number;
+		return result;
+	}
+
+	// Next try to interpret source as a variable
+	if (getSystemVariable(source, &var) != 0) {
+		result->status = FR_INVALID_PARAMETER;
+		return result;
+	}
+
+	// Variable lookup worked
+	switch (var->type) {
+		case MOS_VAR_MACRO: {
+			result->result = expandMacro(var->value);
+			if (result->result == NULL) {
+				result->status = FR_INT_ERR;
+			}
+			result->type = MOS_VAR_STRING;
+			break;
+		}
+		case MOS_VAR_STRING: {
+			result->result = mos_strdup(var->value);
+			if (result->result == NULL) {
+				result->status = FR_INT_ERR;
+			}
+			result->type = MOS_VAR_STRING;
+			break;
+		}
+		case MOS_VAR_NUMBER: {
+			result->result = var->value;
+			result->type = MOS_VAR_NUMBER;
+			break;
+		}
+		default: {
+			// In principle we shouldn't find other variables
+			result->type = var->type;
+			result->status = FR_INT_ERR;
+			break;
+		}
+	}
+
+	return result;
 }

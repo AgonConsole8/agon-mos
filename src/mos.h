@@ -89,6 +89,7 @@ int		mos_cmdREN(char *ptr);
 int		mos_cmdRUN(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdSET(char *ptr);
+int		mos_cmdSETEVAL(char *ptr);
 int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
 int		mos_cmdTIME(char *ptr);
@@ -207,10 +208,13 @@ UINT8	fat_EOF(FIL * fp);
 							"    1: Console on\r\n"
 #define HELP_SET_ARGS		"<varname> <value>"
 
+#define HELP_SETEVAL		"SetEval evaluates an expression and assignes it to a system variable\r\n"
+#define HELP_SETEVAL_ARGS	"<varname> <expression>"
+
 #define HELP_SETMACRO		"SetMacro assigns a macro value to a system variable, which will be expanded each time it is used\r\n"
 #define HELP_SETMACRO_ARGS	"<varname> <value>"
 
-#define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified.\r\n"
+#define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified\r\n"
 #define HELP_SHOW_ARGS		"[<variablespec>]"
 
 #define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
