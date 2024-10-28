@@ -65,6 +65,8 @@ UINT8 	mos_execMode(UINT8 * ptr);
 
 int		mos_mount(void);
 
+void	mos_setupSystemVariables();
+
 BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
 BOOL	mos_parseString(char * ptr, char ** p_Value);
 

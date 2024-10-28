@@ -160,7 +160,6 @@ extern void _heapbot[];
 //
 int main(void) {
 	UART 	pUART0;
-	//void *  empty = NULL;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -200,6 +199,7 @@ int main(void) {
 	bootmsg();
 
 	mos_mount();									// Mount the SD card
+	mos_setupSystemVariables();						// Setup the system variables
 
 	putch(7);										// Startup beep
 	editHistoryInit();								// Initialise the command history
@@ -217,8 +217,8 @@ int main(void) {
 
 	// The main loop
 	//
-	while(1) {
-		if(mos_input(&cmd, sizeof(cmd)) == 13) {
+	while (1) {
+		if (mos_input(&cmd, sizeof(cmd)) == 13) {
 			int err = mos_exec(&cmd, TRUE);
 			if(err > 0) {
 				mos_error(err);

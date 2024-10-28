@@ -361,6 +361,10 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 	char c;
 	int result;
 	t_mosTransInfo * transInfo = gsInit(source, NULL);
+	// belt and braces - ensure we definitely don't write to NULL
+	if (dest == NULL) {
+		remaining = 0;
+	}
 	*read = 0;
 
 	if (source == NULL || source == dest) {

@@ -120,7 +120,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Set",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
 	{ "SetEval",	&mos_cmdSETEVAL,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
 	{ "SetMacro",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
-	{ "SHOW",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
+	{ "Show",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "UNSET",		&mos_cmdUNSET,		HELP_UNSET_ARGS,	HELP_UNSET },
@@ -171,7 +171,7 @@ static char * mos_errors[] = {
 // - error: The FatFS error number
 //
 void mos_error(int error) {
-	if(error >= 0 && error < mos_errors_count) {
+	if (error >= 0 && error < mos_errors_count) {
 		printf("\n\r%s\n\r", mos_errors[error]);
 	}
 }
@@ -182,7 +182,7 @@ void mos_error(int error) {
 //
 BYTE mos_getkey() {
 	BYTE ch = 0;
-	while(ch == 0) {		// Loop whilst no key pressed
+	while (ch == 0) {		// Loop whilst no key pressed
 		ch = keyascii;		// Variable keyascii is updated by interrupt
 	}
 	keyascii = 0;			// Reset keycode to debounce the key
@@ -199,7 +199,18 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	printf("%s %c", cwd, MOS_prompt);
+	t_mosSystemVariable * promptVar = NULL;
+	char * prompt = NULL;
+	retval = getSystemVariable("CLI$Prompt", &promptVar);
+	// Print our prompt
+	if (retval == 0) {
+		prompt = expandVariable(promptVar);
+	}
+	if (prompt == NULL) {
+		prompt = "*\0";
+	}
+	printf("%s", prompt);
+	umm_free(prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 3);
 	printf("\n\r");
 	return retval;
@@ -2521,3 +2532,33 @@ int mos_mount(void) {
 	return ret;
 }
 
+int readCWD(char * buffer, int * size) {
+	int len = strlen(cwd) + 1;
+	if (*size >= len) {
+		if (buffer != NULL) {
+			strncpy(buffer, cwd, len);
+		}
+	}
+	*size = len;
+	return FR_OK;
+}
+
+t_mosCodeSystemVariable cwdVar = {
+	&readCWD,
+	NULL
+};
+
+void mos_setupSystemVariables() {
+	// Set up some system variables
+	t_mosSystemVariable *newVar;
+
+	newVar = createSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
+	if (newVar != NULL) {
+		insertSystemVariable(newVar, NULL);
+	}
+
+	newVar = createSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
+	if (newVar != NULL) {
+		insertSystemVariable(newVar, NULL);
+	}
+}
