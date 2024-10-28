@@ -1126,6 +1126,16 @@ int mos_cmdSHOW(char * ptr) {
 			case MOS_VAR_NUMBER:
 				printf("(Number) : %d\r\n", var->value);
 				break;
+			case MOS_VAR_CODE: {
+				char * value = expandVariable(var);
+				if (value == NULL) {
+					printf(" : Error fetching code-based variable\r\n");
+					break;
+				}
+				printf(" : %s\r\n", value);
+				umm_free(value);
+				break;
+			}
 			default: {
 				// Assume all other types are strings
 				printf(" : ");

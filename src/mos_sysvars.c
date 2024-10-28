@@ -87,7 +87,10 @@ void updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * val
 	}
 
 	if (var->type == MOS_VAR_CODE) {
-		// Call setter function
+		// Call setter function, if we have a write function
+		if (((t_mosCodeSystemVariable *)var->value)->write != NULL) {
+			((t_mosCodeSystemVariable *)var->value)->write(value);
+		}
 		return;
 	}
 
@@ -160,11 +163,17 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 	// Do transformation based on type, if we need to
 	switch (current->type) {
 		case MOS_VAR_LITERAL:
-		case MOS_VAR_STRING: {
+		case MOS_VAR_STRING:
+		case MOS_VAR_CODE:
+		{
 			*read = *current->source++;
 			if (*read == '\0') {
 				// end of the string so dispose of this transInfo object
 				// and move back to the parent
+				if (current->type == MOS_VAR_CODE) {
+					// free cached string, pointer is stored in extraData
+					umm_free(current->extraData);
+				}
 				*transInfo = current->parent;
 				umm_free(current);
 				// return next read from parent
@@ -293,7 +302,18 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 											break;
 										}
 										case MOS_VAR_CODE: {
-											// TODO - execute read code block and cache result
+											// Cache a copy of our expanded variable
+											char * newValue = expandVariable(var);
+											if (!newValue) {
+												*read = '\0';
+												return FR_INT_ERR;
+											}
+											newTransInfo->source = newValue;
+											// extraData will point to our cached value for later release
+											newTransInfo->extraData = newValue;
+											*transInfo = newTransInfo;
+											// get first char from code block
+											result = gsRead(transInfo, read);
 											break;
 										}
 										default:
@@ -444,6 +464,65 @@ char * expandMacro(char * source) {
 	dest[read] = '\0';
 	return dest;
 }
+
+// Expand a variable
+// Parameters:
+// - var: The variable to expand
+// Returns:
+// - The expanded string
+// - NULL if an error occurred
+// NB: The caller is responsible for freeing the returned string
+//
+char * expandVariable(t_mosSystemVariable * var) {
+	if (var->type == MOS_VAR_MACRO) {
+		return expandMacro(var->value);
+	}
+	if (var->type == MOS_VAR_STRING) {
+		return mos_strdup(var->value);
+	}
+	if (var->type == MOS_VAR_NUMBER) {
+		// Work out how many digits we have
+		char * value;
+		int number = (int)var->value;
+		int digits = 1;
+		int divisor = number < 0 ? -1 : 1;
+		while (divisor * 10 <= number) {
+			divisor *= 10;
+			digits++;
+		}
+		if (number < 0) {
+			digits++;
+		}
+		value = umm_malloc(digits + 1);
+		if (value == NULL) {
+			return NULL;
+		}
+		sprintf(value, "%d", number);
+		return value;
+	}
+	if (var->type == MOS_VAR_CODE) {
+		int len = 0;
+		char * newValue = NULL;
+		int result = FR_OK;
+		// get length of our code read result
+		result = ((t_mosCodeSystemVariable *)var->value)->read(NULL, &len);
+		if (result != FR_OK) {
+			return NULL;
+		}
+		newValue = umm_malloc(len);
+		if (newValue == NULL) {
+			return NULL;
+		}
+		// get result value
+		result = ((t_mosCodeSystemVariable *)var->value)->read(newValue, &len);
+		if (result != FR_OK) {
+			umm_free(newValue);
+			return NULL;
+		}
+		return newValue;
+	}
+	return NULL;
+}		
 
 t_mosEvalResult * evaluateExpression(char * source) {
 	t_mosSystemVariable * var = NULL;

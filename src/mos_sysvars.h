@@ -27,6 +27,11 @@ typedef struct {
 	void * next;
 } t_mosSystemVariable;
 
+typedef struct {
+	int (*read)(char *buffer, int *length);
+    int (*write)(char *buffer);
+} t_mosCodeSystemVariable;
+
 /**
  * Structure to hold information for gs string transformation operations
  * Keeps a pointer to the current source string position, and the parent trans info object
@@ -66,6 +71,8 @@ int		gsTrans(char * source, char * dest, int destLen, int * read);
 int		extractNumber(char * source, char * end, int * number);
 
 char *	expandMacro(char * source);
+
+char *	expandVariable(t_mosSystemVariable * var);
 
 t_mosEvalResult * evaluateExpression(char * source);
 
