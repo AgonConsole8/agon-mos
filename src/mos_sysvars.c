@@ -324,10 +324,11 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 										}
 										case MOS_VAR_CODE: {
 											// Cache a copy of our expanded variable
-											char * newValue = expandVariable(var);
+											char * newValue = expandVariable(var, false);
 											if (!newValue) {
+												// Variable couldn't be read for some reason
 												*read = '\0';
-												return FR_INT_ERR;
+												return MOS_BAD_STRING;
 											}
 											newTransInfo->source = newValue;
 											// extraData will point to our cached value for later release
@@ -507,7 +508,7 @@ char * expandMacro(char * source) {
 // - NULL if an error occurred
 // NB: The caller is responsible for freeing the returned string
 //
-char * expandVariable(t_mosSystemVariable * var) {
+char * expandVariable(t_mosSystemVariable * var, bool showWriteOnly) {
 	if (var->type == MOS_VAR_MACRO) {
 		return expandMacro(var->value);
 	}
@@ -537,10 +538,14 @@ char * expandVariable(t_mosSystemVariable * var) {
 	if (var->type == MOS_VAR_CODE) {
 		int len = 0;
 		char * newValue = NULL;
-		int result = FR_OK;
 		// get length of our code read result
-		result = ((t_mosCodeSystemVariable *)var->value)->read(NULL, &len);
-		if (result != FR_OK) {
+		if (((t_mosCodeSystemVariable *)var->value)->read == NULL) {
+			if (showWriteOnly) {
+				return mos_strdup("(write only)");
+			}
+			return NULL;
+		}
+		if (((t_mosCodeSystemVariable *)var->value)->read(NULL, &len) != FR_OK) {
 			return NULL;
 		}
 		newValue = umm_malloc(len);
@@ -548,8 +553,7 @@ char * expandVariable(t_mosSystemVariable * var) {
 			return NULL;
 		}
 		// get result value
-		result = ((t_mosCodeSystemVariable *)var->value)->read(newValue, &len);
-		if (result != FR_OK) {
+		if (((t_mosCodeSystemVariable *)var->value)->read(newValue, &len) != FR_OK) {
 			umm_free(newValue);
 			return NULL;
 		}

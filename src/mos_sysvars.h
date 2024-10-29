@@ -74,7 +74,7 @@ int		extractNumber(char * source, char * end, int * number);
 
 char *	expandMacro(char * source);
 
-char *	expandVariable(t_mosSystemVariable * var);
+char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);
 
 t_mosEvalResult * evaluateExpression(char * source);
 

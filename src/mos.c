@@ -204,7 +204,7 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 	retval = getSystemVariable("CLI$Prompt", &promptVar);
 	// Print our prompt
 	if (retval == 0) {
-		prompt = expandVariable(promptVar);
+		prompt = expandVariable(promptVar, false);
 	}
 	if (prompt == NULL) {
 		prompt = "*\0";
@@ -949,30 +949,6 @@ int mos_cmdSET(char * ptr) {
 	}
 	// "token" is first parameter, which is a string
 
-	// TODO replace KEYBOARD and CONSOLE with code type system variables
-	if (strcasecmp(token, "KEYBOARD") == 0) {
-		if (!mos_parseNumber(NULL, &value)) {
-			return FR_INVALID_PARAMETER;
-		}
-		putch(23);
-		putch(0);
-		putch(VDP_keycode);
-		putch(value & 0xFF);
-		return 0;
-	} else if (strcasecmp(token, "CONSOLE") == 0) {
-		if (!mos_parseNumber(NULL, &value)) {
-			return FR_INVALID_PARAMETER;
-		}
-		putch(23);
-		putch(0);
-		putch(VDP_consolemode);
-		putch(value & 0xFF);
-		return 0;
-	}
-
-	// we are setting a variable
-	// make sure we have a value
-
 	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
 	if (*mos_strtok_ptr == '\0') {
 		return FR_INVALID_PARAMETER;
@@ -1139,7 +1115,7 @@ int mos_cmdSHOW(char * ptr) {
 				printf("(Number) : %d\r\n", var->value);
 				break;
 			case MOS_VAR_CODE: {
-				char * value = expandVariable(var);
+				char * value = expandVariable(var, true);
 				if (value == NULL) {
 					printf(" : Error fetching code-based variable\r\n");
 					break;
@@ -2678,6 +2654,35 @@ int writeTime(char * buffer) {
 	return FR_OK;
 }
 
+// Simplistic VDU 23,0,setting,value wrapper, extracting value as a number from buffer
+int writeVDPSetting(char * buffer, int setting) {
+	int value;
+	int result;
+
+	result = extractNumber(buffer, buffer + strlen(buffer), &value);
+
+	if (result != FR_OK) {
+		return result;
+	}
+
+	putch(23);
+	putch(0);
+	putch(setting);
+	putch(value & 0xFF);
+
+	return FR_OK;
+}
+
+// Write the "keyboard" setting to the VDP
+int writeKeyboard(char * buffer) {
+	return writeVDPSetting(buffer, VDP_keycode);
+}
+
+// Write the "console" setting to the VDP
+int writeConsole(char * buffer) {
+	return writeVDPSetting(buffer, VDP_consolemode);
+}
+
 // Current$Dir variable definition - read-only
 static t_mosCodeSystemVariable cwdVar = {
 	&readCWD,
@@ -2702,6 +2707,18 @@ static t_mosCodeSystemVariable timeVar = {
 	&writeTime
 };
 
+// Keyboard variable definition
+static t_mosCodeSystemVariable keyboardVar = {
+	NULL,
+	&writeKeyboard
+};
+
+// Console variable definition
+static t_mosCodeSystemVariable consoleVar = {
+	NULL,
+	&writeConsole
+};
+
 void mos_setupSystemVariables() {
 	// Date/time variables:
 	// Sys$Time
@@ -2717,4 +2734,8 @@ void mos_setupSystemVariables() {
 	createAndInsertSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
 	// Default CLI prompt
 	createAndInsertSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
+
+	// Keyboard and console settings
+	createAndInsertSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
+	createAndInsertSystemVariable("Console", MOS_VAR_CODE, &consoleVar);
 }
