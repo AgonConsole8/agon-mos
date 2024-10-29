@@ -988,8 +988,8 @@ int mos_cmdSET(char * ptr) {
 	// or the last variable in the list before our token
 
 	if (searchResult == 0) {
-		updateSystemVariable(var, MOS_VAR_STRING, newValue);
-	} else  {
+		return updateSystemVariable(var, MOS_VAR_STRING, newValue);
+	} else {
 		// we have not found a matching variable
 		t_mosSystemVariable *newVar;
 		newVar = createSystemVariable(token, MOS_VAR_STRING, newValue);
@@ -1010,7 +1010,7 @@ int mos_cmdSETEVAL(char * ptr) {
 	char *	token;
 	t_mosSystemVariable * var = NULL;
 	t_mosEvalResult * evaluation = NULL;
-	int searchResult;
+	int result;
 
 	if (!mos_parseString(NULL, &token)) {
 		return FR_INVALID_PARAMETER;
@@ -1031,17 +1031,17 @@ int mos_cmdSETEVAL(char * ptr) {
 		return FR_INT_ERR;
 	}
 	if (evaluation->status != FR_OK) {
-		searchResult = evaluation->status;
+		result = evaluation->status;
 		umm_free(evaluation);
-		return searchResult;
+		return result;
 	}
 
 	// search for our token in the system variables
-	searchResult = getSystemVariable(token, &var);
+	result = getSystemVariable(token, &var);
 
-	if (searchResult == 0) {
-		updateSystemVariable(var, evaluation->type, evaluation->result);
-	} else  {
+	if (result == 0) {
+		result = updateSystemVariable(var, evaluation->type, evaluation->result);
+	} else {
 		// we have not found a matching variable
 		t_mosSystemVariable *newVar;
 		newVar = createSystemVariable(token, evaluation->type, evaluation->result);
@@ -1050,11 +1050,12 @@ int mos_cmdSETEVAL(char * ptr) {
 			return FR_INT_ERR;
 		}
 		insertSystemVariable(newVar, var);
+		result = FR_OK;
 	}
 
 	umm_free(evaluation);
 
-	return FR_OK;
+	return result;
 }
 
 // SETMACRO <varname> <value> command
@@ -1083,8 +1084,8 @@ int mos_cmdSETMACRO(char * ptr) {
 	searchResult = getSystemVariable(token, &var);
 
 	if (searchResult == 0) {
-		updateSystemVariable(var, MOS_VAR_MACRO, newValue);
-	} else  {
+		return updateSystemVariable(var, MOS_VAR_MACRO, newValue);
+	} else {
 		// we have not found a matching variable
 		t_mosSystemVariable *newVar;
 		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
@@ -1263,7 +1264,7 @@ int mos_cmdTIME(char *ptr) {
 
 	// If there is a first parameter
 	//
-	if(mos_parseNumber(NULL, &yr)) {
+	if (mos_parseNumber(NULL, &yr)) {
 		//
 		// Fetch the rest of the parameters
 		//
@@ -2532,6 +2533,10 @@ int mos_mount(void) {
 	return ret;
 }
 
+// Support functions for code-type system variables
+//
+
+// Read the current working directory
 int readCWD(char * buffer, int * size) {
 	int len = strlen(cwd) + 1;
 	if (*size >= len) {
@@ -2543,22 +2548,173 @@ int readCWD(char * buffer, int * size) {
 	return FR_OK;
 }
 
-t_mosCodeSystemVariable cwdVar = {
+// Read the year
+int readYear(char * buffer, int * size) {
+	vdp_time_t t;
+	int len = 5;	// 4 digits + null terminator = not y10k compliant ;)
+
+	if (!buffer) {
+		*size = len;
+		return FR_OK;
+	}
+
+	// Assume that the RTC has been updated ?
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	if (*size >= len) {
+		if (buffer != NULL) {
+			sprintf(buffer, "%04d\0", t.year);
+		}
+	}
+	*size = len;
+	return FR_OK;
+}
+
+// Write the year
+int writeYear(char * buffer) {
+	vdp_time_t t;
+	int	yr;
+	int result;
+	char writeBuffer[6];
+
+	// attempt to read the year
+	result = extractNumber(buffer, buffer + 4, &yr);
+	if (result != FR_OK) {
+		return result;
+	}
+
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	writeBuffer[0] = yr - EPOCH_YEAR;
+	writeBuffer[1] = t.month;
+	writeBuffer[2] = t.day;
+	writeBuffer[3] = t.hour;
+	writeBuffer[4] = t.minute;
+	writeBuffer[5] = t.second;
+	mos_SETRTC((UINT24)writeBuffer);
+
+	rtc_update();
+	return FR_OK;
+}
+
+// Read the date
+int readDate(char * buffer, int * size) {
+	vdp_time_t t;
+	// Date format is Day,dd mmm
+	// or Day, d mmm
+	int len = 11;	// 10 characters + null terminator
+
+	if (!buffer || *size < len) {
+		*size = len;
+		return FR_OK;
+	}
+
+	// Assume that the RTC has been updated ?
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	rtc_formatDate((char *)buffer, &t);
+
+	*size = len;
+	return FR_OK;
+}
+
+// Read the time
+int readTime(char * buffer, int * size) {
+	vdp_time_t t;
+	// Time format is hh:mm:ss
+	int len = 9;	// 8 characters + null terminator
+
+	if (!buffer || *size < len) {
+		*size = len;
+		return FR_OK;
+	}
+
+	// Assume that the RTC has been updated ?
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	rtc_formatTime((char *)buffer, &t);
+
+	*size = len;
+	return FR_OK;
+}
+
+// Update the time
+int writeTime(char * buffer) {
+	vdp_time_t t;
+	int	hr, min, sec;
+	int result;
+	char writeBuffer[6];
+
+	// attempt to read the time
+	result = extractNumber(buffer, buffer + 2, &hr);
+	if (result != FR_OK) {
+		return result;
+	}
+	result = extractNumber(buffer + 3, buffer + 5, &min);
+	if (result != FR_OK) {
+		return result;
+	}
+	result = extractNumber(buffer + 6, buffer + 8, &sec);
+	if (result != FR_OK) {
+		return result;
+	}
+
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	writeBuffer[0] = t.year - EPOCH_YEAR;
+	writeBuffer[1] = t.month;
+	writeBuffer[2] = t.day;
+	writeBuffer[3] = hr;
+	writeBuffer[4] = min;
+	writeBuffer[5] = sec;
+	mos_SETRTC((UINT24)writeBuffer);
+
+	rtc_update();
+	return FR_OK;
+}
+
+// Current$Dir variable definition - read-only
+static t_mosCodeSystemVariable cwdVar = {
 	&readCWD,
 	NULL
 };
 
+// Sys$Year variable definition
+static t_mosCodeSystemVariable yearVar = {
+	&readYear,
+	&writeYear
+};
+
+// Sys$Date variable definition - read-only (for now)
+static t_mosCodeSystemVariable dateVar = {
+	&readDate,
+	NULL
+};
+
+// Sys$Time variable definition
+static t_mosCodeSystemVariable timeVar = {
+	&readTime,
+	&writeTime
+};
+
 void mos_setupSystemVariables() {
-	// Set up some system variables
-	t_mosSystemVariable *newVar;
-
-	newVar = createSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
-	if (newVar != NULL) {
-		insertSystemVariable(newVar, NULL);
-	}
-
-	newVar = createSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
-	if (newVar != NULL) {
-		insertSystemVariable(newVar, NULL);
-	}
+	// Date/time variables:
+	// Sys$Time
+	// Sys$Date
+	// Sys$Year
+	// TODO consider how to handle reading these sysvars without spamming the VDP for updates
+	// as using all three in a single command would result in three VDP RTC reads
+	// A simplistic approach would be to only update the RTC sysvar when Sys$Time is read
+	createAndInsertSystemVariable("Sys$Time", MOS_VAR_CODE, &timeVar);
+	createAndInsertSystemVariable("Sys$Date", MOS_VAR_CODE, &dateVar);
+	createAndInsertSystemVariable("Sys$Year", MOS_VAR_CODE, &yearVar);
+	// Current working directory
+	createAndInsertSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
+	// Default CLI prompt
+	createAndInsertSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
 }

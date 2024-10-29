@@ -81,7 +81,26 @@ void insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * befor
 	}
 }
 
-void updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value) {
+// create and insert/replace system variable object
+// intended for system use only - may silently fail if a creation error occurs
+void createAndInsertSystemVariable(char * label, MOSVARTYPE type, void * value) {
+	t_mosSystemVariable * var = NULL;
+	int result = getSystemVariable(label, &var);
+	if (result == 0) {
+		// we have found a matching variable
+		updateSystemVariable(var, type, value);
+	} else {
+		// we have not found a matching variable
+		t_mosSystemVariable * newVar = createSystemVariable(label, type, value);
+		if (newVar != NULL) {
+			insertSystemVariable(newVar, var);
+		}
+	}
+}
+
+// update system variable object
+// returns a status code
+int updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value) {
 	if (var->type == MOS_VAR_MACRO || var->type == MOS_VAR_STRING) {
 		umm_free(var->value);
 	}
@@ -89,13 +108,15 @@ void updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * val
 	if (var->type == MOS_VAR_CODE) {
 		// Call setter function, if we have a write function
 		if (((t_mosCodeSystemVariable *)var->value)->write != NULL) {
-			((t_mosCodeSystemVariable *)var->value)->write(value);
+			return ((t_mosCodeSystemVariable *)var->value)->write(value);
 		}
-		return;
+		// read-only variables will ignore the update
+		return FR_OK;
 	}
 
 	var->type = type;
 	var->value = value;
+	return FR_OK;
 }
 
 // delete system variable object
@@ -393,6 +414,15 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 	return FR_OK;
 }
 
+// Extract a number from a string
+// Parameters:
+// - source: The source string
+// - end: The end point in the source string for extraction, or null for whole string
+// - number: Pointer to an integer to store the extracted number
+// Returns:
+// - FR_OK if successful
+// - FR_INVALID_PARAMETER if the number could not be extracted, or the string was not fully consumed
+//
 int extractNumber(char * source, char * end, int * number) {
 	int base = 10;
 	char *endptr = NULL;

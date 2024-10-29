@@ -53,7 +53,7 @@ const char * rtc_months[12][2] = {
 // Request an update of the RTC from the ESP32
 //
 void rtc_update() {
-	if(!rtc_enable) {
+	if (!rtc_enable) {
 		return;
 	}
 	vpd_protocol_flags &= 0xDF;	// Reset bit 5
@@ -63,7 +63,7 @@ void rtc_update() {
 	putch(VDP_rtc);
 	putch(0);					// 0: Get time
 
-	while((vpd_protocol_flags & 0x20) == 0);	
+	while ((vpd_protocol_flags & 0x20) == 0);	
 }
 
 // Unpack a 6-byte RTC packet into time struct
@@ -89,4 +89,16 @@ void rtc_unpack(UINT8 * buffer, vdp_time_t * t) {
 //
 void rtc_formatDateTime(char * buffer, vdp_time_t * t) {
 	sprintf(buffer, "%s, %02d/%02d/%4d %02d:%02d:%02d", rtc_days[t->dayOfWeek][0], t->day, t->month + 1, t->year, t->hour, t->minute, t->second);
+}
+
+// Format a date-only string
+//
+void rtc_formatDate(char * buffer, vdp_time_t * t) {
+	sprintf(buffer, "%s,%s%d %s\0", rtc_days[t->dayOfWeek][0], t->day < 10 ? " " : "", t->day, rtc_months[t->month][0]);
+}
+
+// Format a time-only string
+//
+void rtc_formatTime(char * buffer, vdp_time_t * t) {
+	sprintf(buffer, "%02d:%02d:%02d", t->hour, t->minute, t->second);
 }

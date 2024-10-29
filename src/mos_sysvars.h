@@ -57,8 +57,10 @@ int		getSystemVariable(char * token, t_mosSystemVariable ** var);
 t_mosSystemVariable * createSystemVariable(char * label, MOSVARTYPE type, void * value);
 // insert system variable object
 void	insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * before);
+// create and insert/replace system variable object
+void	createAndInsertSystemVariable(char * label, MOSVARTYPE type, void * value);
 // update system variable object
-void	updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value);
+int		updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value);
 // delete system variable object
 void	removeSystemVariable(t_mosSystemVariable * var);
 // find parent system variable object (used for deleting)
