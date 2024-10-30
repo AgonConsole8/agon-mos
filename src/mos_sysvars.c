@@ -284,7 +284,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
 					if (*end == '>' && end > current->source) {
 						int number = 0;
-						if (extractNumber(current->source, &end, &number, 0) != FR_OK) {
+						if (!extractNumber(current->source, &end, ">", &number, 0)) {
 							// value up to end is not a number
 							// we therefore should interpret it as a variable
 							t_mosSystemVariable * var = NULL;
@@ -418,37 +418,43 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 // Extract a number from a string
 // Parameters:
 // - source: The source string
-// - end: The end point in the source string for extraction, a pointer to a token divider string (if flag set) or null for whole string
+// - end: The end point in the source string for extraction,
+//		or null for whole string
+// - divider: The token divider string - null for default (space)
 // - number: Pointer to an integer to store the extracted number
 // - flags: Flags to control extraction
 // Returns:
-// - FR_OK if successful
-// - FR_INVALID_PARAMETER if the number could not be extracted, or the string was not fully consumed
+// - TRUE if successful
+// - FALSE if the number could not be extracted, or the string was not fully consumed
 // - end will be updated to point to the end of the number
 //
-int extractNumber(char * source, char ** end, int * number, BYTE flags) {
+bool extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags) {
 	int base = 10;
 	char *endptr = NULL;
 	char *parseEnd = NULL;
+	char *start = source;
 	char lastChar = '\0';
 
-	// Work out what our endptr should be
-	if (flags & EXTRACT_FLAG_TOKEN_END) {
-		if (end == NULL || *end == NULL) {
-			// no end token found
-			return FR_INVALID_PARAMETER;
-		}
-		// skip our source past any start token dividers
-		source += strspn(source, *end);
-		// then find where our current token ends (or the end of the string)
-		endptr = source + strcspn(source, *end) - 1;
-	} else if (end == NULL || *end == NULL) {
-		endptr = source + strlen(source);
+	if (divider == NULL) {
+		divider = " ";
+	}
+
+	// skip our source past any start token dividers
+	start += strspn(start, divider);
+
+	if (end == NULL || *end == NULL || *end == source) {
+		// No explicit end provided, so set to next divider, or string end
+		endptr = start + strcspn(start, divider);
 	} else {
 		endptr = *end;
 	}
 	lastChar = *endptr;
 	*endptr = '\0';
+
+	if (strlen(start) == 0) {
+		*endptr = lastChar;
+		return false;
+	}
 
 	// number can be decimal, &hex, or base_number
 	if (flags & EXTRACT_FLAG_H_SUFFIX_HEX) {
@@ -458,51 +464,95 @@ int extractNumber(char * source, char ** end, int * number, BYTE flags) {
 			endptr--;
 		}
 	}
-	if (*source == '&') {
+	if (*start == '&') {
 		base = 16;
-		source++;
-	} else if (*source == '0' && ((*(source + 1) == 'x') || (*(source + 1) == 'X'))) {
+		start++;
+	} else if (*start == '0' && ((*(start + 1) == 'x') || (*(start + 1) == 'X'))) {
 		base = 16;
-		source += 2;
+		start += 2;
 	} else if (base != 16) {
-		char *underscore = strchr(source, '_');
-		if (underscore != NULL && underscore > source) {
+		char *underscore = strchr(start, '_');
+		if (underscore != NULL && underscore > start) {
 			char *baseEnd;
 			*underscore = '\0';
-			base = strtol(source, &baseEnd, 10);
+			base = strtol(start, &baseEnd, 10);
 			if (baseEnd != underscore) {
 				// we didn't use all chars before underscore, so invalid base
 				base = -1;
 			}
-			// Move source pointer to the number part
-			source = underscore + 1;
+			// Move start pointer to the number part
+			start = underscore + 1;
 			*underscore = '_';
 		}
 	}
 
 	if ((flags & EXTRACT_FLAG_DECIMAL_ONLY) && base != 10) {
 		*endptr = lastChar;
-		return FR_INVALID_PARAMETER;
+		return false;
 	}
 
 	if (base > 1 && base <= 36) {
-		*number = strtol(source, &parseEnd, base);
+		*number = strtol(start, &parseEnd, base);
 	} else {
-		return FR_INVALID_PARAMETER;
-	}
-
-	if (parseEnd < endptr || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
-		// we didn't consume whole string, or negative found for positive only
-		return FR_INVALID_PARAMETER;
+		return false;
 	}
 
 	*endptr = lastChar;
+
+	// if ((parseEnd < endptr && *end != source) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
+	if ((parseEnd < endptr) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
+		// we didn't consume whole string, or negative found for positive only
+		if (*end == source) {
+			// update our end pointer to point to where we reached
+			*end = parseEnd;
+		}
+		return false;
+	}
 
 	if (end != NULL) {
 		*end = parseEnd;
 	}
 
-	return FR_OK;
+	return true;
+}
+
+// Extract a string
+// Parameters:
+// - source: Pointer to the source string (will be advanced)
+// - result: Pointer to pointer for result string
+// - divider: The token divider string - null for default (space)
+// Returns:
+// - True if successful
+// - False if the string could not be extracted
+// - source will be advanced to point to the end of the string
+// - result point to start of found string and will be null terminated
+//
+bool extractString(char ** source, char ** result, char * divider) {
+	char *start = *source;
+	char *endptr = NULL;
+
+	if (divider == NULL) {
+		divider = " ";
+	}
+
+	// skip our source past any start token dividers
+	start = start + strspn(start, divider);
+	endptr = start + strcspn(start, divider);
+
+	if (strlen(start) == 0 || endptr == start) {
+		*source = start;
+		return false;
+	}
+
+	if (*endptr != '\0') {
+		*endptr = '\0';
+		endptr++;
+	}
+
+	*result = start;
+	*source = endptr;
+
+	return true;
 }
 
 // Expand a macro string
@@ -616,7 +666,7 @@ t_mosEvalResult * evaluateExpression(char * source) {
 	// it will return the type of the result, and a copy of the result itself
 
 	// First try to interpret source as a number
-	if (extractNumber(source, NULL, &number, 0) == FR_OK) {
+	if (extractNumber(source, NULL, NULL, &number, 0)) {
 		result->type = MOS_VAR_NUMBER;
 		result->result = (void *)number;
 		return result;

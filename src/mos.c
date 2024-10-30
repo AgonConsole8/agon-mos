@@ -345,22 +345,24 @@ BOOL mos_parseNumber(char * ptr, UINT24 * p_Value) {
 BOOL mos_parseString(char * ptr, char ** p_Value) {
 	char *	p = ptr;
 
+	// TODO consider that this is always called with ptr = NULL
+
 	p = mos_strtok(p, " ");
-	if(p == NULL) {
+	if (p == NULL) {
 		return 0;
 	}
 	*p_Value = p;
 	return 1;
 }
 
-int mos_runBin(UINT24 addr) {
+int mos_runBin(UINT24 addr, char * args) {
 	UINT8 mode = mos_execMode((UINT8 *)addr);
-	switch(mode) {
+	switch (mode) {
 		case 0:		// Z80 mode
-			return exec16(addr, mos_strtok_ptr);
+			return exec16(addr, args);
 			break;
 		case 1: 	// ADL mode
-			return exec24(addr, mos_strtok_ptr);
+			return exec24(addr, args);
 			break;	
 		default:	// Unrecognised header
 			return MOS_INVALID_EXECUTABLE;
@@ -416,7 +418,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 				sprintf(path, "/mos/%s.bin", ptr);
 				fr = mos_LOAD(path, MOS_starLoadAddress, 0);
 				if (fr == FR_OK) {
-					return mos_runBin(MOS_starLoadAddress);
+					return mos_runBin(MOS_starLoadAddress, mos_strtok_ptr);
 				}
 				if (fr == MOS_OVERLAPPING_SYSTEM) {
 					return fr;
@@ -426,7 +428,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					sprintf(path, "%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress);
+						return mos_runBin(MOS_defaultLoadAddress, mos_strtok_ptr);
 					}
 					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
@@ -434,7 +436,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					sprintf(path, "/bin/%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress);
+						return mos_runBin(MOS_defaultLoadAddress, mos_strtok_ptr);
 					}
 					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
@@ -836,9 +838,9 @@ int mos_cmdDEL(char * ptr) {
 int mos_cmdJMP(char *ptr) {
 	UINT24 	addr;
 	void (* dest)(void) = 0;
-	if(!mos_parseNumber(NULL, &addr)) {
+	if (!extractNumber(ptr, &ptr, NULL, &addr, 0)) {
 		return FR_INVALID_PARAMETER;
-	};
+	}
 	dest = (void *)addr;
 	dest();
 	return 0;
@@ -852,11 +854,10 @@ int mos_cmdJMP(char *ptr) {
 //
 int mos_cmdRUN(char *ptr) {
 	UINT24 	addr;
-	
-	if(!mos_parseNumber(NULL, &addr)) {
+	if (!extractNumber(ptr, &ptr, NULL, &addr, 0)) {
 		addr = MOS_defaultLoadAddress;
 	}
-	return mos_runBin(addr);
+	return mos_runBin(addr, ++ptr);
 }
 
 // CD <path> command
@@ -870,9 +871,7 @@ int mos_cmdCD(char * ptr) {
 	
 	FRESULT	fr;
 	
-	if(
-		!mos_parseString(NULL, &path) 
-	) {
+	if (!mos_parseString(NULL, &path)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
@@ -1185,37 +1184,28 @@ int mos_cmdUNSET(char * ptr) {
 // - MOS error code
 //
 int mos_cmdVDU(char *ptr) {
-	char * value_str;
-	char * endToken = " ,";
+	char * value_str = ptr;
+	char * token = NULL;
+	char * delimiter = ", ";
 
-	// TODO replace mos_parseString with extractString
-	// We loop here extracting strings as we need to additionally look for semicolons
-	// which parseNumber cannot handle
-	while (mos_parseString(NULL, &value_str)) {
+	while (extractString(&value_str, &token, delimiter)) {
 		bool is_word = false;
 		int value;
-		char *endPtr;
-		size_t len = strlen(value_str);
-
-		// Strip trailing comma (as we're using mos_parseString which doesn't understand them)
-		if (value_str[len - 1] == ',') {
-			value_str[len - 1] = '\0';
-			len--;
-		}
+		char *endPtr = NULL;
+		size_t len = strlen(token);
 
 		// Strip semicolon notation and set as word
-		if (len > 0 && value_str[len - 1] == ';') {
-			value_str[len - 1] = '\0';
+		if (len > 0 && token[len - 1] == ';') {
+			token[len - 1] = '\0';
 			len--;
 			is_word = true;
 		}
 
-		endPtr = endToken;
-		if (extractNumber(value_str, &endPtr, &value, EXTRACT_FLAG_H_SUFFIX_HEX) != FR_OK) {
+		if (!extractNumber(token, &endPtr, delimiter, &value, EXTRACT_FLAG_H_SUFFIX_HEX)) {
 			return FR_INVALID_PARAMETER;
 		}
 
-		if ((endPtr != NULL && endPtr < value_str + len) || value > 65535) {
+		if ((endPtr != NULL && endPtr < token + len) || value > 65535) {
 			// Did not consume all of the string, or value too large
 			return FR_INVALID_PARAMETER;
 		}
@@ -1242,21 +1232,19 @@ int mos_cmdVDU(char *ptr) {
 // - 0
 //
 int mos_cmdTIME(char *ptr) {
-	UINT24	yr, mo, da, ho, mi, se;
+	int		yr, mo, da, ho, mi, se;
 	char	buffer[64];
 
-	// If there is a first parameter
-	//
-	if (mos_parseNumber(NULL, &yr)) {
-		//
-		// Fetch the rest of the parameters
-		//
+	if (strlen(ptr) != 0) {
+		// look for yr, mo, da, ho, mi, se
+		// if we find them all, set the time
 		if (
-			!mos_parseNumber(NULL, &mo) ||
-			!mos_parseNumber(NULL, &da) ||
-			!mos_parseNumber(NULL, &ho) ||
-			!mos_parseNumber(NULL, &mi) ||
-			!mos_parseNumber(NULL, &se) 
+			!extractNumber(ptr, &ptr, NULL, &yr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY) ||
+			!extractNumber(ptr, &ptr, NULL, &mo, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY) ||
+			!extractNumber(ptr, &ptr, NULL, &da, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY) ||
+			!extractNumber(ptr, &ptr, NULL, &ho, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY) ||
+			!extractNumber(ptr, &ptr, NULL, &mi, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY) ||
+			!extractNumber(ptr, &ptr, NULL, &se, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)
 		) {
 			return FR_INVALID_PARAMETER;
 		}
@@ -1268,8 +1256,8 @@ int mos_cmdTIME(char *ptr) {
 		buffer[5] = se;
 		mos_SETRTC((UINT24)buffer);
 	}
+
 	// Return the new time
-	//
 	mos_GETRTC((UINT24)buffer);
 	printf("%s\n\r", buffer);
 	return 0;
@@ -2559,14 +2547,12 @@ int readYear(char * buffer, int * size) {
 int writeYear(char * buffer) {
 	vdp_time_t t;
 	int	yr;
-	int result;
 	char writeBuffer[6];
 	char * buffEnd = buffer + 4;
 
 	// attempt to read the year
-	result = extractNumber(buffer, &buffEnd, &yr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
-	if (result != FR_OK) {
-		return result;
+	if (!extractNumber(buffer, &buffEnd, NULL, &yr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)) {
+		return FR_INVALID_PARAMETER;
 	}
 
 	rtc_update();
@@ -2631,26 +2617,22 @@ int readTime(char * buffer, int * size) {
 int writeTime(char * buffer) {
 	vdp_time_t t;
 	int	hr, min, sec;
-	int result;
 	char writeBuffer[6];
 	char * buffEnd = buffer + 2;
 
 	// attempt to read the time
-	result = extractNumber(buffer, &buffEnd, &hr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
-	if (result != FR_OK) {
-		return result;
+	if (!extractNumber(buffer, &buffEnd, ":", &hr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)) {
+		return FR_INVALID_PARAMETER;
 	}
 	buffer += 3;
 	buffEnd += 3;
-	result = extractNumber(buffer, &buffEnd, &min, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
-	if (result != FR_OK) {
-		return result;
+	if (!extractNumber(buffer, &buffEnd, ":", &min, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)) {
+		return FR_INVALID_PARAMETER;
 	}
 	buffer += 3;
 	buffEnd += 3;
-	result = extractNumber(buffer, &buffEnd, &sec, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
-	if (result != FR_OK) {
-		return result;
+	if (!extractNumber(buffer, &buffEnd, "\0", &sec, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)) {
+		return FR_INVALID_PARAMETER;
 	}
 
 	rtc_update();
@@ -2671,13 +2653,10 @@ int writeTime(char * buffer) {
 // Simplistic VDU 23,0,setting,value wrapper, extracting value as a number from buffer
 int writeVDPSetting(char * buffer, int setting) {
 	int value;
-	int result;
 	char * buffEnd = buffer + strlen(buffer);
 
-	result = extractNumber(buffer, &buffEnd, &value, 0);
-
-	if (result != FR_OK) {
-		return result;
+	if (!extractNumber(buffer, &buffEnd, NULL, &value, 0)) {
+		return FR_INVALID_PARAMETER;
 	}
 
 	putch(23);
