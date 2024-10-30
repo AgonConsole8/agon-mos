@@ -58,8 +58,6 @@ BYTE	mos_getkey(void);
 UINT24	mos_input(char * buffer, int bufferLength);
 t_mosCommand	*mos_getCommand(char * ptr);
 char *	mos_trim(char * s);
-char *	mos_strtok(char *s1, char * s2);
-char *	mos_strtok_r(char *s1, const char *s2, char **ptr);
 int		mos_exec(char * buffer, BOOL in_mos);
 UINT8 	mos_execMode(UINT8 * ptr);
 

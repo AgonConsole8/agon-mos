@@ -71,7 +71,6 @@ extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
-static char * 	mos_strtok_ptr;		// Pointer for current position in string tokeniser
 
 TCHAR cwd[256];						// Hold current working directory.
 BOOL sdcardDelay = FALSE;
@@ -242,117 +241,25 @@ t_mosCommand *mos_getCommand(char * ptr) {
 // - s: Pointer to the start of the new string
 //
 char * mos_trim(char * s) {
-    char * ptr;
+	char * ptr;
 
-    if(!s) {								// Return NULL if a null string is passed
-        return NULL;
+	if (!s) {					// Return NULL if a null string is passed
+		return NULL;
 	}
-    if(!*s) {
-        return s;      						// Handle empty string
+	if (!*s) {
+		return s;				// Handle empty string
 	}
-	while(isspace(*s) || *s == '*') {		// Advance the pointer to the first non-whitespace or asterisk character in the string
+	// skip leading spaces and asterisks
+	while (isspace(*s) || *s == '*') {
 		s++;
 	}
+	// strip trailing spaces
 	ptr = s + strlen(s) - 1;
-	while(ptr > s && isspace(*ptr)) {
+	while (ptr > s && isspace(*ptr)) {
 		ptr--;
 	}
 	ptr[1] = '\0';
-    return s;
-}
-
-// String tokeniser
-// Parameters:
-// - s1: String to tokenise
-// - s2: Delimiter
-// - ptr: Pointer to store the current position in (mos_strtok_r)
-// Returns:
-// - Pointer to tokenised string
-//
-char * mos_strtok(char *s1, char * s2) {
-	return mos_strtok_r(s1, s2, &mos_strtok_ptr);
-}
-
-char * mos_strtok_r(char *s1, const char *s2, char **ptr) {
-	char *end;
-
-	if (s1 == NULL) {
-		s1 = *ptr;
-	}
-	
-	if (*s1 == '\0') {
-		*ptr = s1;
-		return NULL;
-    }
-	// Scan leading delimiters
-	//
-	s1 += strspn(s1, s2);
-	if (*s1 == '\0') {
-		*ptr = s1;
-		return NULL;
-    }
-	// Find the end of the token
-	//
-	end = s1 + strcspn(s1, s2);
-	if (*end == '\0') {
-      *ptr = end;
-      return s1;
-    }
-	// Terminate the token and make *SAVE_PTR point past it
-	//
-	*end = '\0';
-	*ptr = end + 1;
-	
-	return s1;
-}
-
-// Parse a number from the line edit buffer
-// Parameters:
-// - ptr: Pointer to the number in the line edit buffer
-// - p_Value: Pointer to the return value
-// Returns:
-// - true if the function succeeded, otherwise false
-//
-BOOL mos_parseNumber(char * ptr, UINT24 * p_Value) {
-	char * 	p = ptr;
-	char * 	e;
-	int 	base = 10;
-	long 	value;
-
-	p = mos_strtok(p, " ");
-	if(p == NULL) {
-		return 0;
-	}
-	if(*p == '&') {
-		base = 16;
-		p++;
-	}	
-	value = strtol(p, &e, base);
-	if(*e != 0) {
-		return 0;
-	}
-	*p_Value = value;
-	return 1;
-}
-
-// Parse a string from the line edit buffer
-// Parameters:
-// - ptr: Pointer to the string in the line edit buffer
-// - p_Value: Pointer to the return value
-// Returns:
-// - true if the function succeeded, otherwise false
-//
-BOOL mos_parseString(char * ptr, char ** p_Value) {
-	char *	p = ptr;
-
-	// TODO consider that this is always called with ptr = NULL
-
-	p = mos_strtok(p, " ");
-	if (p == NULL) {
-		return 0;
-	}
-	*p_Value = p;
-	return 1;
+	return s;
 }
 
 int mos_runBin(UINT24 addr, char * args) {
@@ -391,8 +298,11 @@ int mos_exec(char * buffer, BOOL in_mos) {
 	}
 
 	if (ptr != NULL) {
-		// TODO replace mos_strtok_ptr with a local variable when we have removed mos_parseNumber and mos_parseString
-		ptr = mos_strtok_r(ptr, " ", &mos_strtok_ptr);
+		char * command;
+		if (!extractString(&ptr, &command, NULL)) {
+			// This shouldn't happen
+			return FR_INT_ERR;
+		}
 		// TODO - handle command aliases
 		// which will mean looking up aliases, and then doing string replacement
 		// Basic algorithm to deal with aliases is to repeatedly expand the command until no more aliases are found
@@ -400,10 +310,10 @@ int mos_exec(char * buffer, BOOL in_mos) {
 		// Challenge - how to detect looping aliases?
 		// Probably just use a counter, and if it exceeds a certain number, then bail out
 		// We should also restrict our command length
-		cmd = mos_getCommand(ptr);
+		cmd = mos_getCommand(command);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
-			return func(mos_strtok_ptr);
+			return func(ptr);
 		} else {		
 			// Create a new "path" string for command searching
 			// TODO replace `path` with malloc'd variable
@@ -418,7 +328,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 				sprintf(path, "/mos/%s.bin", ptr);
 				fr = mos_LOAD(path, MOS_starLoadAddress, 0);
 				if (fr == FR_OK) {
-					return mos_runBin(MOS_starLoadAddress, mos_strtok_ptr);
+					return mos_runBin(MOS_starLoadAddress, ptr);
 				}
 				if (fr == MOS_OVERLAPPING_SYSTEM) {
 					return fr;
@@ -428,7 +338,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					sprintf(path, "%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress, mos_strtok_ptr);
+						return mos_runBin(MOS_defaultLoadAddress, ptr);
 					}
 					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
@@ -436,7 +346,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 					sprintf(path, "/bin/%s.bin", ptr);
 					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
 					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress, mos_strtok_ptr);
+						return mos_runBin(MOS_defaultLoadAddress, ptr);
 					}
 					if (fr == MOS_OVERLAPPING_SYSTEM) {
 						return fr;
@@ -459,7 +369,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 // - 1: ADL mode
 //
 UINT8 mos_execMode(UINT8 * ptr) {
-	if(
+	if (
 		*(ptr+0x40) == 'M' &&
 		*(ptr+0x41) == 'O' &&
 		*(ptr+0x42) == 'S'
@@ -485,7 +395,7 @@ int mos_cmdDIR(char * ptr) {
 	char	*path;
 
 	for (;;) {
-		if (!mos_parseString(NULL, &path)) {
+		if (!extractString(&ptr, &path, NULL)) {
 			return mos_DIR(".", longListing);
 		}
 		if (strcasecmp(path, "-l") == 0) {
@@ -593,27 +503,29 @@ int mos_cmdPRINTF(char *ptr) {
 // - MOS error code
 //
 int mos_cmdHOTKEY(char *ptr) {
-	UINT24 fn_number = 0;
+	int fn_number = 0;
 	char *hotkey_string;
 
-	if (!mos_parseNumber(NULL, &fn_number)) {
+	if (!extractNumber(ptr, &ptr, NULL, &fn_number, 0)) {
 		UINT8 key;
 		printf("Hotkey assignments:\r\n\r\n");
 
 		for (key = 0; key < 12; key++) {
-				printf("F%d: %s\r\n", key+1, hotkey_strings[key] == NULL ? "N/A" : hotkey_strings[key]);
+			printf("F%d: %s\r\n", key+1, hotkey_strings[key] == NULL ? "N/A" : hotkey_strings[key]);
 		}
 
 		printf("\r\n");
 		return 0;
 	}
 
+	ptr = mos_trim(ptr);
+
 	if (fn_number < 1 || fn_number > 12) {
 		printf("Invalid FN-key number.\r\n");
 		return 0;
 	}
 
-	if (strlen(mos_strtok_ptr) < 1) {		
+	if (strlen(ptr) < 1) {		
 		if (hotkey_strings[fn_number - 1] != NULL) {
 			umm_free(hotkey_strings[fn_number - 1]);
 			hotkey_strings[fn_number - 1] = NULL;
@@ -623,17 +535,17 @@ int mos_cmdHOTKEY(char *ptr) {
 		return 0;
 	}
 
-	if (mos_strtok_ptr[0] == '\"' && mos_strtok_ptr[strlen(mos_strtok_ptr) - 1] == '\"') {
-		mos_strtok_ptr[strlen(mos_strtok_ptr) - 1] = '\0';
-		mos_strtok_ptr++;		
+	if (ptr[0] == '\"' && ptr[strlen(ptr) - 1] == '\"') {
+		ptr[strlen(ptr) - 1] = '\0';
+		ptr++;		
 	}
 
 	if (hotkey_strings[fn_number - 1] != NULL) umm_free(hotkey_strings[fn_number - 1]);
 
-	hotkey_strings[fn_number - 1] = umm_malloc((strlen(mos_strtok_ptr) + 1) * sizeof(char));
+	hotkey_strings[fn_number - 1] = umm_malloc((strlen(ptr) + 1) * sizeof(char));
 	if (!hotkey_strings[fn_number - 1]) return FR_INT_ERR;
-	strncpy(hotkey_strings[fn_number - 1], mos_strtok_ptr, strlen(mos_strtok_ptr));
-	hotkey_strings[fn_number - 1][strlen(mos_strtok_ptr)] = '\0';
+	strncpy(hotkey_strings[fn_number - 1], ptr, strlen(ptr));
+	hotkey_strings[fn_number - 1][strlen(ptr)] = '\0';
 
 	return 0;
 }
@@ -649,12 +561,13 @@ int mos_cmdLOAD(char * ptr) {
 	char *  filename;
 	UINT24 	addr;
 	
-	if(
-		!mos_parseString(NULL, &filename)
-	) {
+	if (!extractString(&ptr, &filename, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
-	if(!mos_parseNumber(NULL, &addr)) addr = MOS_defaultLoadAddress;
+	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
+		addr = MOS_defaultLoadAddress;
+	}
+
 	fr = mos_LOAD(filename, addr, 0);
 	return fr;	
 }
@@ -672,9 +585,7 @@ int mos_cmdEXEC(char *ptr) {
 	UINT24 	addr;
 	char    buf[256];
 	
-	if(
-		!mos_parseString(NULL, &filename)
-	) {
+	if (!extractString(&ptr, &filename, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_EXEC(filename, buf, sizeof buf);
@@ -693,10 +604,10 @@ int mos_cmdSAVE(char * ptr) {
 	UINT24 	addr;
 	UINT24 	size;
 	
-	if(
-		!mos_parseString(NULL, &filename) ||
-		!mos_parseNumber(NULL, &addr) ||
-		!mos_parseNumber(NULL, &size)
+	if (
+		!extractString(&ptr, &filename, NULL) ||
+		!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0) ||
+		!extractNumber(ptr, &ptr, NULL, (int *)&size, 0)
 	) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -722,15 +633,13 @@ int mos_cmdDEL(char * ptr) {
 	char *lastSeparator;
 	char verify[7];
 
-	if (
-		!mos_parseString(NULL, &filename) 
-	) {
+	if (!extractString(&ptr, &filename, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 
 	if (strcasecmp(filename, "-f") == 0) {
 		force = TRUE;
-		if (!mos_parseString(NULL, &filename)) {
+		if (!extractString(&ptr, &filename, NULL)) {
 			return FR_INVALID_PARAMETER;
 		}
 	}
@@ -757,7 +666,7 @@ int mos_cmdDEL(char * ptr) {
 				umm_free(dirPath);
 				return FR_INT_ERR;
 			}
-        } else {
+		} else {
 			dirPath = mos_strdup(".");
 			pattern = mos_strdup(filename);
 			if (!dirPath || !pattern) {
@@ -765,7 +674,7 @@ int mos_cmdDEL(char * ptr) {
 				if (pattern) umm_free(pattern);
 				return FR_INT_ERR;
 			}
-        }
+		}
 	} else {
 		dirPath = mos_strdup(filename);
 		if (!dirPath) return FR_INT_ERR;
@@ -838,7 +747,7 @@ int mos_cmdDEL(char * ptr) {
 int mos_cmdJMP(char *ptr) {
 	UINT24 	addr;
 	void (* dest)(void) = 0;
-	if (!extractNumber(ptr, &ptr, NULL, &addr, 0)) {
+	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	dest = (void *)addr;
@@ -854,7 +763,7 @@ int mos_cmdJMP(char *ptr) {
 //
 int mos_cmdRUN(char *ptr) {
 	UINT24 	addr;
-	if (!extractNumber(ptr, &ptr, NULL, &addr, 0)) {
+	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		addr = MOS_defaultLoadAddress;
 	}
 	return mos_runBin(addr, ++ptr);
@@ -867,15 +776,14 @@ int mos_cmdRUN(char *ptr) {
 // - MOS error code
 //
 int mos_cmdCD(char * ptr) {
-	char *  path;
-	
+	char *  path;	
 	FRESULT	fr;
 	
-	if (!mos_parseString(NULL, &path)) {
+	if (!extractString(&ptr, &path, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
-	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	f_getcwd(cwd, sizeof(cwd)); // Update full path.
 	return fr;
 }
 
@@ -890,9 +798,9 @@ int mos_cmdREN(char *ptr) {
 	char *  filename1;
 	char *	filename2;
 	
-	if(
-		!mos_parseString(NULL, &filename1) ||
-		!mos_parseString(NULL, &filename2)
+	if (
+		!extractString(&ptr, &filename1, NULL) ||
+		!extractString(&ptr, &filename2, NULL)
 	) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -911,9 +819,9 @@ int mos_cmdCOPY(char *ptr) {
 	char *  filename1;
 	char *	filename2;
 	
-	if(
-		!mos_parseString(NULL, &filename1) ||
-		!mos_parseString(NULL, &filename2)
+	if (
+		!extractString(&ptr, &filename1, NULL) ||
+		!extractString(&ptr, &filename2, NULL)
 	) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -932,9 +840,7 @@ int mos_cmdMKDIR(char * ptr) {
 	
 	FRESULT	fr;
 	
-	if(
-		!mos_parseString(NULL, &filename) 
-	) {
+	if (!extractString(&ptr, &filename, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_MKDIR(filename);
@@ -954,17 +860,17 @@ int mos_cmdSET(char * ptr) {
 	UINT24 	value;
 	int searchResult;
 
-	if (!mos_parseString(NULL, &token)) {
-		return FR_INVALID_PARAMETER;
-	}
 	// "token" is first parameter, which is a string
-
-	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
-	if (*mos_strtok_ptr == '\0') {
+	if (!extractString(&ptr, &token, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 
-	newValue = expandMacro(mos_strtok_ptr);
+	while (isspace(*ptr)) ptr++;
+	if (*ptr == '\0') {
+		return FR_INVALID_PARAMETER;
+	}
+
+	newValue = expandMacro(ptr);
 	if (!newValue) return FR_INT_ERR;
 
 	// search for our token in the system variables
@@ -998,20 +904,20 @@ int mos_cmdSETEVAL(char * ptr) {
 	t_mosEvalResult * evaluation = NULL;
 	int result;
 
-	if (!mos_parseString(NULL, &token)) {
+	// "token" is first parameter, which is a string
+	if (!extractString(&ptr, &token, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
-	// "token" is first parameter, which is a string
 
 	// make sure we have a value
-	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
-	if (*mos_strtok_ptr == '\0') {
+	while (isspace(*ptr)) ptr++;
+	if (*ptr == '\0') {
 		return FR_INVALID_PARAMETER;
 	}
 
-	// we need to work out the value of the expression at mos_strtok_ptr
+	// we need to work out the value of the expression at ptr
 	// and what type it is
-	evaluation = evaluateExpression(mos_strtok_ptr);
+	evaluation = evaluateExpression(ptr);
 
 	if (evaluation == NULL) {
 		return FR_INT_ERR;
@@ -1052,18 +958,18 @@ int mos_cmdSETMACRO(char * ptr) {
 	t_mosSystemVariable * var = NULL;
 	int searchResult;
 
-	if (!mos_parseString(NULL, &token)) {
+	// "token" is first parameter, which is a string
+	if (!extractString(&ptr, &token, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
-	// "token" is first parameter, which is a string
 
 	// make sure we have a value
-	while (isspace(*mos_strtok_ptr)) mos_strtok_ptr++;
-	if (*mos_strtok_ptr == '\0') {
+	while (isspace(*ptr)) ptr++;
+	if (*ptr == '\0') {
 		return FR_INVALID_PARAMETER;
 	}
 
-	newValue = mos_strdup(mos_strtok_ptr);
+	newValue = mos_strdup(ptr);
 	if (!newValue) return FR_INT_ERR;
 
 	// search for our token in the system variables
@@ -1106,7 +1012,7 @@ int mos_cmdSHOW(char * ptr) {
 	t_mosSystemVariable * var = NULL;
 	int searchResult;
 
-	if (!mos_parseString(NULL, &token)) {
+	if (!extractString(&ptr, &token, NULL)) {
 		// Show all variables
 		token = "*";
 	}
@@ -1160,7 +1066,7 @@ int mos_cmdUNSET(char * ptr) {
 	t_mosSystemVariable * var = NULL;
 	int searchResult;
 
-	if (!mos_parseString(NULL, &token)) {
+	if (!extractString(&ptr, &token, NULL)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -1321,8 +1227,9 @@ int mos_cmdTYPE(char * ptr) {
 	FRESULT	fr;
 	char *  filename;
 
-	if(!mos_parseString(NULL, &filename))
+	if (!extractString(&ptr, &filename, NULL)) {
 		return FR_INVALID_PARAMETER;
+	}
 
 	fr = mos_TYPE(filename);
 	return fr;
@@ -1349,8 +1256,9 @@ int	mos_cmdMOUNT(char *ptr) {
 	int fr;
 
 	fr = mos_mount();
-	if (fr != FR_OK)
-		mos_error(fr);
+	if (fr != FR_OK) {
+		return fr;
+	}
 	f_getcwd(cwd, sizeof(cwd)); //Update full path.
 	return 0;
 }
@@ -1404,7 +1312,7 @@ int mos_cmdHELP(char *ptr) {
 	int i;
 	char *cmd;
 
-	BOOL hasCmd = mos_parseString(NULL, &cmd);
+	BOOL hasCmd = extractString(&ptr, &cmd, NULL);
 	if (!hasCmd) {
 		cmd = "help";
 	}
@@ -1446,7 +1354,7 @@ int mos_cmdHELP(char *ptr) {
 		if (!found) {
 			printf("Command not found: %s\r\n", cmd);
 		}
-	} while (mos_parseString(NULL, &cmd));
+	} while (extractString(&ptr, &cmd, NULL));
 
 	return 0;
 }
@@ -1466,21 +1374,21 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	FSIZE_t fSize;
 	
 	fr = f_open(&fil, filename, FA_READ);
-	if(fr == FR_OK) {
+	if (fr == FR_OK) {
 		fSize = f_size(&fil);
-		if(size) {
+		if (size) {
 			// Maximize load according to size parameter
-			if(fSize < size) size = fSize;
-		}
-		else {
+			if (fSize < size) {
+				size = fSize;
+			}
+		} else {
 			// Load the full file size
 			size = fSize;
 		}
 		// Check potential system area overlap
-		if((address <= MOS_externLastRAMaddress) && ((address + size) > MOS_systemAddress)) {
+		if ((address <= MOS_externLastRAMaddress) && ((address + size) > MOS_systemAddress)) {
 			fr = MOS_OVERLAPPING_SYSTEM;
-		}
-		else {
+		} else {
 			fr = f_read(&fil, (void *)address, size, &br);		
 		}		
 	}
@@ -1502,7 +1410,7 @@ UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size) {
 	UINT   	br;	
 	
 	fr = f_open(&fil, filename, FA_WRITE | FA_CREATE_NEW);
-	if(fr == FR_OK) {
+	if (fr == FR_OK) {
 		fr = f_write(&fil, (void *)address, size, &br);
 	}
 	f_close(&fil);	
@@ -1531,8 +1439,12 @@ UINT24 mos_TYPE(char * filename) {
 		fr = f_read(&fil, (void *)buf, sizeof buf, &br);
 		if (br == 0)
 			break;
-		for (i = 0; i < br; ++i)
+		for (i = 0; i < br; ++i) {
 			putchar(buf[i]);
+			if (buf[i] == '\n') {
+				putchar('\r');
+			}
+		}
 	}
 
 	f_close(&fil);
@@ -1631,14 +1543,13 @@ UINT24	mos_DIRFallback(char * path, BOOL longListing, BOOL hideVolumeInfo) {
 
 	if (!hideVolumeInfo) {
 		fr = f_getlabel("", str, 0);
-		if(fr != 0) {
+		if (fr != 0) {
 			return fr;
 		}	
 		printf("Volume: ");
-		if(strlen(str) > 0) {
+		if (strlen(str) > 0) {
 			printf("%s", str);
-		}
-		else {
+		} else {
 			printf("<No Volume Label>");
 		}
 		printf("\n\r\n\r");
@@ -2236,10 +2147,10 @@ UINT24 mos_FOPEN(char * filename, UINT8 mode) {
 	FRESULT fr;
 	int		i;
 	
-	for(i = 0; i < MOS_maxOpenFiles; i++) {
-		if(mosFileObjects[i].free == 0) {
+	for (i = 0; i < MOS_maxOpenFiles; i++) {
+		if (mosFileObjects[i].free == 0) {
 			fr = f_open(&mosFileObjects[i].fileObject, filename, mode);
-			if(fr == FR_OK) {
+			if (fr == FR_OK) {
 				mosFileObjects[i].free = 1;
 				return i + 1;
 			}
@@ -2258,16 +2169,15 @@ UINT24 mos_FCLOSE(UINT8 fh) {
 	FRESULT fr;
 	int 	i;
 	
-	if(fh > 0 && fh <= MOS_maxOpenFiles) {
+	if (fh > 0 && fh <= MOS_maxOpenFiles) {
 		i = fh - 1;
-		if(mosFileObjects[i].free > 0) {
+		if (mosFileObjects[i].free > 0) {
 			fr = f_close(&mosFileObjects[i].fileObject);
 			mosFileObjects[i].free = 0;
 		}
-	}
-	else {
-		for(i = 0; i < MOS_maxOpenFiles; i++) {
-			if(mosFileObjects[i].free > 0) {
+	} else {
+		for (i = 0; i < MOS_maxOpenFiles; i++) {
+			if (mosFileObjects[i].free > 0) {
 				fr = f_close(&mosFileObjects[i].fileObject);
 				mosFileObjects[i].free = 0;
 			}
@@ -2290,9 +2200,9 @@ UINT24	mos_FGETC(UINT8 fh) {
 	char	c;
 
 	fo = (FIL *)mos_GETFIL(fh);
-	if(fo > 0) {
+	if (fo > 0) {
 		fr = f_read(fo, &c, 1, &br); 
-		if(fr == FR_OK) {
+		if (fr == FR_OK) {
 			return	c | (fat_EOF(fo) << 8);
 		}		
 	}
@@ -2307,7 +2217,7 @@ UINT24	mos_FGETC(UINT8 fh) {
 void	mos_FPUTC(UINT8 fh, char c) {
 	FIL * fo = (FIL *)mos_GETFIL(fh);
 
-	if(fo > 0) {
+	if (fo > 0) {
 		f_putc(c, fo);
 	}
 }
@@ -2325,9 +2235,9 @@ UINT24	mos_FREAD(UINT8 fh, UINT24 buffer, UINT24 btr) {
 	FIL *	fo = (FIL *)mos_GETFIL(fh);
 	UINT	br = 0;
 
-	if(fo > 0) {
+	if (fo > 0) {
 		fr = f_read(fo, (const void *)buffer, btr, &br);
-		if(fr == FR_OK) {
+		if (fr == FR_OK) {
 			return br;
 		}
 	}
@@ -2347,9 +2257,9 @@ UINT24	mos_FWRITE(UINT8 fh, UINT24 buffer, UINT24 btw) {
 	FIL *	fo = (FIL *)mos_GETFIL(fh);
 	UINT	bw = 0;
 
-	if(fo > 0) {
+	if (fo > 0) {
 		fr = f_write(fo, (const void *)buffer, btw, &bw);
-		if(fr == FR_OK) {
+		if (fr == FR_OK) {
 			return bw;
 		}
 	}
@@ -2365,7 +2275,7 @@ UINT24	mos_FWRITE(UINT8 fh, UINT24 buffer, UINT24 btw) {
 UINT8  	mos_FLSEEK(UINT8 fh, UINT32 offset) {
 	FIL * fo = (FIL *)mos_GETFIL(fh);
 
-	if(fo > 0) {
+	if (fo > 0) {
 		return f_lseek(fo, offset);
 	}
 	return FR_INVALID_OBJECT;
@@ -2380,7 +2290,7 @@ UINT8  	mos_FLSEEK(UINT8 fh, UINT32 offset) {
 UINT8	mos_FEOF(UINT8 fh) {
 	FIL * fo = (FIL *)mos_GETFIL(fh);
 
-	if(fo > 0) {
+	if (fo > 0) {
 		return fat_EOF(fo);
 	}
 	return 0;
@@ -2393,7 +2303,11 @@ UINT8	mos_FEOF(UINT8 fh) {
 // - size: Size of buffer
 //
 void mos_GETERROR(UINT8 errno, UINT24 address, UINT24 size) {
-	strncpy((char *)address, mos_errors[errno], size - 1);
+	if (errno >= 0 && errno < mos_errors_count) {
+		strncpy((char *)address, mos_errors[errno], size - 1);
+	} else {
+		strncpy((char *)address, "Unknown error", size - 1);
+	}
 }
 
 // OSCLI
@@ -2471,9 +2385,9 @@ UINT24 mos_SETINTVECTOR(UINT8 vector, UINT24 address) {
 UINT24	mos_GETFIL(UINT8 fh) {
 	t_mosFileObject	* mfo;
 
-	if(fh > 0 && fh <= MOS_maxOpenFiles) {
+	if (fh > 0 && fh <= MOS_maxOpenFiles) {
 		mfo = &mosFileObjects[fh - 1];
-		if(mfo->free > 0) {
+		if (mfo->free > 0) {
 			return (UINT24)(&mfo->fileObject);
 		}
 	}
@@ -2487,7 +2401,7 @@ UINT24	mos_GETFIL(UINT8 fh) {
 // - 1 if EOF, otherwise 0
 //
 UINT8 fat_EOF(FIL * fp) {
-	if(f_eof(fp) != 0) {
+	if (f_eof(fp) != 0) {
 		return 1;
 	}
 	return 0;

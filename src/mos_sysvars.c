@@ -420,6 +420,7 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 // - source: The source string
 // - end: The end point in the source string for extraction,
 //		or null for whole string
+//      pointing to source means we will update end to point to the end of the number
 // - divider: The token divider string - null for default (space)
 // - number: Pointer to an integer to store the extracted number
 // - flags: Flags to control extraction
@@ -427,6 +428,8 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 // - TRUE if successful
 // - FALSE if the number could not be extracted, or the string was not fully consumed
 // - end will be updated to point to the end of the number
+//   (will not consume divider characters)
+//   TODO work thru logic around when "end" gets updated
 //
 bool extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags) {
 	int base = 10;
@@ -499,7 +502,6 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 
 	*endptr = lastChar;
 
-	// if ((parseEnd < endptr && *end != source) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
 	if ((parseEnd < endptr) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
 		// we didn't consume whole string, or negative found for positive only
 		if (*end == source) {
