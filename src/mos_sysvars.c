@@ -440,11 +440,11 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 	}
 
 	// skip our source past any start token dividers
-	start += strspn(start, divider);
+	start += mos_strspn(start, divider);
 
 	if (end == NULL || *end == NULL || *end == source) {
 		// No explicit end provided, so set to next divider, or string end
-		endptr = start + strcspn(start, divider);
+		endptr = start + mos_strcspn(start, divider);
 	} else {
 		endptr = *end;
 	}
@@ -536,8 +536,8 @@ bool extractString(char ** source, char ** result, char * divider) {
 	}
 
 	// skip our source past any start token dividers
-	start = start + strspn(start, divider);
-	endptr = start + strcspn(start, divider);
+	start = start + mos_strspn(start, divider);
+	endptr = start + mos_strcspn(start, divider);
 
 	if (strlen(start) == 0 || endptr == start) {
 		*source = start;

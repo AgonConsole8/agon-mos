@@ -30,6 +30,9 @@ char *mos_strdup(const char *s);
 //Alternative to missing strndup() in ZDS libraries
 char *mos_strndup(const char *s, size_t n);
 
+size_t mos_strcspn(const char *s, const char *reject);
+size_t mos_strspn(const char *s, const char *accept);
+
 int pmatch(const char *pattern, const char *string, uint8_t flags);
 
 #endif // STRINGS_H

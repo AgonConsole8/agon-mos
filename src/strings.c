@@ -46,6 +46,30 @@ char * mos_strdup(const char *s) {
 	return d;
 }
 
+// Proper strcspn() implementation
+size_t mos_strcspn(const char *s, const char *reject) {
+	const char *p = s;
+	while (*p != '\0') {
+		if (strchr(reject, *p) != NULL) {
+			break;
+		}
+		p++;
+	}
+	return p - s;
+}
+
+// Proper strspn() implementation
+size_t mos_strspn(const char *s, const char *accept) {
+	const char *p = s;
+	while (*p != '\0') {
+		if (strchr(accept, *p) == NULL) {
+			break;
+		}
+		p++;
+	}
+	return p - s;
+}
+
 // Alternative to missing strndup() in ZDS libraries
 char * mos_strndup(const char *s, size_t n) {
 	size_t len = mos_strnlen(s, n);
