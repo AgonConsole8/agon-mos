@@ -371,6 +371,7 @@ int mos_runBin(UINT24 addr) {
 // Execute a MOS command
 // Parameters:
 // - buffer: Pointer to a zero terminated string that contains the MOS command with arguments
+// - in_mos: Flag to indicate if the command is being run from within MOS CLI (and thus allow running non-moslet executables)
 // Returns:
 // - MOS error code
 //
@@ -383,24 +384,35 @@ int mos_exec(char * buffer, BOOL in_mos) {
 	t_mosCommand *cmd;
 
 	ptr = mos_trim(buffer);
-	if (ptr != NULL && *ptr == '#') {
-	    return FR_OK;
+	if (ptr != NULL && (*ptr == '#' || *ptr == '\0' || (*ptr == '|' && *(ptr+1) == ' '))) {
+		return FR_OK;
 	}
 
-	ptr = mos_strtok(ptr, " ");
 	if (ptr != NULL) {
+		// TODO replace mos_strtok_ptr with a local variable when we have removed mos_parseNumber and mos_parseString
+		ptr = mos_strtok_r(ptr, " ", &mos_strtok_ptr);
 		// TODO - handle command aliases
 		// which will mean looking up aliases, and then doing string replacement
+		// Basic algorithm to deal with aliases is to repeatedly expand the command until no more aliases are found
+		// We should only expand the first word of the command
+		// Challenge - how to detect looping aliases?
+		// Probably just use a counter, and if it exceeds a certain number, then bail out
+		// We should also restrict our command length
 		cmd = mos_getCommand(ptr);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
-			return func(ptr);
-		}
-		else {		
+			return func(mos_strtok_ptr);
+		} else {		
+			// Create a new "path" string for command searching
+			// TODO replace `path` with malloc'd variable
 			if (strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
 				return MOS_INVALID_COMMAND;
-			}
-			else {
+			} else {
+				// Search for the command
+				// We should use system variables to determine our search paths
+				// Moslets need to be handled separately from regular executables
+				// we should maybe have a "moslets path" variable,
+				// and a "system CLI path" variable
 				sprintf(path, "/mos/%s.bin", ptr);
 				fr = mos_LOAD(path, MOS_starLoadAddress, 0);
 				if (fr == FR_OK) {
@@ -486,10 +498,9 @@ int mos_cmdDIR(char * ptr) {
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
-	const char *p = mos_strtok_ptr;
 	char read;
 	int result;
-	t_mosTransInfo * transInfo = gsInit(p, NULL);
+	t_mosTransInfo * transInfo = gsInit(ptr, NULL);
 
 	while (transInfo != NULL) {
 		result = gsRead(&transInfo, &read);
@@ -523,7 +534,7 @@ static int xdigit_to_int(char digit) {
 //
 int mos_cmdPRINTF(char *ptr) {
 	int c;
-	const char *p = mos_strtok_ptr;
+	const char *p = ptr;
 
 	while (*p) {
 		switch (*p) {
@@ -1174,58 +1185,54 @@ int mos_cmdUNSET(char * ptr) {
 // - MOS error code
 //
 int mos_cmdVDU(char *ptr) {
-    char *value_str;
-    UINT24 value = 0;
-    
-    while (mos_parseString(NULL, &value_str)) {
-        UINT8 is_word = 0;
-        UINT8 base = 10;
-        char *endPtr;
-        size_t len = strlen(value_str);
+	char * value_str;
+	char * endToken = " ,";
 
-        //Strip semicolon notation and set as word
-        if (len > 0 && value_str[len - 1] == ';') {
-            value_str[len - 1] = '\0';
-            len--;
-            is_word = 1;
-        }
+	// TODO replace mos_parseString with extractString
+	// We loop here extracting strings as we need to additionally look for semicolons
+	// which parseNumber cannot handle
+	while (mos_parseString(NULL, &value_str)) {
+		bool is_word = false;
+		int value;
+		char *endPtr;
+		size_t len = strlen(value_str);
 
-        // Check for '0x' or '0X' prefix
-        if (len > 2 && (value_str[0] == '0' && tolower(value_str[1] == 'x'))) {
-            base = 16;
-        }
-		
-        // Check for '&' prefix
-        if (value_str[0] == '&') {
-            base = 16;
-            value_str++;
-            len--;
-        }
-        // Check for 'h' suffix
-        if (len > 0 && tolower(value_str[len - 1]) == 'h') {
-            value_str[len - 1] = '\0';
-            base = 16;
-        }
+		// Strip trailing comma (as we're using mos_parseString which doesn't understand them)
+		if (value_str[len - 1] == ',') {
+			value_str[len - 1] = '\0';
+			len--;
+		}
 
-        value = strtol(value_str, &endPtr, base);
+		// Strip semicolon notation and set as word
+		if (len > 0 && value_str[len - 1] == ';') {
+			value_str[len - 1] = '\0';
+			len--;
+			is_word = true;
+		}
 
-        if (*endPtr != '\0' || value > 65535) {
-            return FR_INVALID_PARAMETER;
-        }
-		
-        if (value > 255) {
-            is_word = 1;
-        }
+		endPtr = endToken;
+		if (extractNumber(value_str, &endPtr, &value, EXTRACT_FLAG_H_SUFFIX_HEX) != FR_OK) {
+			return FR_INVALID_PARAMETER;
+		}
 
-        if (is_word) {
-            putch(value & 0xFF); // write LSB
-            putch(value >> 8);   // write MSB
-        } else {
-            putch(value);
-        }
-    }
+		if ((endPtr != NULL && endPtr < value_str + len) || value > 65535) {
+			// Did not consume all of the string, or value too large
+			return FR_INVALID_PARAMETER;
+		}
 
-    return 0;
+		if (value > 255 || value < -255) {
+			is_word = true;
+		}
+
+		if (is_word) {
+			putch(value & 0xFF); // write LSB
+			putch(value >> 8);   // write MSB
+		} else {
+			putch(value);
+		}
+	}
+
+	return 0;
 }
 
 // TIME
@@ -1244,7 +1251,7 @@ int mos_cmdTIME(char *ptr) {
 		//
 		// Fetch the rest of the parameters
 		//
-		if(
+		if (
 			!mos_parseNumber(NULL, &mo) ||
 			!mos_parseNumber(NULL, &da) ||
 			!mos_parseNumber(NULL, &ho) ||
@@ -2409,6 +2416,7 @@ void mos_GETERROR(UINT8 errno, UINT24 address, UINT24 size) {
 //
 UINT24 mos_OSCLI(char * cmd) {
 	UINT24 fr;
+	// NB OSCLI doesn't support automatic running of programs besides moslets
 	fr = mos_exec(cmd, FALSE);
 	return fr;
 }
@@ -2553,9 +2561,10 @@ int writeYear(char * buffer) {
 	int	yr;
 	int result;
 	char writeBuffer[6];
+	char * buffEnd = buffer + 4;
 
 	// attempt to read the year
-	result = extractNumber(buffer, buffer + 4, &yr);
+	result = extractNumber(buffer, &buffEnd, &yr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
 	if (result != FR_OK) {
 		return result;
 	}
@@ -2624,17 +2633,22 @@ int writeTime(char * buffer) {
 	int	hr, min, sec;
 	int result;
 	char writeBuffer[6];
+	char * buffEnd = buffer + 2;
 
 	// attempt to read the time
-	result = extractNumber(buffer, buffer + 2, &hr);
+	result = extractNumber(buffer, &buffEnd, &hr, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
 	if (result != FR_OK) {
 		return result;
 	}
-	result = extractNumber(buffer + 3, buffer + 5, &min);
+	buffer += 3;
+	buffEnd += 3;
+	result = extractNumber(buffer, &buffEnd, &min, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
 	if (result != FR_OK) {
 		return result;
 	}
-	result = extractNumber(buffer + 6, buffer + 8, &sec);
+	buffer += 3;
+	buffEnd += 3;
+	result = extractNumber(buffer, &buffEnd, &sec, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY);
 	if (result != FR_OK) {
 		return result;
 	}
@@ -2658,8 +2672,9 @@ int writeTime(char * buffer) {
 int writeVDPSetting(char * buffer, int setting) {
 	int value;
 	int result;
+	char * buffEnd = buffer + strlen(buffer);
 
-	result = extractNumber(buffer, buffer + strlen(buffer), &value);
+	result = extractNumber(buffer, &buffEnd, &value, 0);
 
 	if (result != FR_OK) {
 		return result;

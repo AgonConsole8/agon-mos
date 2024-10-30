@@ -8,6 +8,11 @@
 #include "ff.h"
 #include "umm_malloc.h"
 
+#define EXTRACT_FLAG_DECIMAL_ONLY	(1 << 0)
+#define EXTRACT_FLAG_POSITIVE_ONLY	(1 << 1)
+#define EXTRACT_FLAG_H_SUFFIX_HEX	(1 << 2)
+#define EXTRACT_FLAG_TOKEN_END		(1 << 3)
+
 /**
  * MOS system variable types
  */
@@ -70,7 +75,7 @@ t_mosTransInfo * gsInit(void * source, void * parent);
 int		gsRead(t_mosTransInfo ** transInfo, char * read);
 int		gsTrans(char * source, char * dest, int destLen, int * read);
 
-int		extractNumber(char * source, char * end, int * number);
+int		extractNumber(char * source, char ** end, int * number, BYTE flags);
 
 char *	expandMacro(char * source);
 

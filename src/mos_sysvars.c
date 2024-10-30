@@ -284,7 +284,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 					// if there isn't an end-tag, or we have a `<>` we do nothing, and let the `<` drop thru
 					if (*end == '>' && end > current->source) {
 						int number = 0;
-						if (extractNumber(current->source, end, &number) != FR_OK) {
+						if (extractNumber(current->source, &end, &number, 0) != FR_OK) {
 							// value up to end is not a number
 							// we therefore should interpret it as a variable
 							t_mosSystemVariable * var = NULL;
@@ -418,28 +418,53 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 // Extract a number from a string
 // Parameters:
 // - source: The source string
-// - end: The end point in the source string for extraction, or null for whole string
+// - end: The end point in the source string for extraction, a pointer to a token divider string (if flag set) or null for whole string
 // - number: Pointer to an integer to store the extracted number
+// - flags: Flags to control extraction
 // Returns:
 // - FR_OK if successful
 // - FR_INVALID_PARAMETER if the number could not be extracted, or the string was not fully consumed
+// - end will be updated to point to the end of the number
 //
-int extractNumber(char * source, char * end, int * number) {
+int extractNumber(char * source, char ** end, int * number, BYTE flags) {
 	int base = 10;
 	char *endptr = NULL;
-	char *start = source;
+	char *parseEnd = NULL;
 	char lastChar = '\0';
-	if (end == NULL) {
-		end = source + strlen(source);
+
+	// Work out what our endptr should be
+	if (flags & EXTRACT_FLAG_TOKEN_END) {
+		if (end == NULL || *end == NULL) {
+			// no end token found
+			return FR_INVALID_PARAMETER;
+		}
+		// skip our source past any start token dividers
+		source += strspn(source, *end);
+		// then find where our current token ends (or the end of the string)
+		endptr = source + strcspn(source, *end) - 1;
+	} else if (end == NULL || *end == NULL) {
+		endptr = source + strlen(source);
 	} else {
-		lastChar = *end;
-		*end = '\0';
+		endptr = *end;
 	}
+	lastChar = *endptr;
+	*endptr = '\0';
+
 	// number can be decimal, &hex, or base_number
+	if (flags & EXTRACT_FLAG_H_SUFFIX_HEX) {
+		// check for 'h' suffix
+		if (*(endptr - 1) == 'h') {
+			base = 16;
+			endptr--;
+		}
+	}
 	if (*source == '&') {
 		base = 16;
 		source++;
-	} else {
+	} else if (*source == '0' && ((*(source + 1) == 'x') || (*(source + 1) == 'X'))) {
+		base = 16;
+		source += 2;
+	} else if (base != 16) {
 		char *underscore = strchr(source, '_');
 		if (underscore != NULL && underscore > source) {
 			char *baseEnd;
@@ -455,16 +480,26 @@ int extractNumber(char * source, char * end, int * number) {
 		}
 	}
 
-	if (base > 1 && base <= 36) {
-		*number = strtol(source, &endptr, base);
-	}
-	if (lastChar != '\0') {
-		*end = lastChar;
+	if ((flags & EXTRACT_FLAG_DECIMAL_ONLY) && base != 10) {
+		*endptr = lastChar;
+		return FR_INVALID_PARAMETER;
 	}
 
-	if (endptr != end) {
-		// we didn't consume whole string, so (for now) it's not considered a valid number
+	if (base > 1 && base <= 36) {
+		*number = strtol(source, &parseEnd, base);
+	} else {
 		return FR_INVALID_PARAMETER;
+	}
+
+	if (parseEnd < endptr || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
+		// we didn't consume whole string, or negative found for positive only
+		return FR_INVALID_PARAMETER;
+	}
+
+	*endptr = lastChar;
+
+	if (end != NULL) {
+		*end = parseEnd;
 	}
 
 	return FR_OK;
@@ -581,7 +616,7 @@ t_mosEvalResult * evaluateExpression(char * source) {
 	// it will return the type of the result, and a copy of the result itself
 
 	// First try to interpret source as a number
-	if (extractNumber(source, NULL, &number) == FR_OK) {
+	if (extractNumber(source, NULL, &number, 0) == FR_OK) {
 		result->type = MOS_VAR_NUMBER;
 		result->result = (void *)number;
 		return result;
