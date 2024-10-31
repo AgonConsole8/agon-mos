@@ -83,7 +83,7 @@ void insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * befor
 
 // create and insert/replace system variable object
 // intended for system use only - may silently fail if a creation error occurs
-void createAndInsertSystemVariable(char * label, MOSVARTYPE type, void * value) {
+void createOrUpdateSystemVariable(char * label, MOSVARTYPE type, void * value) {
 	t_mosSystemVariable * var = NULL;
 	int result = getSystemVariable(label, &var);
 	if (result == 0) {
@@ -529,7 +529,7 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 // - source will be advanced to point to the end of the string
 // - result point to start of found string and will be null terminated
 //
-bool extractString(char ** source, char ** result, char * divider) {
+bool extractString(char ** source, char ** result, char * divider, BYTE flags) {
 	char *start = *source;
 	char *endptr = NULL;
 
@@ -546,7 +546,7 @@ bool extractString(char ** source, char ** result, char * divider) {
 		return false;
 	}
 
-	if (*endptr != '\0') {
+	if (*endptr != '\0' && !(flags & EXTRACT_FLAG_NO_TERMINATOR)) {
 		*endptr = '\0';
 		endptr++;
 	}
@@ -712,4 +712,168 @@ t_mosEvalResult * evaluateExpression(char * source) {
 	}
 
 	return result;
+}
+
+// Get an argument from a source string
+//
+char * getArgument(char * source, int argNo, char ** end) {
+	char * result = source;
+	char * divider = " ";
+	int argCount = 0;
+	char * scanFrom = result;
+
+	// TODO add support for quoted strings
+	// as we are currently only supporting space separated arguments
+	// spaces within quoted strings should not be treated as dividers
+
+	if (end != NULL) {
+		*end = NULL;
+	}
+
+	while (argCount <= argNo) {
+		if (!extractString(&scanFrom, &result, divider, EXTRACT_FLAG_NO_TERMINATOR)) {
+			return NULL;
+		}
+		argCount++;
+	}
+
+	if (end != NULL) {
+		*end = scanFrom;
+	}
+
+	return result;
+}
+
+// substitute in arguments into a source string
+// Source will contain placeholders in the form %n where n is the argument number
+// or %*n meaning all arguments from n onwards
+// or %s as an equivalent to %*0 (all arguments)
+//
+char * substituteArguments(char * source, char * args, bool includeRest) {
+	char * dest;
+	char * destPos;
+	char * argument;
+	char * argEnd = NULL;
+	char * start = source;
+	char * end = source + strlen(source);
+	int maxArg = 0;
+	int size = 0;
+
+	// Work out how long our string will be with substitutions
+	while (start < end) {
+		if (*start == '%') {
+			start++;
+			if (*start == 's') {
+				size += strlen(args);
+				start++;
+				maxArg = 99;	// we have used all arguments
+			} else if (*start == '*' && *(start + 1) >= '0' && *(start + 1) <= '9') {
+				int argNo;
+				start++;	// skip the *
+				argNo = *start - '0';
+				start++;	// skip the number
+				argument = getArgument(args, argNo, NULL);
+				if (argument != NULL) {
+					size += strlen(argument);
+				}
+				maxArg = 99;	// count a rest arg as all arguments
+			} else if (*start >= '0' && *start <= '9') {
+				int argNo;
+				argNo = *start - '0';
+				start++;	// skip the number
+				argument = getArgument(args, argNo, &argEnd);
+				if (argument != NULL) {
+					size += argEnd - argument;
+				}
+				if (argNo > maxArg) {
+					maxArg = argNo;
+				}
+			} else {
+				// not a valid argument, so just copy the % and move on
+				size++;
+				if (*start == '%') {
+					start++;
+				}
+			}
+		} else {
+			size++;
+			start++;
+		}
+	}
+
+	// Work out if we have any unused arguments
+	if (maxArg < 99 && includeRest) {
+		// we have a rest argument
+		maxArg++;
+		argument = getArgument(args, maxArg, NULL);
+		if (argument != NULL) {
+			size += strlen(argument);
+		} else {
+			includeRest = false;
+		}
+	} else {
+		includeRest = false;
+	}
+
+	dest = umm_malloc(size + 1);
+	if (dest == NULL) {
+		return NULL;
+	}
+
+	start = source;
+	destPos = dest;
+
+	while (start < end) {
+		if (*start == '%') {
+			start++;
+			if (*start == 's') {
+				strcpy(destPos, args);
+				destPos += strlen(args);
+				start++;
+			} else if (*start == '*' && *(start + 1) >= '0' && *(start + 1) <= '9') {
+				int argNo;
+				start++;		// skip the *
+				argNo = *start - '0';
+				start++;		// skip the number
+				argument = getArgument(args, argNo, NULL);
+				if (argument != NULL) {
+					size = strlen(argument);
+					strncpy(destPos, argument, size);
+					destPos += size;
+				}
+			} else if (*start >= '0' && *start <= '9') {
+				int argNo;
+				argNo = *start - '0';
+				start++;		// skip the number
+				argument = getArgument(args, argNo, &argEnd);
+				if (argument != NULL) {
+					size = argEnd - argument;
+					strncpy(destPos, argument, size);
+					destPos += size;
+				}
+			} else {
+				// not a valid argument, so just copy the % and move on
+				*destPos++ = '%';
+				if (*start == '%') {
+					start++;
+				}
+			}
+		} else {
+			*destPos++ = *start++;
+		}
+	}
+
+	// Include any rest args
+	if (includeRest) {
+		// we have a rest argument
+		argument = getArgument(args, maxArg, NULL);
+		if (argument != NULL) {
+			strcpy(destPos, argument);
+			destPos += strlen(argument);
+		}
+	}
+
+	// return the expanded string
+	*destPos = '\0';
+	return dest;
 }

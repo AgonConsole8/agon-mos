@@ -11,6 +11,7 @@
 #define EXTRACT_FLAG_DECIMAL_ONLY	(1 << 0)
 #define EXTRACT_FLAG_POSITIVE_ONLY	(1 << 1)
 #define EXTRACT_FLAG_H_SUFFIX_HEX	(1 << 2)
+#define EXTRACT_FLAG_NO_TERMINATOR	(1 << 3)
 
 /**
  * MOS system variable types
@@ -61,8 +62,8 @@ int		getSystemVariable(char * token, t_mosSystemVariable ** var);
 t_mosSystemVariable * createSystemVariable(char * label, MOSVARTYPE type, void * value);
 // insert system variable object
 void	insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * before);
-// create and insert/replace system variable object
-void	createAndInsertSystemVariable(char * label, MOSVARTYPE type, void * value);
+// create or update system variable object
+void	createOrUpdateSystemVariable(char * label, MOSVARTYPE type, void * value);
 // update system variable object
 int		updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value);
 // delete system variable object
@@ -76,12 +77,16 @@ int		gsTrans(char * source, char * dest, int destLen, int * read);
 
 bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags);
 
-bool	extractString(char ** source, char ** end, char * divider);
+bool	extractString(char ** source, char ** result, char * divider, BYTE flags);
 
 char *	expandMacro(char * source);
 
 char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);
 
 t_mosEvalResult * evaluateExpression(char * source);
+
+char *  getArgument(char * source, int argNo, char ** end);
+
+char *	substituteArguments(char * source, char * args, bool includeRest);
 
 #endif MOS_SYSVARS_H

@@ -45,8 +45,6 @@ extern BYTE scrcols;
 //
 static char	* cmd_history[cmd_historyDepth];
 
-char *hotkey_strings[12] = NULL; 
-
 // Get the current cursor position from the VPD
 //
 void getCursorPos() {
@@ -218,45 +216,35 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 // - 1 if the hotkey was handled, otherwise 0
 //
 BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, int len) {
-	if (hotkey_strings[fkey] != NULL) {
-		char *wildcardPos = strstr(hotkey_strings[fkey], "%s");
+	char label[10];
+	t_mosSystemVariable *hotkeyVar = NULL;
 
-		if (wildcardPos == NULL) { // No wildcard in the hotkey string
-			removeEditLine(buffer, insertPos, len);
-			strcpy(buffer, hotkey_strings[fkey]);
-			printf("%s", buffer);
-		} else {
-			UINT8 prefixLength = wildcardPos - hotkey_strings[fkey];
-			UINT8 replacementLength = strlen(buffer);
-			UINT8 suffixLength = strlen(wildcardPos + 2);
-			char *result;
-
-			if (prefixLength + replacementLength + suffixLength + 1 >= bufferLength) {
-				// Exceeds max command length (256 chars)
-				putch(0x07); // Beep
-				return 0;
-			}
-
-			result = umm_malloc(prefixLength + replacementLength + suffixLength + 1); // +1 for null terminator
-			if (!result) {
-				// Memory allocation failed
-				return 0;
-			}
-
-			strncpy(result, hotkey_strings[fkey], prefixLength); // Copy the portion preceding the wildcard to the buffer
-			result[prefixLength] = '\0'; // Terminate
-
-			strcat(result, buffer);
-			strcat(result, wildcardPos + 2);
-
-			removeEditLine(buffer, insertPos, len);
-			strcpy(buffer, result);
-			printf("%s", buffer);
-
-			umm_free(result);
+	sprintf(label, "Hotkey$%d", fkey + 1);
+	if (getSystemVariable(label, &hotkeyVar) == 0) {
+		char * substitutedString = NULL;
+		char * hotkeyString = expandVariable(hotkeyVar, false);
+		if (!hotkeyString) {
+			// Variable couldn't be read for some reason
+			return 0;
 		}
+
+		substitutedString = substituteArguments(hotkeyString, buffer, true);
+		umm_free(hotkeyString);
+		if (!substitutedString) {
+			return 0;
+		}
+		if (strlen(substitutedString) > bufferLength) {
+			// Exceeds max length
+			umm_free(substitutedString);
+			putch(0x07); // Beep
+			return 0;
+		}
+
+		removeEditLine(buffer, insertPos, len);
+		strcpy(buffer, substitutedString);
+		printf("%s", buffer);
+		umm_free(substitutedString);
 		return 1;
-		// Key was present, so drop through to ASCII key handling
 	}
 	return 0;
 }

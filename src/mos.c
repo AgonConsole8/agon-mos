@@ -299,7 +299,7 @@ int mos_exec(char * buffer, BOOL in_mos) {
 
 	if (ptr != NULL) {
 		char * command;
-		if (!extractString(&ptr, &command, NULL)) {
+		if (!extractString(&ptr, &command, NULL, 0)) {
 			// This shouldn't happen
 			return FR_INT_ERR;
 		}
@@ -395,7 +395,7 @@ int mos_cmdDIR(char * ptr) {
 	char	*path;
 
 	for (;;) {
-		if (!extractString(&ptr, &path, NULL)) {
+		if (!extractString(&ptr, &path, NULL, 0)) {
 			return mos_DIR(".", longListing);
 		}
 		if (strcasecmp(path, "-l") == 0) {
@@ -504,50 +504,61 @@ int mos_cmdPRINTF(char *ptr) {
 //
 int mos_cmdHOTKEY(char *ptr) {
 	int fn_number = 0;
-	char *hotkey_string;
+	char *hotkeyString;
+	t_mosSystemVariable *hotkeyVar = NULL;
+	char label[10];
 
 	if (!extractNumber(ptr, &ptr, NULL, &fn_number, 0)) {
 		UINT8 key;
-		printf("Hotkey assignments:\r\n\r\n");
 
-		for (key = 0; key < 12; key++) {
-			printf("F%d: %s\r\n", key+1, hotkey_strings[key] == NULL ? "N/A" : hotkey_strings[key]);
+		if (*ptr != '\0') {
+			return FR_INVALID_PARAMETER;
 		}
 
+		printf("Hotkey assignments:\r\n\r\n");
+		for (key = 1; key <= 12; key++) {
+			hotkeyVar = NULL;
+			sprintf(label, "Hotkey$%d", key);
+			if (getSystemVariable(label, &hotkeyVar) == 0) {
+				printf("F%d: %s%s\r\n", key, key < 10 ? " " : "", hotkeyVar->value);
+			} else {
+				printf("F%d: %sN/A\r\n", key, key < 10 ? " " : "");
+			}
+		}
 		printf("\r\n");
-		return 0;
+		return FR_OK;
 	}
 
 	ptr = mos_trim(ptr);
 
 	if (fn_number < 1 || fn_number > 12) {
-		printf("Invalid FN-key number.\r\n");
-		return 0;
+		return FR_INVALID_PARAMETER;
 	}
+
+	sprintf(label, "Hotkey$%d", fn_number);
 
 	if (strlen(ptr) < 1) {		
-		if (hotkey_strings[fn_number - 1] != NULL) {
-			umm_free(hotkey_strings[fn_number - 1]);
-			hotkey_strings[fn_number - 1] = NULL;
+		if (getSystemVariable(label, &hotkeyVar) == 0) {
+			removeSystemVariable(hotkeyVar);
 			printf("F%u cleared.\r\n", fn_number);
-		} else printf("F%u already clear, no hotkey command provided.\r\n", fn_number);
-		
+		} else {
+			printf("F%d already clear, no hotkey command provided.\r\n", fn_number);
+		}
 		return 0;
 	}
 
+	// Remove surrounding quotes
+	// TODO consider whether this should be part of expandMacro?
 	if (ptr[0] == '\"' && ptr[strlen(ptr) - 1] == '\"') {
 		ptr[strlen(ptr) - 1] = '\0';
-		ptr++;		
+		ptr++;
 	}
 
-	if (hotkey_strings[fn_number - 1] != NULL) umm_free(hotkey_strings[fn_number - 1]);
+	hotkeyString = expandMacro(ptr);
+	if (!hotkeyString) return FR_INT_ERR;
+	createOrUpdateSystemVariable(label, MOS_VAR_STRING, hotkeyString);
 
-	hotkey_strings[fn_number - 1] = umm_malloc((strlen(ptr) + 1) * sizeof(char));
-	if (!hotkey_strings[fn_number - 1]) return FR_INT_ERR;
-	strncpy(hotkey_strings[fn_number - 1], ptr, strlen(ptr));
-	hotkey_strings[fn_number - 1][strlen(ptr)] = '\0';
-
-	return 0;
+	return FR_OK;
 }
 
 // LOAD <filename> <addr> command
@@ -561,7 +572,7 @@ int mos_cmdLOAD(char * ptr) {
 	char *  filename;
 	UINT24 	addr;
 	
-	if (!extractString(&ptr, &filename, NULL)) {
+	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
@@ -585,7 +596,7 @@ int mos_cmdEXEC(char *ptr) {
 	UINT24 	addr;
 	char    buf[256];
 	
-	if (!extractString(&ptr, &filename, NULL)) {
+	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_EXEC(filename, buf, sizeof buf);
@@ -605,7 +616,7 @@ int mos_cmdSAVE(char * ptr) {
 	UINT24 	size;
 	
 	if (
-		!extractString(&ptr, &filename, NULL) ||
+		!extractString(&ptr, &filename, NULL, 0) ||
 		!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0) ||
 		!extractNumber(ptr, &ptr, NULL, (int *)&size, 0)
 	) {
@@ -633,13 +644,13 @@ int mos_cmdDEL(char * ptr) {
 	char *lastSeparator;
 	char verify[7];
 
-	if (!extractString(&ptr, &filename, NULL)) {
+	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
 	if (strcasecmp(filename, "-f") == 0) {
 		force = TRUE;
-		if (!extractString(&ptr, &filename, NULL)) {
+		if (!extractString(&ptr, &filename, NULL, 0)) {
 			return FR_INVALID_PARAMETER;
 		}
 	}
@@ -779,7 +790,7 @@ int mos_cmdCD(char * ptr) {
 	char *  path;	
 	FRESULT	fr;
 	
-	if (!extractString(&ptr, &path, NULL)) {
+	if (!extractString(&ptr, &path, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
@@ -799,8 +810,8 @@ int mos_cmdREN(char *ptr) {
 	char *	filename2;
 	
 	if (
-		!extractString(&ptr, &filename1, NULL) ||
-		!extractString(&ptr, &filename2, NULL)
+		!extractString(&ptr, &filename1, NULL, 0) ||
+		!extractString(&ptr, &filename2, NULL, 0)
 	) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -820,8 +831,8 @@ int mos_cmdCOPY(char *ptr) {
 	char *	filename2;
 	
 	if (
-		!extractString(&ptr, &filename1, NULL) ||
-		!extractString(&ptr, &filename2, NULL)
+		!extractString(&ptr, &filename1, NULL, 0) ||
+		!extractString(&ptr, &filename2, NULL, 0)
 	) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -840,7 +851,7 @@ int mos_cmdMKDIR(char * ptr) {
 	
 	FRESULT	fr;
 	
-	if (!extractString(&ptr, &filename, NULL)) {
+	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_MKDIR(filename);
@@ -861,7 +872,7 @@ int mos_cmdSET(char * ptr) {
 	int searchResult;
 
 	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL)) {
+	if (!extractString(&ptr, &token, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -905,7 +916,7 @@ int mos_cmdSETEVAL(char * ptr) {
 	int result;
 
 	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL)) {
+	if (!extractString(&ptr, &token, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -959,7 +970,7 @@ int mos_cmdSETMACRO(char * ptr) {
 	int searchResult;
 
 	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL)) {
+	if (!extractString(&ptr, &token, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -1012,7 +1023,7 @@ int mos_cmdSHOW(char * ptr) {
 	t_mosSystemVariable * var = NULL;
 	int searchResult;
 
-	if (!extractString(&ptr, &token, NULL)) {
+	if (!extractString(&ptr, &token, NULL, 0)) {
 		// Show all variables
 		token = "*";
 	}
@@ -1066,7 +1077,7 @@ int mos_cmdUNSET(char * ptr) {
 	t_mosSystemVariable * var = NULL;
 	int searchResult;
 
-	if (!extractString(&ptr, &token, NULL)) {
+	if (!extractString(&ptr, &token, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -1094,7 +1105,7 @@ int mos_cmdVDU(char *ptr) {
 	char * token = NULL;
 	char * delimiter = ", ";
 
-	while (extractString(&value_str, &token, delimiter)) {
+	while (extractString(&value_str, &token, delimiter, 0)) {
 		bool is_word = false;
 		int value;
 		char *endPtr = NULL;
@@ -1227,7 +1238,7 @@ int mos_cmdTYPE(char * ptr) {
 	FRESULT	fr;
 	char *  filename;
 
-	if (!extractString(&ptr, &filename, NULL)) {
+	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
@@ -1312,7 +1323,7 @@ int mos_cmdHELP(char *ptr) {
 	int i;
 	char *cmd;
 
-	BOOL hasCmd = extractString(&ptr, &cmd, NULL);
+	BOOL hasCmd = extractString(&ptr, &cmd, NULL, 0);
 	if (!hasCmd) {
 		cmd = "help";
 	}
@@ -1354,7 +1365,7 @@ int mos_cmdHELP(char *ptr) {
 		if (!found) {
 			printf("Command not found: %s\r\n", cmd);
 		}
-	} while (extractString(&ptr, &cmd, NULL));
+	} while (extractString(&ptr, &cmd, NULL, 0));
 
 	return 0;
 }
@@ -2635,15 +2646,15 @@ void mos_setupSystemVariables() {
 	// TODO consider how to handle reading these sysvars without spamming the VDP for updates
 	// as using all three in a single command would result in three VDP RTC reads
 	// A simplistic approach would be to only update the RTC sysvar when Sys$Time is read
-	createAndInsertSystemVariable("Sys$Time", MOS_VAR_CODE, &timeVar);
-	createAndInsertSystemVariable("Sys$Date", MOS_VAR_CODE, &dateVar);
-	createAndInsertSystemVariable("Sys$Year", MOS_VAR_CODE, &yearVar);
+	createOrUpdateSystemVariable("Sys$Time", MOS_VAR_CODE, &timeVar);
+	createOrUpdateSystemVariable("Sys$Date", MOS_VAR_CODE, &dateVar);
+	createOrUpdateSystemVariable("Sys$Year", MOS_VAR_CODE, &yearVar);
 	// Current working directory
-	createAndInsertSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
+	createOrUpdateSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
 	// Default CLI prompt
-	createAndInsertSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
+	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
 
 	// Keyboard and console settings
-	createAndInsertSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
-	createAndInsertSystemVariable("Console", MOS_VAR_CODE, &consoleVar);
+	createOrUpdateSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
+	createOrUpdateSystemVariable("Console", MOS_VAR_CODE, &consoleVar);
 }
