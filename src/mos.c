@@ -88,41 +88,41 @@ BOOL	vdpSupportsTextPalette = FALSE;
 //
 static t_mosCommand mosCommands[] = {
 	{ ".", 			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-	{ "CAT",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "Cat",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
 	{ "CD", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
-	{ "CDIR", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
+	{ "CDir", 		&mos_cmdCD,			HELP_CD_ARGS,		HELP_CD },
 	{ "CLS",		&mos_cmdCLS,		NULL,			HELP_CLS },
-	{ "COPY", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
+	{ "Copy", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
 	{ "CP", 		&mos_cmdCOPY,		HELP_COPY_ARGS,		HELP_COPY },
-	{ "CREDITS",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
-	{ "DELETE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
-	{ "DIR",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-	{ "DISC",		&mos_cmdDISC,		NULL,		NULL },
-	{ "ECHO",		&mos_cmdECHO,		HELP_ECHO_ARGS,		HELP_ECHO },
-	{ "ERASE",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
-	{ "EXEC",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
-	{ "HELP",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
+	{ "Credits",	&mos_cmdCREDITS,	NULL,			HELP_CREDITS },
+	{ "Delete",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
+	{ "Dir",		&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
+	{ "Disc",		&mos_cmdDISC,		NULL,		NULL },
+	{ "Echo",		&mos_cmdECHO,		HELP_ECHO_ARGS,		HELP_ECHO },
+	{ "Erase",		&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
+	{ "Exec",		&mos_cmdEXEC,		HELP_EXEC_ARGS,		HELP_EXEC },
+	{ "Help",		&mos_cmdHELP,		HELP_HELP_ARGS,		HELP_HELP },
+	{ "Hotkey",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "JMP",		&mos_cmdJMP,		HELP_JMP_ARGS,		HELP_JMP },
-	{ "LOAD",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
+	{ "Load",		&mos_cmdLOAD,		HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		HELP_CAT_ARGS,		HELP_CAT },
-	{ "HOTKEY",		&mos_cmdHOTKEY,		HELP_HOTKEY_ARGS,	HELP_HOTKEY },
-	{ "MEM",		&mos_cmdMEM,		NULL,		HELP_MEM },
-	{ "MKDIR", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
-	{ "MOUNT",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
-	{ "MOVE",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "Mem",		&mos_cmdMEM,		NULL,		HELP_MEM },
+	{ "MkDir", 		&mos_cmdMKDIR,		HELP_MKDIR_ARGS,	HELP_MKDIR },
+	{ "Mount",		&mos_cmdMOUNT,		NULL,			HELP_MOUNT },
+	{ "Move",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "MV",			&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
-	{ "PRINTF",		&mos_cmdPRINTF,		HELP_PRINTF_ARGS,	HELP_PRINTF },
-	{ "RENAME",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "PrintF",		&mos_cmdPRINTF,		HELP_PRINTF_ARGS,	HELP_PRINTF },
+	{ "Rename",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
-	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
-	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
+	{ "Run", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
+	{ "Save", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "Set",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
 	{ "SetEval",	&mos_cmdSETEVAL,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
 	{ "SetMacro",	&mos_cmdSETMACRO,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
 	{ "Show",		&mos_cmdSHOW,		HELP_SHOW_ARGS,		HELP_SHOW },
-	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
-	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
-	{ "UNSET",		&mos_cmdUNSET,		HELP_UNSET_ARGS,	HELP_UNSET },
+	{ "Time", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
+	{ "Type",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
+	{ "Unset",		&mos_cmdUNSET,		HELP_UNSET_ARGS,	HELP_UNSET },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
 #if DEBUG > 0
 	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		NULL,		"Run the MOS OS test suite" },
@@ -613,14 +613,12 @@ int mos_cmdLOAD(char * ptr) {
 //
 int mos_cmdEXEC(char *ptr) {
 	FRESULT	fr;
-	char *  filename;
-	UINT24 	addr;
-	char    buf[256];
+	char *	filename;
 	
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
-	fr = mos_EXEC(filename, buf, sizeof buf);
+	fr = mos_EXEC(filename);
 	return fr;
 }
 
@@ -664,6 +662,8 @@ int mos_cmdDEL(char * ptr) {
 	char *filename;
 	char *lastSeparator;
 	char verify[7];
+
+	// TODO support path and variable expansion with expandPath
 
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
@@ -779,6 +779,7 @@ int mos_cmdDEL(char * ptr) {
 int mos_cmdJMP(char *ptr) {
 	UINT24 	addr;
 	void (* dest)(void) = 0;
+	// TODO consider allowing macro expansion here
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
@@ -787,18 +788,24 @@ int mos_cmdJMP(char *ptr) {
 	return 0;
 }
 
-// RUN <addr> command
+// RUN [<addr>] [<arguments>] command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
 // - MOS error code
 //
 int mos_cmdRUN(char *ptr) {
-	UINT24 	addr;
+	UINT24	addr;
+	int		result;
+
+	ptr = expandMacro(ptr);
+	if (!ptr) return FR_INT_ERR;
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		addr = MOS_defaultLoadAddress;
 	}
-	return mos_runBin(addr, ptr);
+	result = mos_runBin(addr, ptr);
+	if (ptr) umm_free(ptr);
+	return result;
 }
 
 // CD <path> command
@@ -810,12 +817,16 @@ int mos_cmdRUN(char *ptr) {
 int mos_cmdCD(char * ptr) {
 	char *  path;	
 	FRESULT	fr;
-	
+
+	// TODO why doesn't this use mos_CD?
+
+	ptr = expandPath(ptr);
 	if (!extractString(&ptr, &path, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
 	f_getcwd(cwd, sizeof(cwd)); // Update full path.
+	if (ptr) umm_free(ptr);
 	return fr;
 }
 
@@ -869,13 +880,14 @@ int mos_cmdCOPY(char *ptr) {
 //
 int mos_cmdMKDIR(char * ptr) {
 	char *  filename;
-	
 	FRESULT	fr;
-	
+
+	ptr = expandPath(ptr);
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_MKDIR(filename);
+	if (ptr) umm_free(ptr);
 	return fr;
 }
 
@@ -1122,9 +1134,11 @@ int mos_cmdUNSET(char * ptr) {
 // - MOS error code
 //
 int mos_cmdVDU(char *ptr) {
-	char * value_str = ptr;
+	char * value_str;
 	char * token = NULL;
 	char * delimiter = ", ";
+
+	value_str = expandMacro(ptr);
 
 	while (extractString(&value_str, &token, delimiter, 0)) {
 		bool is_word = false;
@@ -1140,11 +1154,13 @@ int mos_cmdVDU(char *ptr) {
 		}
 
 		if (!extractNumber(token, &endPtr, delimiter, &value, EXTRACT_FLAG_H_SUFFIX_HEX)) {
+			umm_free(value_str);
 			return FR_INVALID_PARAMETER;
 		}
 
 		if ((endPtr != NULL && endPtr < token + len) || value > 65535) {
 			// Did not consume all of the string, or value too large
+			umm_free(value_str);
 			return FR_INVALID_PARAMETER;
 		}
 
@@ -1160,6 +1176,7 @@ int mos_cmdVDU(char *ptr) {
 		}
 	}
 
+	umm_free(value_str);
 	return 0;
 }
 
@@ -1401,10 +1418,13 @@ int mos_cmdHELP(char *ptr) {
 // 
 UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	FRESULT	fr;
-	FIL	   	fil;
-	UINT   	br;	
+	FIL		fil;
+	UINT	br;	
 	FSIZE_t fSize;
 	
+	// TODO loop over filenames until we find a file, or have none left
+	filename = expandPath(filename);
+	if (!filename) return FR_INT_ERR;
 	fr = f_open(&fil, filename, FA_READ);
 	if (fr == FR_OK) {
 		fSize = f_size(&fil);
@@ -1425,6 +1445,7 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 		}		
 	}
 	f_close(&fil);	
+	umm_free(filename);
 	return fr;
 }
 
@@ -1438,14 +1459,19 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 // 
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size) {
 	FRESULT	fr;
-	FIL	   	fil;
-	UINT   	br;	
-	
+	FIL		fil;
+	UINT	br;	
+
+	// TODO loop over path options until we find a file, or have none left
+	filename = expandPath(filename);
+	if (!filename) return FR_INT_ERR;
+
 	fr = f_open(&fil, filename, FA_WRITE | FA_CREATE_NEW);
 	if (fr == FR_OK) {
 		fr = f_write(&fil, (void *)address, size, &br);
 	}
-	f_close(&fil);	
+	f_close(&fil);
+	umm_free(filename);
 	return fr;
 }
 
@@ -1458,28 +1484,41 @@ UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size) {
 UINT24 mos_TYPE(char * filename) {
 	FRESULT	fr;
 	FIL		fil;
-	UINT   	br;
-	char	buf[512];
+	UINT	br;
+	int		size = 512;
+	char *	buffer;
 	int		i;
 
+	// TODO loop over path options until we find a file, or have none left
+	filename = expandPath(filename);
+	if (!filename) return FR_INT_ERR;
+	buffer = umm_malloc(size);
+	if (!buffer) {
+		umm_free(filename);
+		return FR_INT_ERR;
+	}
 	fr = f_open(&fil, filename, FA_READ);
 	if (fr != FR_OK) {
+		umm_free(buffer);
+		umm_free(filename);
 		return fr;
 	}
 
 	while (1) {
-		fr = f_read(&fil, (void *)buf, sizeof buf, &br);
+		fr = f_read(&fil, (void *)buffer, size, &br);
 		if (br == 0)
 			break;
 		for (i = 0; i < br; ++i) {
-			putchar(buf[i]);
-			if (buf[i] == '\n') {
+			putchar(buffer[i]);
+			if (buffer[i] == '\n') {
 				putchar('\r');
 			}
 		}
 	}
 
 	f_close(&fil);
+	umm_free(buffer);
+	umm_free(filename);
 	return FR_OK;
 }
 
@@ -1492,7 +1531,11 @@ UINT24 mos_TYPE(char * filename) {
 UINT24	mos_CD(char *path) {
 	FRESULT	fr;
 
+	path = expandPath(path);
+	if (!path) return FR_INT_ERR;
 	fr = f_chdir(path);
+	f_getcwd(cwd, sizeof(cwd)); // Update full path.
+	umm_free(path);
 	return fr;
 }
 
@@ -1647,6 +1690,8 @@ UINT24 mos_DIR(char* inputPath, BOOL longListing) {
     if (fr != FR_OK) {
         return fr;
     }
+
+	// TODO use expandPath here to expand macros and paths in the inputPath
 
     if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
         dirPath = mos_strdup(".");
@@ -1849,7 +1894,10 @@ cleanup:
 UINT24 mos_DEL(char * filename) {
 	FRESULT	fr;	
 
+	// TODO loop over path options until we find a file, or have none left
+	filename = expandPath(filename);
 	fr = f_unlink(filename);
+	umm_free(filename);
 	return fr;
 }
 
@@ -1880,6 +1928,9 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
     char *srcDir = NULL, *pattern = NULL, *fullSrcPath = NULL, *fullDstPath = NULL, *srcFilename = NULL;
 	char *asteriskPos, *lastSeparator;
     BOOL usePattern = FALSE;
+
+	// TODO add in path expansion using expandPath
+	// that would need to do iteration over srcPath, but use first expanded dstPath
 
     if (strchr(dstPath, '*') != NULL) {
         // printf("Wildcards permitted in source only.\r\n");
@@ -2001,6 +2052,9 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
     char *srcDir = NULL, *pattern = NULL, *fullSrcPath = NULL, *fullDstPath = NULL, *srcFilename = NULL;
 	char *asteriskPos, *lastSeparator;
     BOOL usePattern = FALSE;
+
+	// TODO add in path expansion using expandPath
+	// that would need to do iteration over srcPath, but use first expanded dstPath
 
     if (strchr(dstPath, '*') != NULL) {
         return FR_INVALID_PARAMETER; // Wildcards not allowed in destination path
@@ -2133,9 +2187,15 @@ cleanup:
 // - FatFS return code
 // 
 UINT24 mos_MKDIR(char * filename) {
-	FRESULT	fr;	
-	
+	FRESULT	fr;
+
+	// Expand path - we will only attempt to mkdir at first expansion
+	filename = expandPath(filename);
+	if (!filename) {
+		return FR_INT_ERR;
+	}
 	fr = f_mkdir(filename);
+	umm_free(filename);
 	return fr;
 }
 
@@ -2147,10 +2207,23 @@ UINT24 mos_MKDIR(char * filename) {
 // Returns:
 // - FatFS return code (of the last command)
 //
-UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
+UINT24 mos_EXEC(char * filename) {
 	FRESULT	fr;
-	FIL	   	fil;
-	int     line =  0;
+	FIL		fil;
+	int		size = 256;
+	char *	buffer = (char *)umm_malloc(size);
+	int		line =  0;
+
+	if (!buffer) {
+		return FR_INT_ERR;
+	}
+	// TODO handle path expansion here
+	// looping thru path
+	filename = expandPath(filename);
+	if (!filename) {
+		umm_free(buffer);
+		return FR_INT_ERR;
+	}
 	
 	fr = f_open(&fil, filename, FA_READ);
 	if (fr == FR_OK) {
@@ -2164,7 +2237,9 @@ UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
 			}
 		}
 	}
-	f_close(&fil);	
+	f_close(&fil);
+	umm_free(filename);
+	umm_free(buffer);
 	return fr;	
 }
 
@@ -2179,15 +2254,18 @@ UINT24 mos_FOPEN(char * filename, UINT8 mode) {
 	FRESULT fr;
 	int		i;
 	
+	filename = expandPath(filename);
 	for (i = 0; i < MOS_maxOpenFiles; i++) {
 		if (mosFileObjects[i].free == 0) {
 			fr = f_open(&mosFileObjects[i].fileObject, filename, mode);
 			if (fr == FR_OK) {
 				mosFileObjects[i].free = 1;
+				umm_free(filename);
 				return i + 1;
 			}
 		}
 	}
+	umm_free(filename);
 	return 0;
 }
 

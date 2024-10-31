@@ -109,7 +109,7 @@ UINT24	mos_REN(char *srcPath, char *dstPath, BOOL verbose);
 UINT24	mos_COPY_API(char *srcPath, char *dstPath);
 UINT24	mos_COPY(char *srcPath, char *dstPath, BOOL verbose);
 UINT24	mos_MKDIR(char * filename);
-UINT24 	mos_EXEC(char * filename, char * buffer, UINT24 size);
+UINT24 	mos_EXEC(char * filename);
 
 UINT24	mos_FOPEN(char * filename, UINT8 mode);
 UINT24	mos_FCLOSE(UINT8 fh);

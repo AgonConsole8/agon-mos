@@ -83,6 +83,8 @@ char *	expandMacro(char * source);
 
 char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);
 
+char *	expandPath(char * source);
+
 t_mosEvalResult * evaluateExpression(char * source);
 
 char *  getArgument(char * source, int argNo, char ** end);

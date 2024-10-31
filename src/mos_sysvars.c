@@ -647,7 +647,15 @@ char * expandVariable(t_mosSystemVariable * var, bool showWriteOnly) {
 		return newValue;
 	}
 	return NULL;
-}		
+}
+
+char * expandPath(char * source) {
+	// For now, simplistically return macro expansion
+	// this should however support looping thru paths
+	// as a path variable may point to several different directories
+	// exact API TBD
+	return expandMacro(source);
+}
 
 t_mosEvalResult * evaluateExpression(char * source) {
 	t_mosSystemVariable * var = NULL;
