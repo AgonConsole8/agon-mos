@@ -302,34 +302,43 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		int (*func)(char * ptr);
 		t_mosCommand *cmd;
 		t_mosSystemVariable *alias = NULL;
-		char * aliasToken = NULL;
+		char * aliasToken;
+		char * rawCommand;
 		char * command;
-		if (!extractString(&ptr, &command, NULL, 0)) {
+		if (!extractString(&ptr, &rawCommand, " .", EXTRACT_FLAG_NO_TERMINATOR)) {
 			// This shouldn't happen
 			return FR_INT_ERR;
 		}
+		if (*ptr == '.') {
+			ptr++;
+		}
+		command = mos_strndup(rawCommand, ptr - rawCommand);
 		// ptr will now point to the arguments
 
 		// Check if this command has an alias
 		aliasToken = umm_malloc(strlen(command) + 7);
+		if (aliasToken == NULL) {
+			umm_free(command);
+			return FR_INT_ERR;
+		}
 		sprintf(aliasToken, "Alias$%s", command);
 		if (getSystemVariable(aliasToken, &alias) == 0) {
-			char * newCommand;
 			char * aliasTemplate;
+			umm_free(command);
 			umm_free(aliasToken);
 			aliasTemplate = expandVariable(alias, false);
 			if (!aliasTemplate) {
 				return FR_INT_ERR;
 			}
-			newCommand = substituteArguments(aliasTemplate, ptr, true);
-			if (!newCommand) {
+			command = substituteArguments(aliasTemplate, ptr, true);
+			if (!command) {
 				umm_free(aliasTemplate);
 				return FR_INT_ERR;
 			}
 
 			umm_free(aliasTemplate);
-			result = mos_exec(newCommand, in_mos, depth + 1);
-			umm_free(newCommand);
+			result = mos_exec(command, in_mos, depth + 1);
+			umm_free(command);
 			return result;
 		}
 
@@ -344,6 +353,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			char * path = umm_malloc(strlen(command) + 10);
 			if (path == NULL) {
 				// Out of memory, but report it as an invalid command
+				umm_free(command);
 				return MOS_INVALID_COMMAND;
 			}
 
@@ -379,6 +389,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			if (args) umm_free(args);
 		}
 	}
+	umm_free(command);
 	return result;
 }
 
