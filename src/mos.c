@@ -822,6 +822,7 @@ int mos_cmdCD(char * ptr) {
 
 	ptr = expandPath(ptr);
 	if (!extractString(&ptr, &path, NULL, 0)) {
+		// TODO should we default to the root directory?
 		return FR_INVALID_PARAMETER;
 	}
 	fr = f_chdir(path);
@@ -2430,6 +2431,7 @@ UINT24 mos_OSCLI(char * cmd) {
 	UINT24 fr;
 	// NB OSCLI doesn't support automatic running of programs besides moslets
 	fr = mos_exec(cmd, FALSE, 0);
+	createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)fr);
 	return fr;
 }
 
@@ -2745,6 +2747,8 @@ void mos_setupSystemVariables() {
 	// TODO consider how to handle reading these sysvars without spamming the VDP for updates
 	// as using all three in a single command would result in three VDP RTC reads
 	// A simplistic approach would be to only update the RTC sysvar when Sys$Time is read
+	createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)0);
+
 	createOrUpdateSystemVariable("Sys$Time", MOS_VAR_CODE, &timeVar);
 	createOrUpdateSystemVariable("Sys$Date", MOS_VAR_CODE, &dateVar);
 	createOrUpdateSystemVariable("Sys$Year", MOS_VAR_CODE, &yearVar);

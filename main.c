@@ -45,6 +45,7 @@
 #include "ff.h"
 #include "clock.h"
 #include "mos_editor.h"
+#include "mos_sysvars.h"
 #include "mos.h"
 #include "i2c.h"
 #include "umm_malloc.h"
@@ -209,6 +210,7 @@ int main(void) {
 	#if enable_config == 1
 	{
 		int err = mos_EXEC("autoexec.txt");			// Then load and run the config file
+		createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)err);
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
@@ -220,6 +222,7 @@ int main(void) {
 	while (1) {
 		if (mos_input(&cmd, sizeof(cmd)) == 13) {
 			int err = mos_exec(&cmd, TRUE, 0);
+			createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)err);
 			if (err > 0) {
 				mos_error(err);
 			}
