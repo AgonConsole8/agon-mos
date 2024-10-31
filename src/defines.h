@@ -51,6 +51,7 @@ typedef enum {
 	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
 	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
 	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
+	MOS_TOO_DEEP,				/* (26) Too many nested commands */
 } MOSRESULT;
 
 #define SPL_STACK_SIZE				2048

@@ -756,7 +756,7 @@ char * substituteArguments(char * source, char * args, bool includeRest) {
 	char * argEnd = NULL;
 	char * start = source;
 	char * end = source + strlen(source);
-	int maxArg = 0;
+	int maxArg = -1;
 	int size = 0;
 
 	// Work out how long our string will be with substitutions
@@ -868,6 +868,7 @@ char * substituteArguments(char * source, char * args, bool includeRest) {
 		// we have a rest argument
 		argument = getArgument(args, maxArg, NULL);
 		if (argument != NULL) {
+			*destPos++ = ' ';
 			strcpy(destPos, argument);
 			destPos += strlen(argument);
 		}

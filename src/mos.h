@@ -58,7 +58,7 @@ BYTE	mos_getkey(void);
 UINT24	mos_input(char * buffer, int bufferLength);
 t_mosCommand	*mos_getCommand(char * ptr);
 char *	mos_trim(char * s);
-int		mos_exec(char * buffer, BOOL in_mos);
+int		mos_exec(char * buffer, BOOL in_mos, BYTE depth);
 UINT8 	mos_execMode(UINT8 * ptr);
 
 int		mos_mount(void);

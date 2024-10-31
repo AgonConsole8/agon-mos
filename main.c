@@ -219,12 +219,11 @@ int main(void) {
 	//
 	while (1) {
 		if (mos_input(&cmd, sizeof(cmd)) == 13) {
-			int err = mos_exec(&cmd, TRUE);
-			if(err > 0) {
+			int err = mos_exec(&cmd, TRUE, 0);
+			if (err > 0) {
 				mos_error(err);
 			}
-		}
-		else {
+		} else {
 			printf("Escape\n\r");
 		}
 	}

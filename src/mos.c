@@ -161,6 +161,7 @@ static char * mos_errors[] = {
 	"Not implemented",
 	"Load overlaps system area",
 	"Bad string",
+	"Too deep",
 };
 
 #define mos_errors_count (sizeof(mos_errors)/sizeof(char *))
@@ -284,13 +285,13 @@ int mos_runBin(UINT24 addr, char * args) {
 // Returns:
 // - MOS error code
 //
-int mos_exec(char * buffer, BOOL in_mos) {
+int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 	char * 	ptr;
-	int 	fr = 0;
-	int 	(*func)(char * ptr);
-	char	path[256];
-	UINT8	mode;
-	t_mosCommand *cmd;
+	int 	result = 0;
+
+	if (depth > 10) {
+		return MOS_TOO_DEEP;
+	}
 
 	ptr = mos_trim(buffer);
 	if (ptr != NULL && (*ptr == '#' || *ptr == '\0' || (*ptr == '|' && *(ptr+1) == ' '))) {
@@ -298,67 +299,87 @@ int mos_exec(char * buffer, BOOL in_mos) {
 	}
 
 	if (ptr != NULL) {
+		int (*func)(char * ptr);
+		t_mosCommand *cmd;
+		t_mosSystemVariable *alias = NULL;
+		char * aliasToken = NULL;
 		char * command;
 		if (!extractString(&ptr, &command, NULL, 0)) {
 			// This shouldn't happen
 			return FR_INT_ERR;
 		}
-		// TODO - handle command aliases
-		// which will mean looking up aliases, and then doing string replacement
-		// Basic algorithm to deal with aliases is to repeatedly expand the command until no more aliases are found
-		// We should only expand the first word of the command
-		// Challenge - how to detect looping aliases?
-		// Probably just use a counter, and if it exceeds a certain number, then bail out
-		// We should also restrict our command length
+		// ptr will now point to the arguments
+
+		// Check if this command has an alias
+		aliasToken = umm_malloc(strlen(command) + 7);
+		sprintf(aliasToken, "Alias$%s", command);
+		if (getSystemVariable(aliasToken, &alias) == 0) {
+			char * newCommand;
+			char * aliasTemplate;
+			umm_free(aliasToken);
+			aliasTemplate = expandVariable(alias, false);
+			if (!aliasTemplate) {
+				return FR_INT_ERR;
+			}
+			newCommand = substituteArguments(aliasTemplate, ptr, true);
+			if (!newCommand) {
+				umm_free(aliasTemplate);
+				return FR_INT_ERR;
+			}
+
+			umm_free(aliasTemplate);
+			result = mos_exec(newCommand, in_mos, depth + 1);
+			umm_free(newCommand);
+			return result;
+		}
+
+		umm_free(aliasToken);
+
 		cmd = mos_getCommand(command);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
 			return func(ptr);
-		} else {		
-			// Create a new "path" string for command searching
-			// TODO replace `path` with malloc'd variable
-			if (strlen(ptr) > 246) {	// Maximum command length (to prevent buffer overrun)
+		} else {
+			char * args = NULL;
+			char * path = umm_malloc(strlen(command) + 10);
+			if (path == NULL) {
+				// Out of memory, but report it as an invalid command
 				return MOS_INVALID_COMMAND;
-			} else {
-				// Search for the command
-				// We should use system variables to determine our search paths
-				// Moslets need to be handled separately from regular executables
-				// we should maybe have a "moslets path" variable,
-				// and a "system CLI path" variable
-				sprintf(path, "/mos/%s.bin", ptr);
-				fr = mos_LOAD(path, MOS_starLoadAddress, 0);
-				if (fr == FR_OK) {
-					return mos_runBin(MOS_starLoadAddress, ptr);
-				}
-				if (fr == MOS_OVERLAPPING_SYSTEM) {
-					return fr;
-				}
-				
-				if (in_mos) {
-					sprintf(path, "%s.bin", ptr);
-					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress, ptr);
+			}
+
+			// Search for the command
+			// Moslets should attempt to be loaded under `Moslet$Path`
+			// with the general search path being `Run$Path`
+			// if `in_mos` is _not_ set we should only search `Moslet$Path`
+
+			// expand any variables in our arguments, if we can
+			args = expandMacro(ptr);
+
+			sprintf(path, "/mos/%s.bin", command);
+			result = mos_LOAD(path, MOS_starLoadAddress, 0);
+			if (result == FR_OK) {
+				result = mos_runBin(MOS_starLoadAddress, args ? args : ptr);
+			} else if (in_mos && result != MOS_OVERLAPPING_SYSTEM) {
+				sprintf(path, "%s.bin", command);
+				result = mos_LOAD(path, MOS_defaultLoadAddress, 0);
+				if (result == FR_OK) {
+					result = mos_runBin(MOS_defaultLoadAddress, args ? args : ptr);
+				} else if (result != MOS_OVERLAPPING_SYSTEM) {
+					sprintf(path, "/bin/%s.bin", command);
+					result = mos_LOAD(path, MOS_defaultLoadAddress, 0);
+					if (result == FR_OK) {
+						result = mos_runBin(MOS_defaultLoadAddress, args ? args : ptr);
 					}
-					if (fr == MOS_OVERLAPPING_SYSTEM) {
-						return fr;
-					}
-					sprintf(path, "/bin/%s.bin", ptr);
-					fr = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-					if (fr == FR_OK) {
-						return mos_runBin(MOS_defaultLoadAddress, ptr);
-					}
-					if (fr == MOS_OVERLAPPING_SYSTEM) {
-						return fr;
-					}
-				}				
-				if (fr == FR_NO_FILE || fr == FR_NO_PATH) {
-					return MOS_INVALID_COMMAND;
 				}
 			}
+			if (result == FR_NO_FILE || result == FR_NO_PATH) {
+				result = MOS_INVALID_COMMAND;
+			}
+			umm_free(path);
+			if (args) umm_free(args);
 		}
 	}
-	return fr;
+	return result;
 }
 
 // Get the MOS Z80 execution mode
@@ -777,7 +798,7 @@ int mos_cmdRUN(char *ptr) {
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		addr = MOS_defaultLoadAddress;
 	}
-	return mos_runBin(addr, ++ptr);
+	return mos_runBin(addr, ptr);
 }
 
 // CD <path> command
@@ -2136,7 +2157,7 @@ UINT24 mos_EXEC(char * filename, char * buffer, UINT24 size) {
 		while (!f_eof(&fil)) {
 			line++;
 			f_gets(buffer, size, &fil);
-			fr = mos_exec(buffer, TRUE);
+			fr = mos_exec(buffer, TRUE, 0);
 			if (fr != FR_OK) {
 				printf("\r\nError executing %s at line %d\r\n", filename, line);
 				break;
@@ -2330,7 +2351,7 @@ void mos_GETERROR(UINT8 errno, UINT24 address, UINT24 size) {
 UINT24 mos_OSCLI(char * cmd) {
 	UINT24 fr;
 	// NB OSCLI doesn't support automatic running of programs besides moslets
-	fr = mos_exec(cmd, FALSE);
+	fr = mos_exec(cmd, FALSE, 0);
 	return fr;
 }
 
