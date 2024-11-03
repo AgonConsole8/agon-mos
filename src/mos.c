@@ -270,12 +270,46 @@ int mos_runBin(UINT24 addr, char * args) {
 	}
 }
 
-int mos_runBinFile(char * filepath, char * args) {
+void splitFilepath(char * filepath, char ** prefixPtr, char ** dirPtr, char ** filenamePtr) {
+	char * prefix = NULL;
+	char * dir = NULL;
+	char * filename = NULL;
+
+	if (strchr(filepath, ':') != NULL) {
+		prefix = filepath;
+		filepath = strchr(filepath, ':');
+		*filepath = '\0';
+		filepath++;
+	}
+
+	// If we have a directory, it will start at current filepath
+	dir = filepath;
+	// skip past any slashes to get to filename
+	while (extractString(&filepath, &filename, "/", EXTRACT_FLAG_NO_TERMINATOR)) {}
+
+	if (dir == filename) {
+		dir = NULL;
+	} else {
+		// Terminate the directory string
+		*(filename - 1) = '\0';
+	}
+
+	if (prefixPtr != NULL) {
+		*prefixPtr = prefix;
+	}
+	if (dirPtr != NULL) {
+		*dirPtr = dir;
+	}
+	if (filenamePtr != NULL) {
+		*filenamePtr = filename;
+	}
+}
+
+bool isMoslet(char * filepath) {
 	char * checkPath = NULL;
+	char * mosletPath;
 	char * mosletPathStr;
-	char * mosletPath = NULL;
-	int result = 0;
-	UINT24 addr = MOS_defaultLoadAddress;
+	bool result = false;
 
 	mosletPathStr = expandVariableToken("Moslet$Path");
 	if (mosletPathStr == NULL) {
@@ -285,34 +319,95 @@ int mos_runBinFile(char * filepath, char * args) {
 		mosletPath = mosletPathStr;
 	}
 
-	// TODO when checking paths we need to expand path prefixes in our source filepath
-	// NB moslet detection won't resolve relative paths
-
-	// We probably need to split filepath into path (prefix:), directory, and filename
-
-	// when splitting, to find filename, we _could_ use an exrtactString variant
-	// that scans backwards from the end of the string for "/:" separators
-
-	// Check if the filepath is a moslet
-	// Path variables are separated by space, comma, or semicolon - this will zero terminate the path elements
 	while (extractString(&mosletPath, &checkPath, ", ;", 0)) {
 		if (pmatch(checkPath, filepath, MATCH_BEGINS_WITH | MATCH_CASE_INSENSITIVE | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR) == 0) {
 			// We have a match
 			// TODO check if the filepath (without the matched path) is only a filename?
-			addr = MOS_starLoadAddress;
+			result = true;
 			break;
 		}
 	}
 
-	if (mosletPathStr != NULL) {
-		umm_free(mosletPathStr);
+	umm_free(mosletPathStr);
+
+	return result;
+}
+
+int mos_runBinFile(char * filepath, char * args) {
+	char * pathPrefix = NULL;
+	char * pathValue = NULL;
+	char * dir = NULL;
+	char * filename = NULL;
+	int result = FR_OK;
+	UINT24 addr = MOS_defaultLoadAddress;
+
+	// TODO add support for wildcard matching
+	// if wildcard is in directory path we'd need to walk path
+	// if it's just in filename we can use f_findfirst on the directory
+
+	// TODO add support for relative paths
+	// We'd need to resolve all paths into absolute paths for matching to work
+	// path resolution can be done by temporarily changing directory then using getcwd
+
+	// NB until path resolution is in place, system variables for paths should not contain relative paths
+
+	splitFilepath(filepath, &pathPrefix, &dir, &filename);
+	// Clear filepath variable, as we will re-use it later
+	filepath = NULL;
+
+	if (pathPrefix) {
+		char * pathToken = umm_malloc(strlen(pathPrefix) + 6);
+		if (pathToken == NULL) {
+			return FR_INT_ERR;
+		}
+		sprintf(pathToken, "%s$Path", pathPrefix);
+		pathValue = expandVariableToken(pathToken);
+		umm_free(pathToken);
 	}
 
-	result = mos_LOAD(filepath, addr, 0);
+	if (pathValue) {
+		char * checkPath = NULL;
+		char * checkPtr = pathValue;
+		FILINFO fil;
+		filepath = NULL;
+		// we have a path, so check all options until we find a match
+		while (extractString(&checkPtr, &checkPath, ", ;", 0)) {
+			filepath = umm_malloc(strlen(checkPath) + (dir ? strlen(dir) : 0) + strlen(filename) + 2);
+			if (filepath == NULL) {
+				result = FR_INT_ERR;
+				break;
+			}
+			sprintf(filepath, "%s%s%s%s", checkPath, dir ? dir : "", dir ? "/" : "", filename);
+			if (f_stat(filepath, &fil) == FR_OK) {
+				break;
+			}
+			umm_free(filepath);
+			filepath = NULL;
+		}
+		umm_free(pathValue);
+		if (!filepath) {
+			result = result || FR_NO_FILE;
+		}
+	} else {
+		// no path, so re-construct filename from dir and filename
+		filepath = umm_malloc(strlen(filename) + (dir ? strlen(dir) : 0) + 2);
+		if (filepath == NULL) {
+			result = FR_INT_ERR;
+		}
+		sprintf(filepath, "%s%s%s", dir ? dir : "", dir ? "/" : "", filename);
+	}
+
 	if (result == FR_OK) {
-		result = mos_runBin(addr, args);
+		if (isMoslet(filepath)) {
+			addr = MOS_starLoadAddress;
+		}
+		result = mos_LOAD(filepath, addr, 0);
+		if (result == FR_OK) {
+			result = mos_runBin(addr, args);
+		}
 	}
 
+	umm_free(filepath);
 	return result;
 }
 
@@ -406,32 +501,20 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 				// Out of memory, but report it as an invalid command
 				return MOS_INVALID_COMMAND;
 			}
+			if (memchr(command, ':', cmdLen) != NULL) {
+				// Command has a path prefix, so we use it as-is
+				sprintf(path, "%.*s.bin", cmdLen, command);
+			} else {
+				// If "in_mos" is true we use full run path, otherwise restrict to moslets only
+				sprintf(path, "%s:%.*s.bin", in_mos ? "run" : "moslet", cmdLen, command);
+			}
 
 			// expand any variables in our arguments, if we can
 			args = expandMacro(ptr);
 
-			// We'll use `runBinFile` to run the file, which will work out load/run address
-			// when we have runtype support we can use `runFile`
-
-			// For now we don't support paths, so we'll go thru a fixed set of directories
-			// Once we support paths then we can use `moslet:` or `run:` prefix depending on `in_mos` setting
-
-			// TODO if command was `.` terminated then try to find a wildcard match
-			// (not currently supported)
-			// our fatfs is configured to allow wildcard matching, but that only works in f_findfirst/f_findnext
-
+			// Once we have runtype support we should `runFile`
 			// Run the command as a binary file
-			// sprintf(path, "%s:%.*s.bin", in_mos ? 'moslet' : 'run', cmdLen, command);
-			sprintf(path, "/mos/%.*s.bin", cmdLen, command);
 			result = mos_runBinFile(path, args);
-			if (result != FR_OK && result != MOS_OVERLAPPING_SYSTEM) {
-				sprintf(path, "./%.*s.bin", cmdLen, command);
-				result = mos_runBinFile(path, args);
-			}
-			if (result != FR_OK && result != MOS_OVERLAPPING_SYSTEM) {
-				sprintf(path, "/bin/%.*s.bin", cmdLen, command);
-				result = mos_runBinFile(path, args);
-			}
 
 			if (result == FR_NO_FILE || result == FR_NO_PATH || result == FR_DISK_ERR) {
 				result = MOS_INVALID_COMMAND;

@@ -17,7 +17,6 @@
 #define EXTRACT_FLAG_SUPPORT_QUOTES	(1 << 4)
 #define EXTRACT_FLAG_OMIT_ENCLOSING_QUOTES	(1 << 5)
 #define EXTRACT_FLAG_OMIT_LEADSKIP	(1 << 6)
-#define EXTRACT_FLAG_BACKWARDS		(1 << 7)
 
 /**
  * MOS system variable types
