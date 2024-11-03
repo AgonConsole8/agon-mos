@@ -8,10 +8,16 @@
 #include "ff.h"
 #include "umm_malloc.h"
 
+// TODO renumber these flags and split between number and string
 #define EXTRACT_FLAG_DECIMAL_ONLY	(1 << 0)
 #define EXTRACT_FLAG_POSITIVE_ONLY	(1 << 1)
 #define EXTRACT_FLAG_H_SUFFIX_HEX	(1 << 2)
+
 #define EXTRACT_FLAG_NO_TERMINATOR	(1 << 3)
+#define EXTRACT_FLAG_SUPPORT_QUOTES	(1 << 4)
+#define EXTRACT_FLAG_OMIT_ENCLOSING_QUOTES	(1 << 5)
+#define EXTRACT_FLAG_OMIT_LEADSKIP	(1 << 6)
+#define EXTRACT_FLAG_BACKWARDS		(1 << 7)
 
 /**
  * MOS system variable types
@@ -82,6 +88,8 @@ bool	extractString(char ** source, char ** result, char * divider, BYTE flags);
 char *	expandMacro(char * source);
 
 char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);
+
+char *	expandVariableToken(char * token);
 
 char *	expandPath(char * source);
 

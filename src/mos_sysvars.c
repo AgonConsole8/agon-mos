@@ -537,9 +537,17 @@ bool extractString(char ** source, char ** result, char * divider, BYTE flags) {
 		divider = " ";
 	}
 
-	// skip our source past any start token dividers
-	start = start + mos_strspn(start, divider);
-	endptr = start + mos_strcspn(start, divider);
+	if (!(flags & EXTRACT_FLAG_OMIT_LEADSKIP)) {
+		// skip our source past any start token dividers
+		start = start + mos_strspn(start, divider);
+		endptr = start + mos_strcspn(start, divider);
+	} else {
+		if (strchr(divider, *start) != NULL) {
+			endptr = start + 1;
+		} else {
+			endptr = start + mos_strcspn(start, divider);
+		}
+	}
 
 	if (strlen(start) == 0 || endptr == start) {
 		*source = start;
@@ -647,6 +655,15 @@ char * expandVariable(t_mosSystemVariable * var, bool showWriteOnly) {
 		return newValue;
 	}
 	return NULL;
+}
+
+char * expandVariableToken(char * token) {
+	t_mosSystemVariable * var = NULL;
+	int result = getSystemVariable(token, &var);
+	if (result != 0) {
+		return NULL;
+	}
+	return expandVariable(var, false);
 }
 
 char * expandPath(char * source) {

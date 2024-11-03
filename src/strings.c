@@ -91,10 +91,10 @@ int pmatch(const char *pattern, const char *string, uint8_t flags) {
 	bool beginsWith = flags & MATCH_BEGINS_WITH;
 	bool upToSpace = flags & MATCH_UP_TO_SPACE;
 
-	if (*pattern == '\0' || (upToSpace && *pattern == ' ')) {
+	if (*pattern == '\0' || (upToSpace && *pattern == ' ') || (dotAsStar && *pattern == '.')) {
 		// if the pattern has been exhausted
 		// return success if the string has also been exhausted, or we are doing a beginsWith test
-		if (beginsWith) {
+		if (beginsWith || (dotAsStar && *pattern == '.')) {
 			return 0; // Match if beginsWith is set
 		}
 		return *string == '\0' ? 0 : -1;

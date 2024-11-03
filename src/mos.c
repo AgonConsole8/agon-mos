@@ -199,17 +199,9 @@ BYTE mos_getkey() {
 //
 UINT24 mos_input(char * buffer, int bufferLength) {
 	INT24 retval;
-	t_mosSystemVariable * promptVar = NULL;
-	char * prompt = NULL;
-	retval = getSystemVariable("CLI$Prompt", &promptVar);
-	// Print our prompt
-	if (retval == 0) {
-		prompt = expandVariable(promptVar, false);
-	}
-	if (prompt == NULL) {
-		prompt = "*\0";
-	}
-	printf("%s", prompt);
+	char * prompt = expandVariableToken("CLI$Prompt");
+
+	printf("%s", prompt ? prompt : "*");
 	umm_free(prompt);
 	retval = mos_EDITLINE(buffer, bufferLength, 3);
 	printf("\n\r");
@@ -278,6 +270,52 @@ int mos_runBin(UINT24 addr, char * args) {
 	}
 }
 
+int mos_runBinFile(char * filepath, char * args) {
+	char * checkPath = NULL;
+	char * mosletPathStr;
+	char * mosletPath = NULL;
+	int result = 0;
+	UINT24 addr = MOS_defaultLoadAddress;
+
+	mosletPathStr = expandVariableToken("Moslet$Path");
+	if (mosletPathStr == NULL) {
+		// Mostlet$Path variable has been removed, so default it to /mos/
+		mosletPath = "/mos/";
+	} else {
+		mosletPath = mosletPathStr;
+	}
+
+	// TODO when checking paths we need to expand path prefixes in our source filepath
+	// NB moslet detection won't resolve relative paths
+
+	// We probably need to split filepath into path (prefix:), directory, and filename
+
+	// when splitting, to find filename, we _could_ use an exrtactString variant
+	// that scans backwards from the end of the string for "/:" separators
+
+	// Check if the filepath is a moslet
+	// Path variables are separated by space, comma, or semicolon - this will zero terminate the path elements
+	while (extractString(&mosletPath, &checkPath, ", ;", 0)) {
+		if (pmatch(checkPath, filepath, MATCH_BEGINS_WITH | MATCH_CASE_INSENSITIVE | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR) == 0) {
+			// We have a match
+			// TODO check if the filepath (without the matched path) is only a filename?
+			addr = MOS_starLoadAddress;
+			break;
+		}
+	}
+
+	if (mosletPathStr != NULL) {
+		umm_free(mosletPathStr);
+	}
+
+	result = mos_LOAD(filepath, addr, 0);
+	if (result == FR_OK) {
+		result = mos_runBin(addr, args);
+	}
+
+	return result;
+}
+
 // Execute a MOS command
 // Parameters:
 // - buffer: Pointer to a zero terminated string that contains the MOS command with arguments
@@ -303,28 +341,39 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		t_mosCommand *cmd;
 		t_mosSystemVariable *alias = NULL;
 		char * aliasToken;
-		char * rawCommand;
 		char * command;
-		if (!extractString(&ptr, &rawCommand, " .", EXTRACT_FLAG_NO_TERMINATOR)) {
+		int cmdLen = 0;
+		// TODO consider bypassing command maching if we have a direct path to a file
+		// and don't use "." as a separator
+		// Should we still support aliasing tho?
+		// if (!extractString(&ptr, &command, *ptr == '/' ? " " : " .", EXTRACT_FLAG_NO_TERMINATOR | EXTRACT_FLAG_OMIT_LEADSKIP)) {
+		if (!extractString(&ptr, &command, " .", EXTRACT_FLAG_NO_TERMINATOR | EXTRACT_FLAG_OMIT_LEADSKIP)) {
 			// This shouldn't happen
 			return FR_INT_ERR;
 		}
-		if (*ptr == '.') {
+		cmdLen = ptr - command;
+		if (cmdLen > 1 && *ptr == '.') {
 			ptr++;
+			cmdLen++;
 		}
-		command = mos_strndup(rawCommand, ptr - rawCommand);
 		// ptr will now point to the arguments
 
+		// TODO revisit our `.` handling logic
+		// as a `cd..` command will be interpreted as `cd.` as the command and `.` as the argument
+		// this _might_ be OK, as `cd.` _should_ match to `cdir`,
+		// however it is _actually_ matching to `cd`
+
 		// Check if this command has an alias
-		aliasToken = umm_malloc(strlen(command) + 7);
+		aliasToken = umm_malloc(cmdLen + 7);
 		if (aliasToken == NULL) {
-			umm_free(command);
 			return FR_INT_ERR;
 		}
-		sprintf(aliasToken, "Alias$%s", command);
+		sprintf(aliasToken, "Alias$%.*s", cmdLen, command);
+		if (aliasToken[strlen(aliasToken) - 1] == '.') {
+			aliasToken[strlen(aliasToken) - 1] = '*';
+		}
 		if (getSystemVariable(aliasToken, &alias) == 0) {
 			char * aliasTemplate;
-			umm_free(command);
 			umm_free(aliasToken);
 			aliasTemplate = expandVariable(alias, false);
 			if (!aliasTemplate) {
@@ -347,49 +396,50 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		cmd = mos_getCommand(command);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
+			// printf("Command: '%s' '%s'\n\r", cmd->name, ptr);
 			return func(ptr);
 		} else {
+			// Command not built-in, so see if it's a file
 			char * args = NULL;
-			char * path = umm_malloc(strlen(command) + 10);
+			char * path = umm_malloc(cmdLen + 12);
 			if (path == NULL) {
 				// Out of memory, but report it as an invalid command
-				umm_free(command);
 				return MOS_INVALID_COMMAND;
 			}
-
-			// Search for the command
-			// Moslets should attempt to be loaded under `Moslet$Path`
-			// with the general search path being `Run$Path`
-			// if `in_mos` is _not_ set we should only search `Moslet$Path`
 
 			// expand any variables in our arguments, if we can
 			args = expandMacro(ptr);
 
-			sprintf(path, "/mos/%s.bin", command);
-			result = mos_LOAD(path, MOS_starLoadAddress, 0);
-			if (result == FR_OK) {
-				result = mos_runBin(MOS_starLoadAddress, args ? args : ptr);
-			} else if (in_mos && result != MOS_OVERLAPPING_SYSTEM) {
-				sprintf(path, "%s.bin", command);
-				result = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-				if (result == FR_OK) {
-					result = mos_runBin(MOS_defaultLoadAddress, args ? args : ptr);
-				} else if (result != MOS_OVERLAPPING_SYSTEM) {
-					sprintf(path, "/bin/%s.bin", command);
-					result = mos_LOAD(path, MOS_defaultLoadAddress, 0);
-					if (result == FR_OK) {
-						result = mos_runBin(MOS_defaultLoadAddress, args ? args : ptr);
-					}
-				}
+			// We'll use `runBinFile` to run the file, which will work out load/run address
+			// when we have runtype support we can use `runFile`
+
+			// For now we don't support paths, so we'll go thru a fixed set of directories
+			// Once we support paths then we can use `moslet:` or `run:` prefix depending on `in_mos` setting
+
+			// TODO if command was `.` terminated then try to find a wildcard match
+			// (not currently supported)
+			// our fatfs is configured to allow wildcard matching, but that only works in f_findfirst/f_findnext
+
+			// Run the command as a binary file
+			// sprintf(path, "%s:%.*s.bin", in_mos ? 'moslet' : 'run', cmdLen, command);
+			sprintf(path, "/mos/%.*s.bin", cmdLen, command);
+			result = mos_runBinFile(path, args);
+			if (result != FR_OK && result != MOS_OVERLAPPING_SYSTEM) {
+				sprintf(path, "./%.*s.bin", cmdLen, command);
+				result = mos_runBinFile(path, args);
 			}
-			if (result == FR_NO_FILE || result == FR_NO_PATH) {
+			if (result != FR_OK && result != MOS_OVERLAPPING_SYSTEM) {
+				sprintf(path, "/bin/%.*s.bin", cmdLen, command);
+				result = mos_runBinFile(path, args);
+			}
+
+			if (result == FR_NO_FILE || result == FR_NO_PATH || result == FR_DISK_ERR) {
 				result = MOS_INVALID_COMMAND;
 			}
 			umm_free(path);
 			if (args) umm_free(args);
 		}
 	}
-	umm_free(command);
 	return result;
 }
 
@@ -2767,6 +2817,10 @@ void mos_setupSystemVariables() {
 	createOrUpdateSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
 	// Default CLI prompt
 	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
+
+	// Default paths
+	createOrUpdateSystemVariable("Moslet$Path", MOS_VAR_STRING, "/mos/");
+	createOrUpdateSystemVariable("Run$Path", MOS_VAR_MACRO, "<Moslet$Path>, ./, /bin/");
 
 	// Keyboard and console settings
 	createOrUpdateSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
