@@ -447,10 +447,11 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			return FR_INT_ERR;
 		}
 		cmdLen = ptr - command;
-		if (cmdLen > 1 && *ptr == '.') {
+		if (cmdLen >= 1 && *ptr == '.') {
 			ptr++;
 			cmdLen++;
 		}
+		ptr = mos_trim(ptr);
 		// ptr will now point to the arguments
 
 		// TODO revisit our `.` handling logic
