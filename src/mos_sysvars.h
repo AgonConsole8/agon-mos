@@ -90,7 +90,7 @@ char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);
 
 char *	expandVariableToken(char * token);
 
-char *	expandPath(char * source);
+int		expandPath(char * source, char ** resolvedPath);
 
 t_mosEvalResult * evaluateExpression(char * source);
 

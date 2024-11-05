@@ -40,7 +40,7 @@
 
 			XREF	_mos_OSCLI		; In mos.c
 			XREF	_mos_EDITLINE
-			XREF	_mos_LOAD
+			XREF	_mos_LOAD_API
 			XREF	_mos_SAVE
 			XREF	_mos_CD
 			XREF	_mos_DIR_API
@@ -331,7 +331,7 @@ mos_api_load:		LD	A, MB		; Check if MBASE is 0
 $$:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
-			CALL	_mos_LOAD	; Call the C function mos_LOAD
+			CALL	_mos_LOAD_API	; Call the C function mos_LOAD_API
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
@@ -361,8 +361,8 @@ mos_api_save:		LD	A, MB		; Check if MBASE is 0
 $$:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
-			CALL	_mos_SAVE	; Call the C function mos_LOAD
-			LD	A, L		; Return vaue in HLU, put in A
+			CALL	_mos_SAVE	; Call the C function mos_SAVE
+			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
 			POP	BC

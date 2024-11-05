@@ -54,6 +54,7 @@
 #include "strings.h"
 #include "umm_malloc.h"
 #include "mos_sysvars.h"
+#include "mos_file.h"
 #if DEBUG > 0
 # include "tests.h"
 #endif /* DEBUG */
@@ -115,6 +116,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Rename",		&mos_cmdREN,		HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Run", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
+	{ "RunBin", 	&mos_cmdRUNBIN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "Save", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "Set",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
 	{ "SetEval",	&mos_cmdSETEVAL,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
@@ -230,10 +232,11 @@ t_mosCommand *mos_getCommand(char * ptr) {
 // NB: This also includes the asterisk character as whitespace
 // Parameters:
 // - s: Pointer to the string to trim
+// - removeLeadingAsterisks: If true, remove leading asterisks
 // Returns:
 // - s: Pointer to the start of the new string
 //
-char * mos_trim(char * s) {
+char * mos_trim(char * s, bool removeLeadingAsterisks) {
 	char * ptr;
 
 	if (!s) {					// Return NULL if a null string is passed
@@ -243,7 +246,7 @@ char * mos_trim(char * s) {
 		return s;				// Handle empty string
 	}
 	// skip leading spaces and asterisks
-	while (isspace(*s) || *s == '*') {
+	while (isspace(*s) || removeLeadingAsterisks && (*s == '*')) {
 		s++;
 	}
 	// strip trailing spaces
@@ -270,144 +273,38 @@ int mos_runBin(UINT24 addr, char * args) {
 	}
 }
 
-void splitFilepath(char * filepath, char ** prefixPtr, char ** dirPtr, char ** filenamePtr) {
-	char * prefix = NULL;
-	char * dir = NULL;
-	char * filename = NULL;
-
-	if (strchr(filepath, ':') != NULL) {
-		prefix = filepath;
-		filepath = strchr(filepath, ':');
-		*filepath = '\0';
-		filepath++;
-	}
-
-	// If we have a directory, it will start at current filepath
-	dir = filepath;
-	// skip past any slashes to get to filename
-	while (extractString(&filepath, &filename, "/", EXTRACT_FLAG_NO_TERMINATOR)) {}
-
-	if (dir == filename) {
-		dir = NULL;
-	} else {
-		// Terminate the directory string
-		*(filename - 1) = '\0';
-	}
-
-	if (prefixPtr != NULL) {
-		*prefixPtr = prefix;
-	}
-	if (dirPtr != NULL) {
-		*dirPtr = dir;
-	}
-	if (filenamePtr != NULL) {
-		*filenamePtr = filename;
-	}
-}
-
-bool isMoslet(char * filepath) {
-	char * checkPath = NULL;
-	char * mosletPath;
-	char * mosletPathStr;
-	bool result = false;
-
-	mosletPathStr = expandVariableToken("Moslet$Path");
-	if (mosletPathStr == NULL) {
-		// Mostlet$Path variable has been removed, so default it to /mos/
-		mosletPath = "/mos/";
-	} else {
-		mosletPath = mosletPathStr;
-	}
-
-	while (extractString(&mosletPath, &checkPath, ", ;", 0)) {
-		if (pmatch(checkPath, filepath, MATCH_BEGINS_WITH | MATCH_CASE_INSENSITIVE | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR) == 0) {
-			// We have a match
-			// TODO check if the filepath (without the matched path) is only a filename?
-			result = true;
-			break;
-		}
-	}
-
-	umm_free(mosletPathStr);
-
-	return result;
-}
-
 int mos_runBinFile(char * filepath, char * args) {
-	char * pathPrefix = NULL;
-	char * pathValue = NULL;
-	char * dir = NULL;
-	char * filename = NULL;
-	int result = FR_OK;
+	char * resolvedPath = NULL;
+	char * fullyResolvedPath = NULL;
+	int pathLen = 0;
 	UINT24 addr = MOS_defaultLoadAddress;
+	int result = getResolvedPath(filepath, &resolvedPath);
 
-	// TODO add support for wildcard matching
-	// if wildcard is in directory path we'd need to walk path
-	// if it's just in filename we can use f_findfirst on the directory
-
-	// TODO add support for relative paths
-	// We'd need to resolve all paths into absolute paths for matching to work
-	// path resolution can be done by temporarily changing directory then using getcwd
-
-	// NB until path resolution is in place, system variables for paths should not contain relative paths
-
-	splitFilepath(filepath, &pathPrefix, &dir, &filename);
-	// Clear filepath variable, as we will re-use it later
-	filepath = NULL;
-
-	if (pathPrefix) {
-		char * pathToken = umm_malloc(strlen(pathPrefix) + 6);
-		if (pathToken == NULL) {
-			return FR_INT_ERR;
-		}
-		sprintf(pathToken, "%s$Path", pathPrefix);
-		pathValue = expandVariableToken(pathToken);
-		umm_free(pathToken);
+	if (result != FR_OK) {
+		return result;
 	}
 
-	if (pathValue) {
-		char * checkPath = NULL;
-		char * checkPtr = pathValue;
-		FILINFO fil;
-		filepath = NULL;
-		// we have a path, so check all options until we find a match
-		while (extractString(&checkPtr, &checkPath, ", ;", 0)) {
-			filepath = umm_malloc(strlen(checkPath) + (dir ? strlen(dir) : 0) + strlen(filename) + 2);
-			if (filepath == NULL) {
-				result = FR_INT_ERR;
-				break;
-			}
-			sprintf(filepath, "%s%s%s%s", checkPath, dir ? dir : "", dir ? "/" : "", filename);
-			if (f_stat(filepath, &fil) == FR_OK) {
-				break;
-			}
-			umm_free(filepath);
-			filepath = NULL;
-		}
-		umm_free(pathValue);
-		if (!filepath) {
-			result = result || FR_NO_FILE;
-		}
-	} else {
-		// no path, so re-construct filename from dir and filename
-		filepath = umm_malloc(strlen(filename) + (dir ? strlen(dir) : 0) + 2);
-		if (filepath == NULL) {
-			result = FR_INT_ERR;
-		}
-		sprintf(filepath, "%s%s%s", dir ? dir : "", dir ? "/" : "", filename);
+	// Fully resolved path allocation - size is very conservative
+	pathLen = strlen(resolvedPath) + strlen(cwd) + 1;
+	fullyResolvedPath = umm_malloc(pathLen);
+	if (fullyResolvedPath == NULL) {
+		umm_free(resolvedPath);
+		return FR_INT_ERR;
 	}
 
+	result = resolveRelativePath(resolvedPath, fullyResolvedPath, pathLen);
 	if (result == FR_OK) {
-		if (isMoslet(filepath)) {
+		if (isMoslet(fullyResolvedPath)) {
 			addr = MOS_starLoadAddress;
 		}
-		result = mos_LOAD(filepath, addr, 0);
+		result = mos_LOAD(fullyResolvedPath, addr, 0);
 		if (result == FR_OK) {
 			result = mos_runBin(addr, args);
 		}
 	}
 
-	umm_free(filepath);
+	umm_free(fullyResolvedPath);
+	umm_free(resolvedPath);
 	return result;
 }
 
@@ -426,7 +323,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		return MOS_TOO_DEEP;
 	}
 
-	ptr = mos_trim(buffer);
+	ptr = mos_trim(buffer, true);
 	if (ptr != NULL && (*ptr == '#' || *ptr == '\0' || (*ptr == '|' && *(ptr+1) == ' '))) {
 		return FR_OK;
 	}
@@ -451,13 +348,14 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			ptr++;
 			cmdLen++;
 		}
-		ptr = mos_trim(ptr);
+		ptr = mos_trim(ptr, false);
 		// ptr will now point to the arguments
 
 		// TODO revisit our `.` handling logic
 		// as a `cd..` command will be interpreted as `cd.` as the command and `.` as the argument
 		// this _might_ be OK, as `cd.` _should_ match to `cdir`,
 		// however it is _actually_ matching to `cd`
+		// we should _maybe_ check for command _without_ the `.` first, then with the `.` if not found
 
 		// Check if this command has an alias
 		aliasToken = umm_malloc(cmdLen + 7);
@@ -492,7 +390,6 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		cmd = mos_getCommand(command);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
-			// printf("Command: '%s' '%s'\n\r", cmd->name, ptr);
 			return func(ptr);
 		} else {
 			// Command not built-in, so see if it's a file
@@ -502,6 +399,12 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 				// Out of memory, but report it as an invalid command
 				return MOS_INVALID_COMMAND;
 			}
+			if (*(command + cmdLen - 1) == '.') {
+				// If we have a trailing dot on our command, replace with * for wilcard matching
+				*(command + cmdLen - 1) = '*';
+			}
+			// TODO when we have support for runtypes, we should omit the ".bin" extension
+			// and use `runFile` instead of `runBinFile`
 			if (memchr(command, ':', cmdLen) != NULL) {
 				// Command has a path prefix, so we use it as-is
 				sprintf(path, "%.*s.bin", cmdLen, command);
@@ -515,7 +418,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 
 			// Once we have runtype support we should `runFile`
 			// Run the command as a binary file
-			result = mos_runBinFile(path, args);
+			result = mos_runBinFile(path, args ? args : ptr);
 
 			if (result == FR_NO_FILE || result == FR_NO_PATH || result == FR_DISK_ERR) {
 				result = MOS_INVALID_COMMAND;
@@ -695,7 +598,7 @@ int mos_cmdHOTKEY(char *ptr) {
 		return FR_OK;
 	}
 
-	ptr = mos_trim(ptr);
+	ptr = mos_trim(ptr, false);
 
 	if (fn_number < 1 || fn_number > 12) {
 		return FR_INVALID_PARAMETER;
@@ -736,16 +639,30 @@ int mos_cmdHOTKEY(char *ptr) {
 int mos_cmdLOAD(char * ptr) {
 	FRESULT	fr;
 	char *  filename;
+	char *  resolvedPath;
 	UINT24 	addr;
-	
+
+	ptr = expandMacro(ptr);
+	if (!ptr) {
+		return FR_INT_ERR;
+	}
+
 	if (!extractString(&ptr, &filename, NULL, 0)) {
+		umm_free(ptr);
 		return FR_INVALID_PARAMETER;
 	}
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		addr = MOS_defaultLoadAddress;
 	}
 
-	fr = mos_LOAD(filename, addr, 0);
+	// resolve path
+	fr = getResolvedPath(filename, &resolvedPath);
+	if (fr == FR_OK) {
+		fr = mos_LOAD(resolvedPath, addr, 0);
+	}
+
+	umm_free(resolvedPath);
+	umm_free(ptr);
 	return fr;	
 }
 
@@ -774,11 +691,13 @@ int mos_cmdEXEC(char *ptr) {
 // - MOS error code
 //
 int mos_cmdSAVE(char * ptr) {
-	FRESULT	fr;
 	char *  filename;
 	UINT24 	addr;
 	UINT24 	size;
-	
+
+	// TODO consider expanding args (at ptr) with expandMacro
+	// but, as noted against cmdLOAD, this probably should be done after extracting filename
+
 	if (
 		!extractString(&ptr, &filename, NULL, 0) ||
 		!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0) ||
@@ -786,11 +705,10 @@ int mos_cmdSAVE(char * ptr) {
 	) {
 		return FR_INVALID_PARAMETER;
 	}
-	fr = mos_SAVE(filename, addr, size);
-	return fr;
+	return mos_SAVE(filename, addr, size);
 }
 
-// DEL <filename> command
+// DEL [-f] <filename> command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
@@ -953,6 +871,25 @@ int mos_cmdRUN(char *ptr) {
 	return result;
 }
 
+// RUNBIN <filename> [<arguments>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdRUNBIN(char *ptr) {
+	char * 	filename = NULL;
+	int		result;
+
+	ptr = expandMacro(ptr);
+	if (!ptr) return FR_INT_ERR;
+	extractString(&ptr, &filename, NULL, 0);
+	ptr = mos_trim(ptr, false);
+	result = mos_runBinFile(filename, ptr);
+	if (ptr) umm_free(ptr);
+	return result;
+}
+
 // CD <path> command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -960,20 +897,14 @@ int mos_cmdRUN(char *ptr) {
 // - MOS error code
 //
 int mos_cmdCD(char * ptr) {
-	char *  path;	
-	FRESULT	fr;
+	char *  path;
 
-	// TODO why doesn't this use mos_CD?
-
-	ptr = expandPath(ptr);
 	if (!extractString(&ptr, &path, NULL, 0)) {
 		// TODO should we default to the root directory?
 		return FR_INVALID_PARAMETER;
 	}
-	fr = f_chdir(path);
-	f_getcwd(cwd, sizeof(cwd)); // Update full path.
-	if (ptr) umm_free(ptr);
-	return fr;
+
+	return mos_CD(path);
 }
 
 // REN <filename1> <filename2> command
@@ -1028,12 +959,10 @@ int mos_cmdMKDIR(char * ptr) {
 	char *  filename;
 	FRESULT	fr;
 
-	ptr = expandPath(ptr);
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	fr = mos_MKDIR(filename);
-	if (ptr) umm_free(ptr);
 	return fr;
 }
 
@@ -1556,7 +1485,7 @@ int mos_cmdHELP(char *ptr) {
 
 // Load a file from SD card to memory
 // Parameters:
-// - filename: Path of file to load
+// - filename: Path of file to load (path must be resolved, including any variables)
 // - address: Address in RAM to load the file into
 // - size: Number of bytes to load, 0 for maximum file size
 // Returns:
@@ -1568,9 +1497,6 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 	UINT	br;	
 	FSIZE_t fSize;
 	
-	// TODO loop over filenames until we find a file, or have none left
-	filename = expandPath(filename);
-	if (!filename) return FR_INT_ERR;
 	fr = f_open(&fil, filename, FA_READ);
 	if (fr == FR_OK) {
 		fSize = f_size(&fil);
@@ -1588,10 +1514,19 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 			fr = MOS_OVERLAPPING_SYSTEM;
 		} else {
 			fr = f_read(&fil, (void *)address, size, &br);		
-		}		
+		}
 	}
-	f_close(&fil);	
-	umm_free(filename);
+	f_close(&fil);
+	return fr;
+}
+
+UINT24 mos_LOAD_API(char * filename, UINT24 address, UINT24 size) {
+	char *  expandedFilename = NULL;
+	FRESULT	fr = expandPath(filename, &expandedFilename);
+	if (fr == FR_OK) {
+		fr = mos_LOAD(expandedFilename, address, size);
+	}
+	umm_free(expandedFilename);
 	return fr;
 }
 
@@ -1604,20 +1539,19 @@ UINT24 mos_LOAD(char * filename, UINT24 address, UINT24 size) {
 // - FatFS return code
 // 
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size) {
-	FRESULT	fr;
 	FIL		fil;
 	UINT	br;	
+	char *  expandedFilename = NULL;
+	FRESULT	fr = expandPath(filename, &expandedFilename);
 
-	// TODO loop over path options until we find a file, or have none left
-	filename = expandPath(filename);
-	if (!filename) return FR_INT_ERR;
-
-	fr = f_open(&fil, filename, FA_WRITE | FA_CREATE_NEW);
-	if (fr == FR_OK) {
-		fr = f_write(&fil, (void *)address, size, &br);
+	if (fr == FR_OK || fr == FR_NO_FILE) {
+		fr = f_open(&fil, expandedFilename, FA_WRITE | FA_CREATE_NEW);
+		if (fr == FR_OK) {
+			fr = f_write(&fil, (void *)address, size, &br);
+		}
+		f_close(&fil);
 	}
-	f_close(&fil);
-	umm_free(filename);
+	umm_free(expandedFilename);
 	return fr;
 }
 
@@ -1632,39 +1566,35 @@ UINT24 mos_TYPE(char * filename) {
 	FIL		fil;
 	UINT	br;
 	int		size = 512;
-	char *	buffer;
 	int		i;
+	char *	expandedFilename = NULL;
+	char *	buffer = umm_malloc(size);
 
-	// TODO loop over path options until we find a file, or have none left
-	filename = expandPath(filename);
-	if (!filename) return FR_INT_ERR;
-	buffer = umm_malloc(size);
 	if (!buffer) {
-		umm_free(filename);
 		return FR_INT_ERR;
 	}
-	fr = f_open(&fil, filename, FA_READ);
-	if (fr != FR_OK) {
-		umm_free(buffer);
-		umm_free(filename);
-		return fr;
-	}
 
-	while (1) {
-		fr = f_read(&fil, (void *)buffer, size, &br);
-		if (br == 0)
-			break;
-		for (i = 0; i < br; ++i) {
-			putchar(buffer[i]);
-			if (buffer[i] == '\n') {
-				putchar('\r');
+	fr = expandPath(filename, &expandedFilename);
+	if (fr == FR_OK) {
+		fr = f_open(&fil, expandedFilename, FA_READ);
+	}
+	if (fr == FR_OK) {
+		while (1) {
+			fr = f_read(&fil, (void *)buffer, size, &br);
+			if (br == 0)
+				break;
+			for (i = 0; i < br; ++i) {
+				putchar(buffer[i]);
+				if (buffer[i] == '\n') {
+					putchar('\r');
+				}
 			}
 		}
+		f_close(&fil);
 	}
 
-	f_close(&fil);
+	umm_free(expandedFilename);
 	umm_free(buffer);
-	umm_free(filename);
 	return FR_OK;
 }
 
@@ -1676,12 +1606,14 @@ UINT24 mos_TYPE(char * filename) {
 // 
 UINT24	mos_CD(char *path) {
 	FRESULT	fr;
+	char * expandedPath = NULL;
 
-	path = expandPath(path);
-	if (!path) return FR_INT_ERR;
-	fr = f_chdir(path);
-	f_getcwd(cwd, sizeof(cwd)); // Update full path.
-	umm_free(path);
+	fr = expandPath(path, &expandedPath);
+	if (fr == FR_OK || fr == FR_NO_FILE) {
+		fr = f_chdir(expandedPath);
+		f_getcwd(cwd, sizeof(cwd)); // Update full path.
+	}
+	umm_free(expandedPath);
 	return fr;
 }
 
@@ -2041,7 +1973,7 @@ UINT24 mos_DEL(char * filename) {
 	FRESULT	fr;	
 
 	// TODO loop over path options until we find a file, or have none left
-	filename = expandPath(filename);
+	// filename = expandPath(filename);
 	fr = f_unlink(filename);
 	umm_free(filename);
 	return fr;
@@ -2336,10 +2268,10 @@ UINT24 mos_MKDIR(char * filename) {
 	FRESULT	fr;
 
 	// Expand path - we will only attempt to mkdir at first expansion
-	filename = expandPath(filename);
-	if (!filename) {
-		return FR_INT_ERR;
-	}
+	// filename = expandPath(filename);
+	// if (!filename) {
+	// 	return FR_INT_ERR;
+	// }
 	fr = f_mkdir(filename);
 	umm_free(filename);
 	return fr;
@@ -2357,34 +2289,30 @@ UINT24 mos_EXEC(char * filename) {
 	FRESULT	fr;
 	FIL		fil;
 	int		size = 256;
+	char *	expandedPath = NULL;
 	char *	buffer = (char *)umm_malloc(size);
 	int		line =  0;
 
 	if (!buffer) {
 		return FR_INT_ERR;
 	}
-	// TODO handle path expansion here
-	// looping thru path
-	filename = expandPath(filename);
-	if (!filename) {
-		umm_free(buffer);
-		return FR_INT_ERR;
+	fr = expandPath(filename, &expandedPath);
+	if (fr == FR_OK) {
+		fr = f_open(&fil, expandedPath, FA_READ);
 	}
-	
-	fr = f_open(&fil, filename, FA_READ);
 	if (fr == FR_OK) {
 		while (!f_eof(&fil)) {
 			line++;
 			f_gets(buffer, size, &fil);
 			fr = mos_exec(buffer, TRUE, 0);
 			if (fr != FR_OK) {
-				printf("\r\nError executing %s at line %d\r\n", filename, line);
+				printf("\r\nError executing %s at line %d\r\n", expandedPath, line);
 				break;
 			}
 		}
+		f_close(&fil);
 	}
-	f_close(&fil);
-	umm_free(filename);
+	umm_free(expandedPath);
 	umm_free(buffer);
 	return fr;	
 }
@@ -2397,21 +2325,23 @@ UINT24 mos_EXEC(char * filename) {
 // - File handle, or 0 if the file cannot be opened
 // 
 UINT24 mos_FOPEN(char * filename, UINT8 mode) {
-	FRESULT fr;
+	char *  expandedFilename = NULL;
 	int		i;
-	
-	filename = expandPath(filename);
-	for (i = 0; i < MOS_maxOpenFiles; i++) {
-		if (mosFileObjects[i].free == 0) {
-			fr = f_open(&mosFileObjects[i].fileObject, filename, mode);
-			if (fr == FR_OK) {
-				mosFileObjects[i].free = 1;
-				umm_free(filename);
-				return i + 1;
+	FRESULT fr = expandPath(filename, &expandedFilename);
+
+	if (fr == FR_OK) {
+		for (i = 0; i < MOS_maxOpenFiles; i++) {
+			if (mosFileObjects[i].free == 0) {
+				fr = f_open(&mosFileObjects[i].fileObject, expandedFilename, mode);
+				if (fr == FR_OK) {
+					mosFileObjects[i].free = 1;
+					umm_free(expandedFilename);
+					return i + 1;
+				}
 			}
 		}
 	}
-	umm_free(filename);
+	umm_free(expandedFilename);
 	return 0;
 }
 

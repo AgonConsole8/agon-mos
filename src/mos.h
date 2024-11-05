@@ -57,16 +57,15 @@ void 	mos_error(int error);
 BYTE	mos_getkey(void);
 UINT24	mos_input(char * buffer, int bufferLength);
 t_mosCommand	*mos_getCommand(char * ptr);
-char *	mos_trim(char * s);
+char *	mos_trim(char * s, bool removeLeadingAsterisks);
+int		mos_runBin(UINT24 addr, char * args);
+int		mos_runBinFile(char * filepath, char * args);
 int		mos_exec(char * buffer, BOOL in_mos, BYTE depth);
 UINT8 	mos_execMode(UINT8 * ptr);
 
 int		mos_mount(void);
 
 void	mos_setupSystemVariables();
-
-BOOL 	mos_parseNumber(char * ptr, UINT24 * p_Value);
-BOOL	mos_parseString(char * ptr, char ** p_Value);
 
 int		mos_cmdCD(char * ptr);
 int		mos_cmdCLS(char *ptr);
@@ -87,6 +86,7 @@ int		mos_cmdMOUNT(char *ptr);
 int		mos_cmdPRINTF(char *ptr);
 int		mos_cmdREN(char *ptr);
 int		mos_cmdRUN(char * ptr);
+int		mos_cmdRUNBIN(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdSET(char *ptr);
 int		mos_cmdSETEVAL(char *ptr);
@@ -97,6 +97,7 @@ int		mos_cmdTYPE(char *ptr);
 int		mos_cmdUNSET(char *ptr);
 int		mos_cmdVDU(char *ptr);
 
+UINT24	mos_LOAD_API(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);

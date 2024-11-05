@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "mos_sysvars.h"
+#include "mos_file.h"
 
 t_mosSystemVariable * mosSystemVariables = NULL;
 
@@ -666,12 +667,17 @@ char * expandVariableToken(char * token) {
 	return expandVariable(var, false);
 }
 
-char * expandPath(char * source) {
-	// For now, simplistically return macro expansion
-	// this should however support looping thru paths
-	// as a path variable may point to several different directories
-	// exact API TBD
-	return expandMacro(source);
+int expandPath(char * source, char ** resolvedPath) {
+	// Expand path, and resolve it
+	int result = FR_INT_ERR;
+	char * path = NULL;
+	char * expanded = expandMacro(source);
+	if (expanded == NULL) {
+		return result;
+	}
+	result = getResolvedPath(expanded, resolvedPath);
+	umm_free(expanded);
+	return result;
 }
 
 t_mosEvalResult * evaluateExpression(char * source) {

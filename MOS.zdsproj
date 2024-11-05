@@ -36,6 +36,7 @@
 <file filter-key="">.\\src\\crash.asm</file>
 <file filter-key="">.\\src_umm_malloc\\umm_malloc.c</file>
 <file filter-key="">.\\src\\mos_sysvars.c</file>
+<file filter-key="">.\\src\\mos_file.c</file>
 </files>
 
 <!-- configuration information -->
