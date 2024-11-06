@@ -26,6 +26,7 @@
 #include "uart.h"
 #include "timer.h"
 #include "mos_editor.h"
+#include "mos_file.h"
 #include "umm_malloc.h"
 
 extern volatile BYTE vpd_protocol_flags;		// In globals.asm
@@ -124,21 +125,46 @@ BOOL insertCharacter(char *buffer, char c, int insertPos, int len, int limit) {
 	int	i;
 	int count = 0;
 	
-	if(len < limit) {
+	if (len < limit) {
 		putch(c);
-		for(i = len; i >= insertPos; i--) {
+		for (i = len; i >= insertPos; i--) {
 			buffer[i+1] = buffer[i];
 		}
 		buffer[insertPos] = c;
-		for(i = insertPos + 1; i <= len; i++, count++) {
+		for (i = insertPos + 1; i <= len; i++, count++) {
 			putch(buffer[i]);
 		}
-		for(i = 0; i < count; i++) {
+		for (i = 0; i < count; i++) {
 			doLeftCursor();
 		}
 		return 1;
 	}	
 	return 0;
+}
+
+BOOL insertString(char * buffer, char * source, int sourceLen, int sourceOffset, int insertPos, int len, int limit, char addedChar) {
+	int i;
+	source += sourceOffset;
+	sourceLen -= sourceOffset;
+	if (len + sourceLen > limit) {
+		return false;
+	}
+	if (addedChar != '\0') {
+		sourceLen++;
+	}
+
+	// Move buffer contents to allow for new string
+	for (i = len; i >= insertPos; i--) {
+		buffer[i + sourceLen] = buffer[i];
+	}
+	strncpy(buffer + insertPos, source, sourceLen - 1);
+	if (addedChar != '\0') {
+		buffer[insertPos + sourceLen - 1] = addedChar;
+	}
+
+	// Overwrite what's on-screen with what we are inserting
+	printf("%s", buffer + insertPos);
+	return true;
 }
 
 // Remove a character from the input string
@@ -385,143 +411,104 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 							} break;
 							
-							case 0x09: if (enableTab) { // Tab
+							case 0x09: if (enableTab) { // Tab completion
+								FRESULT fr;
 								char *search_term = NULL;
 								char *path = NULL;
+								const char *termStart = buffer + insertPos;
+								int termLength = 0;
 
-								FRESULT fr;
-								DIR dj;
-								FILINFO fno;
-								t_mosCommand *cmd;
-								const char *searchTermStart;
-								const char *lastSpace = strrchr(buffer, ' ');
-								const char *lastSlash = strrchr(buffer, '/');
-								
-								if (lastSlash == NULL && lastSpace == NULL) { //Try commands first before fatfs completion
-									
-									search_term = (char*) umm_malloc(strlen(buffer) + 6);
+								// With tab-completion we are completing a "term" in the buffer
+								// start will be the last space before the insert position
+								// end is the insert position
+								while (termStart > buffer && *(termStart - 1) != ' ') {
+									termStart--;
+								}
+								termLength = buffer + insertPos - termStart;
+
+								// if we're at the start of the buffer, then we're looking for a command, or executable
+								if (
+									termStart == buffer + mos_strspn(buffer, "* ") &&
+									memchr(termStart, '/', termLength) == NULL
+								) {
+									t_mosSystemVariable *var = NULL;
+									t_mosCommand *cmd;
+									bool matched = false;
+									bool success = false;
+
+									search_term = (char*) umm_malloc(termLength + 10);
 									if (!search_term) {
 										// umm_malloc failed, so no tab completion for us today
 										break;
 									}
-									
-									strcpy(search_term, buffer);
-									strcat(search_term, ".");
-									
-									// TODO add support for expansion of aliases
-									cmd = mos_getCommand(search_term);
-									if (cmd != NULL) { //First try internal MOS commands
-										
-										printf("%s ", cmd->name + strlen(buffer));
-										strcat(buffer, cmd->name + strlen(buffer));
-										strcat(buffer, " ");
-										len = strlen(buffer);
-										insertPos = strlen(buffer);										
-										umm_free(search_term);										
-										break;
-										
-									}
-									
-									strcpy(search_term, buffer);
-									strcat(search_term, "*.bin");
-									fr = f_findfirst(&dj, &fno, "/mos/", search_term);
-									if (fr == FR_OK && fno.fname[0]) { //Now try MOSlets
-										
-										printf("%.*s ", strlen(fno.fname) - 4 - strlen(buffer), fno.fname + strlen(buffer));
-										strncat(buffer, fno.fname + strlen(buffer), strlen(fno.fname) - 4 - strlen(buffer));
-										strcat(buffer, " ");
-										len = strlen(buffer);
-										insertPos = strlen(buffer);										
-										umm_free(search_term);
-										break;
-										
-									}
-									
-									//Try local .bin
-									fr = f_findfirst(&dj, &fno, "", search_term);
-									if ((fr == FR_OK && fno.fname[0])) {
-										printf("%.*s ", strlen(fno.fname) - 4 - strlen(buffer), fno.fname + strlen(buffer));
-										strncat(buffer, fno.fname + strlen(buffer), strlen(fno.fname) - 4 - strlen(buffer));
-										strcat(buffer, " ");
-										len = strlen(buffer);
-										insertPos = strlen(buffer);										
-										umm_free(search_term);
-										break;									
-									}									
-									
-									//Otherwise try /bin/
-									fr = f_findfirst(&dj, &fno, "/bin/", search_term);
-									if ((fr == FR_OK && fno.fname[0])) {
-										printf("%.*s ", strlen(fno.fname) - 4 - strlen(buffer), fno.fname + strlen(buffer));
-										strncat(buffer, fno.fname + strlen(buffer), strlen(fno.fname) - 4 - strlen(buffer));
-										strcat(buffer, " ");
-										len = strlen(buffer);
-										insertPos = strlen(buffer);										
-										umm_free(search_term);
-										break;									
-									}
-								}
-								
-								if (lastSlash != NULL) {
-									int pathLength = 1;
-																		
-									if (lastSpace != NULL && lastSlash > lastSpace) {
-										pathLength = lastSlash - lastSpace; // Path starts after the last space and includes the slash
-									}
-									if (lastSpace == NULL) {
-										lastSpace = buffer;
-										pathLength = lastSlash - lastSpace;
+
+									sprintf(search_term, "Alias$%.*s*", termLength, termStart);
+									if (getSystemVariable(search_term, &var) == 0) {
+										// Matching alias found
+										matched = true;
+										success = insertString(buffer, var->label + 6, strlen(var->label + 6), termLength, insertPos, len, limit, ' ');
 									}
 
-									path = (char*) umm_malloc(pathLength + 1); // +1 for null terminator
-									if (path == NULL) {
-										break;
+									if (!matched) {
+										// Internal command?
+										sprintf(search_term, "%.*s.", termLength, termStart);
+										cmd = mos_getCommand(search_term, MATCH_COMMANDS_AUTO);
+										if (cmd != NULL) {
+											// Matching command found
+											matched = true;
+											success = insertString(buffer, cmd->name, strlen(cmd->name), termLength, insertPos, len, limit, ' ');
+										}
 									}
-									strncpy(path, lastSpace + 1, pathLength); // Start after the last space
-									path[pathLength] = '\0'; // Null-terminate the string
 
-									// Determine the start of the search term
-									searchTermStart = lastSlash + 1;
-									if (lastSpace != NULL && lastSpace > lastSlash) {
-										searchTermStart = lastSpace + 1;
+									if (!matched) {
+										// Find command in runpath, or given path
+										if (memchr(termStart, ':' , termLength) != NULL) {
+											sprintf(search_term, "%.*s*.bin", termLength, termStart);
+										} else {
+											sprintf(search_term, "run:%.*s*.bin", termLength, termStart);
+										}
+										fr = getResolvedPath(search_term, &path);
+										if (fr == FR_OK) {
+											char * sourceLeaf = getFilepathLeafname(search_term);
+											int sourceOffset = sourceLeaf - search_term;
+											char * leafname = getFilepathLeafname(path);
+											matched = true;
+											success = insertString(buffer, leafname, strlen(leafname) - 4, strlen(sourceLeaf) - 5, insertPos, len, limit, isDirectory(path) ? '/' : ' ');
+										}
 									}
-									search_term = (char*) umm_malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
-								} else {
-									path = (char*) umm_malloc(1);
-									if (path == NULL) {
-										break;
-									}
-									path[0] = '\0'; // Path is empty (current dir, essentially).
-
-									searchTermStart = lastSpace ? lastSpace + 1 : buffer;
-									search_term = (char*) umm_malloc(strlen(searchTermStart) + 2); // +2 for '*' and null terminator
-								}
-
-								if (search_term == NULL) {
 									if (path) umm_free(path);
+									umm_free(search_term);
+									if (success) {
+										len = strlen(buffer);
+										insertPos = len;
+									}
+									if (matched) {
+										break;
+									}
+								}
+
+								// if not at start of buffer, then we're doing filename completion
+								search_term = (char*) umm_malloc(termLength + 2);
+
+								if (!search_term) {
+									// umm_malloc failed, so no tab completion for us today
 									break;
 								}
+								sprintf(search_term, "%.*s*", termLength, termStart);
 
-								strcpy(search_term, lastSpace && lastSlash > lastSpace ? lastSlash + 1 : lastSpace ? lastSpace + 1 : buffer);
-								strcat(search_term, "*");
-								
-								//printf("Path:\"%s\" Pattern:\"%s\"\r\n", path, search_term);
-								fr = f_findfirst(&dj, &fno, path, search_term);
-								
-								if (fr == FR_OK && fno.fname[0]) {
-									if (fno.fattrib & AM_DIR) printf("%s/", fno.fname + strlen(search_term) - 1);
-									else printf("%s", fno.fname + strlen(search_term) - 1);
-
-									strcat(buffer, fno.fname + strlen(search_term) - 1);
-									if (fno.fattrib & AM_DIR) strcat(buffer, "/");
-
-									len = strlen(buffer);
-									insertPos = strlen(buffer);
+								fr = getResolvedPath(search_term, &path);
+								if (fr == FR_OK) {
+									char * sourceLeaf = getFilepathLeafname(search_term);
+									int sourceOffset = sourceLeaf - search_term;
+									char * leafname = getFilepathLeafname(path);
+									if (insertString(buffer, leafname, strlen(leafname), strlen(sourceLeaf) - 1, insertPos, len, limit, isDirectory(path) ? '/' : ' ')) {
+										len = strlen(buffer);
+										insertPos = len;
+									}
 								}
 
-								// Free the allocated memory
-								if (search_term) umm_free(search_term);
-								if (path) umm_free(path);
+								umm_free(path);
+								umm_free(search_term);
 							}
 							break;							
 							

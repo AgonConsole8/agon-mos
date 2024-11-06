@@ -216,12 +216,12 @@ UINT24 mos_input(char * buffer, int bufferLength) {
 // Returns:
 // - Command pointer, or 0 if command not found
 //
-t_mosCommand *mos_getCommand(char * ptr) {
+t_mosCommand *mos_getCommand(char * ptr, uint8_t flags) {
 	int i;
 	t_mosCommand * cmd;
 	for (i = 0; i < mosCommands_count; i++) {
 		cmd = &mosCommands[i];
-		if (pmatch(ptr, cmd->name, MATCH_COMMANDS) == 0) {
+		if (pmatch(ptr, cmd->name, flags) == 0) {
 			return cmd;
 		}
 	}
@@ -280,6 +280,7 @@ int mos_runBinFile(char * filepath, char * args) {
 	UINT24 addr = MOS_defaultLoadAddress;
 	int result = getResolvedPath(filepath, &resolvedPath);
 
+	createOrUpdateSystemVariable("LastApp$RunPath", MOS_VAR_STRING, mos_strdup(filepath));
 	if (result != FR_OK) {
 		return result;
 	}
@@ -302,6 +303,8 @@ int mos_runBinFile(char * filepath, char * args) {
 			result = mos_runBin(addr, args);
 		}
 	}
+
+	createOrUpdateSystemVariable("LastApp$Run", MOS_VAR_STRING, mos_strdup(fullyResolvedPath));
 
 	umm_free(fullyResolvedPath);
 	umm_free(resolvedPath);
@@ -387,14 +390,28 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 
 		umm_free(aliasToken);
 
-		cmd = mos_getCommand(command);
+		cmd = mos_getCommand(command, MATCH_COMMANDS);
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
+			// printf("command is %s\n\r, args '%s'", cmd->name, args);
 			return func(ptr);
 		} else {
 			// Command not built-in, so see if it's a file
 			char * args = NULL;
-			char * path = umm_malloc(cmdLen + 12);
+			char * path;
+			// OK - with the logic as it was, `./` would match an arbitrary moslet
+			// this is not what we want
+			// and `./filename.bin` would fail to find the file to run it
+			if (*command == '.') {
+				// Single dot can't match
+				// printf("cmdLen is 1\n\r");
+				return MOS_INVALID_COMMAND;
+			}
+			if (cmdLen < 2) {
+				// Command is too short to be a valid command
+				return MOS_INVALID_COMMAND;
+			}
+			path = umm_malloc(cmdLen + 12);
 			if (path == NULL) {
 				// Out of memory, but report it as an invalid command
 				return MOS_INVALID_COMMAND;

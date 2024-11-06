@@ -56,7 +56,7 @@ void 	mos_error(int error);
 
 BYTE	mos_getkey(void);
 UINT24	mos_input(char * buffer, int bufferLength);
-t_mosCommand	*mos_getCommand(char * ptr);
+t_mosCommand	*mos_getCommand(char * ptr, uint8_t flags);
 char *	mos_trim(char * s, bool removeLeadingAsterisks);
 int		mos_runBin(UINT24 addr, char * args);
 int		mos_runBinFile(char * filepath, char * args);
@@ -102,6 +102,7 @@ UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD(char * path);
+BOOL isDirectory(char *path);
 UINT24	mos_DIR_API(char * path);
 UINT24	mos_DIR(char * path, BOOL longListing);
 UINT24	mos_DEL(char * filename);
