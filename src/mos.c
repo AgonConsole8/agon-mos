@@ -576,6 +576,7 @@ int mos_cmdHOTKEY(char *ptr) {
 	char *hotkeyString;
 	t_mosSystemVariable *hotkeyVar = NULL;
 	char label[10];
+	int result;
 
 	if (!extractNumber(ptr, &ptr, NULL, &fn_number, 0)) {
 		UINT8 key;
@@ -613,7 +614,7 @@ int mos_cmdHOTKEY(char *ptr) {
 		} else {
 			printf("F%d already clear, no hotkey command provided.\r\n", fn_number);
 		}
-		return 0;
+		return FR_OK;
 	}
 
 	// Remove surrounding quotes
@@ -625,9 +626,12 @@ int mos_cmdHOTKEY(char *ptr) {
 
 	hotkeyString = expandMacro(ptr);
 	if (!hotkeyString) return FR_INT_ERR;
-	createOrUpdateSystemVariable(label, MOS_VAR_STRING, hotkeyString);
+	result = createOrUpdateSystemVariable(label, MOS_VAR_STRING, hotkeyString);
+	if (result != FR_OK) {
+		umm_free(hotkeyString);
+	}
 
-	return FR_OK;
+	return result;
 }
 
 // LOAD <filename> <addr> command
@@ -842,12 +846,14 @@ int mos_cmdDEL(char * ptr) {
 int mos_cmdJMP(char *ptr) {
 	UINT24 	addr;
 	void (* dest)(void) = 0;
-	// TODO consider allowing macro expansion here
+
+	ptr = expandMacro(ptr);
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	dest = (void *)addr;
 	dest();
+	if (ptr) umm_free(ptr);
 	return 0;
 }
 
@@ -975,16 +981,14 @@ int mos_cmdMKDIR(char * ptr) {
 int mos_cmdSET(char * ptr) {
 	char *	token;
 	char *	newValue;
-	t_mosSystemVariable * var = NULL;
-	UINT24 	value;
-	int searchResult;
+	int 	result;
 
 	// "token" is first parameter, which is a string
 	if (!extractString(&ptr, &token, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 
-	while (isspace(*ptr)) ptr++;
+	mos_trim(ptr, false);
 	if (*ptr == '\0') {
 		return FR_INVALID_PARAMETER;
 	}
@@ -992,36 +996,19 @@ int mos_cmdSET(char * ptr) {
 	newValue = expandMacro(ptr);
 	if (!newValue) return FR_INT_ERR;
 
-	// search for our token in the system variables
-	searchResult = getSystemVariable(token, &var);
-
-	// at this point var will either point to the variable we want,
-	// or the last variable in the list before our token
-
-	if (searchResult == 0) {
-		return updateSystemVariable(var, MOS_VAR_STRING, newValue);
-	} else {
-		// we have not found a matching variable
-		t_mosSystemVariable *newVar;
-		newVar = createSystemVariable(token, MOS_VAR_STRING, newValue);
-		if (newVar == NULL || newValue == NULL) {
-			if (newValue) umm_free(newValue);
-			if (newVar) umm_free(newVar);
-			return FR_INT_ERR;
-		}
-		insertSystemVariable(newVar, var);
+	result = createOrUpdateSystemVariable(token, MOS_VAR_STRING, newValue);
+	if (result != FR_OK) {
+		umm_free(newValue);
 	}
-
-	return FR_OK;
+	return result;
 }
 
 // SetEval <varname> <expression> command
 //
 int mos_cmdSETEVAL(char * ptr) {
 	char *	token;
-	t_mosSystemVariable * var = NULL;
 	t_mosEvalResult * evaluation = NULL;
-	int result;
+	int		result;
 
 	// "token" is first parameter, which is a string
 	if (!extractString(&ptr, &token, NULL, 0)) {
@@ -1037,35 +1024,16 @@ int mos_cmdSETEVAL(char * ptr) {
 	// we need to work out the value of the expression at ptr
 	// and what type it is
 	evaluation = evaluateExpression(ptr);
-
 	if (evaluation == NULL) {
 		return FR_INT_ERR;
 	}
+
 	if (evaluation->status != FR_OK) {
 		result = evaluation->status;
-		umm_free(evaluation);
-		return result;
-	}
-
-	// search for our token in the system variables
-	result = getSystemVariable(token, &var);
-
-	if (result == 0) {
-		result = updateSystemVariable(var, evaluation->type, evaluation->result);
 	} else {
-		// we have not found a matching variable
-		t_mosSystemVariable *newVar;
-		newVar = createSystemVariable(token, evaluation->type, evaluation->result);
-		if (newVar == NULL) {
-			umm_free(evaluation);
-			return FR_INT_ERR;
-		}
-		insertSystemVariable(newVar, var);
-		result = FR_OK;
+		result = createOrUpdateSystemVariable(token, evaluation->type, evaluation->result);
 	}
-
 	umm_free(evaluation);
-
 	return result;
 }
 
@@ -1074,8 +1042,7 @@ int mos_cmdSETEVAL(char * ptr) {
 int mos_cmdSETMACRO(char * ptr) {
 	char *	token;
 	char *	newValue;
-	t_mosSystemVariable * var = NULL;
-	int searchResult;
+	int		result;
 
 	// "token" is first parameter, which is a string
 	if (!extractString(&ptr, &token, NULL, 0)) {
@@ -1091,23 +1058,13 @@ int mos_cmdSETMACRO(char * ptr) {
 	newValue = mos_strdup(ptr);
 	if (!newValue) return FR_INT_ERR;
 
-	// search for our token in the system variables
-	searchResult = getSystemVariable(token, &var);
+	result = createOrUpdateSystemVariable(token, MOS_VAR_MACRO, newValue);
 
-	if (searchResult == 0) {
-		return updateSystemVariable(var, MOS_VAR_MACRO, newValue);
-	} else {
-		// we have not found a matching variable
-		t_mosSystemVariable *newVar;
-		newVar = createSystemVariable(token, MOS_VAR_MACRO, newValue);
-		if (newVar == NULL) {
-			if (newValue) umm_free(newValue);
-			return FR_INT_ERR;
-		}
-		insertSystemVariable(newVar, var);
+	if (result != FR_OK) {
+		umm_free(newValue);
 	}
 
-	return FR_OK;
+	return result;
 }
 
 void printEscapedString(char * value) {
@@ -1968,14 +1925,15 @@ cleanup:
 // - filename: Path of file to delete
 // Returns:
 // - FatFS return code
-// 
+//
 UINT24 mos_DEL(char * filename) {
-	FRESULT	fr;	
-
-	// TODO loop over path options until we find a file, or have none left
-	// filename = expandPath(filename);
-	fr = f_unlink(filename);
-	umm_free(filename);
+	char * expandedPath = NULL;
+	// TODO set flag on expandPath to ensure leafname doesn't get replaced/expanded
+	FRESULT	fr = expandPath(filename, &expandedPath);
+	if (fr == FR_OK) {
+		fr = f_unlink(expandedPath);
+	}
+	umm_free(expandedPath);
 	return fr;
 }
 
@@ -2793,7 +2751,7 @@ static t_mosCodeSystemVariable yearVar = {
 // Sys$Date variable definition - read-only (for now)
 static t_mosCodeSystemVariable dateVar = {
 	&readDate,
-	NULL
+	NULL		// TODO implement date write function
 };
 
 // Sys$Time variable definition

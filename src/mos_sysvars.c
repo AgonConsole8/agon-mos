@@ -84,19 +84,21 @@ void insertSystemVariable(t_mosSystemVariable * var, t_mosSystemVariable * befor
 
 // create and insert/replace system variable object
 // intended for system use only - may silently fail if a creation error occurs
-void createOrUpdateSystemVariable(char * label, MOSVARTYPE type, void * value) {
+int createOrUpdateSystemVariable(char * label, MOSVARTYPE type, void * value) {
 	t_mosSystemVariable * var = NULL;
 	int result = getSystemVariable(label, &var);
 	if (result == 0) {
 		// we have found a matching variable
-		updateSystemVariable(var, type, value);
+		return updateSystemVariable(var, type, value);
 	} else {
 		// we have not found a matching variable
 		t_mosSystemVariable * newVar = createSystemVariable(label, type, value);
 		if (newVar != NULL) {
 			insertSystemVariable(newVar, var);
+			return FR_OK;
 		}
 	}
+	return FR_INT_ERR;
 }
 
 // update system variable object
