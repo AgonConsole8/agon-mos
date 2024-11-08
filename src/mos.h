@@ -43,6 +43,7 @@ extern char  	cmd[256];				// Array for the command line handler
 typedef struct {
 	char * name;
 	int (*func)(char * ptr);
+	bool expandArgs;
 	char * args;
 	char * help;
 } t_mosCommand;
@@ -99,8 +100,10 @@ int		mos_cmdVDU(char *ptr);
 
 UINT24	mos_LOAD_API(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
+UINT24	mos_SAVE_API(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
+UINT24	mos_CD_API(char * path);
 UINT24	mos_CD(char * path);
 BOOL isDirectory(char *path);
 UINT24	mos_DIR_API(char * path);
@@ -110,6 +113,7 @@ UINT24	mos_REN_API(char *srcPath, char *dstPath);
 UINT24	mos_REN(char *srcPath, char *dstPath, BOOL verbose);
 UINT24	mos_COPY_API(char *srcPath, char *dstPath);
 UINT24	mos_COPY(char *srcPath, char *dstPath, BOOL verbose);
+UINT24	mos_MKDIR_API(char * filename);
 UINT24	mos_MKDIR(char * filename);
 UINT24 	mos_EXEC(char * filename);
 

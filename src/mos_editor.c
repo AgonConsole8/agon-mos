@@ -419,8 +419,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								int termLength = 0;
 
 								// With tab-completion we are completing a "term" in the buffer
-								// start will be the last space before the insert position
-								// end is the insert position
+								// start is last space before the insert position, end is the insert position
 								while (termStart > buffer && *(termStart - 1) != ' ') {
 									termStart--;
 								}

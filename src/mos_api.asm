@@ -41,8 +41,8 @@
 			XREF	_mos_OSCLI		; In mos.c
 			XREF	_mos_EDITLINE
 			XREF	_mos_LOAD_API
-			XREF	_mos_SAVE
-			XREF	_mos_CD
+			XREF	_mos_SAVE_API
+			XREF	_mos_CD_API
 			XREF	_mos_DIR_API
 			XREF	_mos_DEL
 			XREF	_mos_REN_API
@@ -52,7 +52,7 @@
 			XREF	_mos_FPUTC
 			XREF	_mos_FEOF
 			XREF	_mos_GETERROR
-			XREF	_mos_MKDIR
+			XREF	_mos_MKDIR_API
 			XREF	_mos_COPY_API
 			XREF	_mos_GETRTC 
 			XREF	_mos_SETRTC 
@@ -361,7 +361,7 @@ mos_api_save:		LD	A, MB		; Check if MBASE is 0
 $$:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
-			CALL	_mos_SAVE	; Call the C function mos_SAVE
+			CALL	_mos_SAVE_API	; Call the C function mos_SAVE_API
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
@@ -384,7 +384,7 @@ mos_api_cd:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename	
-			CALL	_mos_CD
+			CALL	_mos_CD_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
@@ -494,7 +494,7 @@ mos_api_mkdir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename
-			CALL	_mos_MKDIR	; Call the C function mos_MKDIR
+			CALL	_mos_MKDIR_API	; Call the C function mos_MKDIR_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
