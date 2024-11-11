@@ -127,7 +127,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Unset",		&mos_cmdUNSET,		false,	HELP_UNSET_ARGS,	HELP_UNSET },
 	{ "VDU",		&mos_cmdVDU,		true,	HELP_VDU_ARGS,		HELP_VDU },
 #if DEBUG > 0
-	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		NULL,		"Run the MOS OS test suite" },
+	{ "RUN_MOS_TESTS",		&mos_cmdTEST,		false,	NULL,		"Run the MOS OS test suite" },
 #endif /* DEBUG */
 };
 
@@ -1420,6 +1420,35 @@ int mos_cmdHELP(char *ptr) {
 
 	return 0;
 }
+
+
+#if DEBUG > 0
+int mos_cmdTEST(char *ptr) {
+	char * testName;
+	bool ran = false;
+	while (extractString(&ptr, &testName, NULL, 0)) {
+		if (strcasecmp(testName, "mem") == 0) {
+			ran = true;
+			malloc_grind();
+		}
+		if (strcasecmp(testName, "path") == 0) {
+			ran = true;
+			path_tests();
+		}
+		if (strcasecmp(testName, "all") == 0) {
+			ran = true;
+			malloc_grind();
+			path_tests();
+			break;
+		}
+	}
+	if (!ran) {
+		printf("No tests run.\n\rAvailable tests are 'mem' and 'path', or 'all' to run all.\r\n");
+	}
+	return FR_OK;
+}
+#endif /* DEBUG */
+
 
 // Load a file from SD card to memory
 // Parameters:
@@ -2807,6 +2836,7 @@ static t_mosCodeSystemVariable consoleVar = {
 };
 
 void mos_setupSystemVariables() {
+	char * tempString;
 	// Date/time variables:
 	// Sys$Time
 	// Sys$Date
@@ -2822,11 +2852,14 @@ void mos_setupSystemVariables() {
 	// Current working directory
 	createOrUpdateSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
 	// Default CLI prompt
-	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
+	tempString = mos_strdup("<Current$Dir> *");
+	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, tempString);
 
 	// Default paths
-	createOrUpdateSystemVariable("Moslet$Path", MOS_VAR_STRING, "/mos/");
-	createOrUpdateSystemVariable("Run$Path", MOS_VAR_MACRO, "<Moslet$Path>, ./, /bin/");
+	tempString = mos_strdup("/mos/");
+	createOrUpdateSystemVariable("Moslet$Path", MOS_VAR_STRING, tempString);
+	tempString = mos_strdup("<Moslet$Path>, ./, /bin/");
+	createOrUpdateSystemVariable("Run$Path", MOS_VAR_MACRO, tempString);
 
 	// Keyboard and console settings
 	createOrUpdateSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);

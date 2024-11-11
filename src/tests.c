@@ -1,8 +1,11 @@
-#include "tests.h"
-#include "umm_malloc.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+
+#include "umm_malloc.h"
+#include "ff.h"
+
+#include "tests.h"
 
 #if DEBUG > 0
 
@@ -21,8 +24,7 @@ static void malloc_grind_fill(struct mg_item_t *item) {
 	}
 }
 
-static BOOL malloc_grind_validate(struct mg_item_t *item)
-{
+static BOOL malloc_grind_validate(struct mg_item_t *item) {
 	int i;
 	for (i=0; i<item->num; i++) {
 		if (item->ptr[i] != (int)item->ptr) {
@@ -32,8 +34,7 @@ static BOOL malloc_grind_validate(struct mg_item_t *item)
 	return 1;
 }
 
-static void malloc_grind()
-{
+void malloc_grind() {
 	int iter, num, idx;
 	BOOL status = 1;
 	struct mg_item_t *items = umm_malloc(sizeof(struct mg_item_t) * MG_MAX_ITEMS);
@@ -43,7 +44,6 @@ static void malloc_grind()
 		return;
 	}
 	memset(items, 0, sizeof(struct mg_item_t) * MG_MAX_ITEMS);
-	
 
 	for (iter=0; iter<MG_ITERS; iter++) {
 		idx = rand() % MG_MAX_ITEMS;
@@ -84,10 +84,52 @@ cleanup:
 	}
 }
 
-int mos_cmdTEST(char *ptr)
-{
-	malloc_grind();
-	return 0;
+void path_tests() {
+	FRESULT fr;
+	DIR dir;
+	FILINFO fno;
+
+	printf("Perform path tests\r\n");
+	printf("Path tests require a working SD card.\r\n");
+
+	// create a test folder, and test files
+	// once tests are complete, delete the test folder
+
+	// For now, we're winging it, working with existing directory stuff
+	// which will all need to be rewritten
+
+	// check exact behaviour of fatfs APIs on hardware vs emulator
+	// what does opendir do when there's no directory
+
+	fr = f_opendir(&dir, "non-existent-directory");
+
+	printf("f_opendir non-existent directory result: %d\r\n", fr);
+
+	f_closedir(&dir);
+
+	// what does findfirst do when there's no directory?
+
+	fr = f_findfirst(&dir, &fno, "non-existent-directory", "*");
+
+	printf("f_findfirst non-existent directory result: %d\r\n", fr);
+
+	f_closedir(&dir);
+
+	// what does findfirst do when there's no leafname/pattern (empty string)
+
+	fr = f_findfirst(&dir, &fno, "/mos/", "");
+
+	printf("f_findfirst empty pattern result: %d\r\n", fr);
+
+	// what does findfirst do when there's no matching pattern
+
+	fr = f_findfirst(&dir, &fno, "/mos/", "non-existent-file");
+
+	printf("f_findfirst non-existent file result: %d\r\n", fr);
+
+	// can we just use fstat when we don't have a pattern?
+	// what does fstat do when there is a pattern?
+
 }
 
 #endif /* DEBUG */

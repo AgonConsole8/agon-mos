@@ -5,7 +5,9 @@
 
 #if DEBUG > 0
 
-extern int mos_cmdTEST(char *ptr);
+void malloc_grind();
+
+void path_tests();
 
 #endif /* DEBUG */
 

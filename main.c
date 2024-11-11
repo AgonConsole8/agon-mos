@@ -148,9 +148,6 @@ void bootmsg(void) {
 	#endif
 
 	printf("\n\r\n\r");
-	#if	DEBUG > 0
-	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
-	#endif
 }
 
 
@@ -198,6 +195,9 @@ int main(void) {
 	}
 
 	bootmsg();
+	#if	DEBUG > 0
+	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
+	#endif
 
 	mos_mount();									// Mount the SD card
 	mos_setupSystemVariables();						// Setup the system variables

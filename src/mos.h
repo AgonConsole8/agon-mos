@@ -97,6 +97,9 @@ int		mos_cmdTIME(char *ptr);
 int		mos_cmdTYPE(char *ptr);
 int		mos_cmdUNSET(char *ptr);
 int		mos_cmdVDU(char *ptr);
+#if DEBUG > 0
+int mos_cmdTEST(char *ptr);
+#endif /* DEBUG */
 
 UINT24	mos_LOAD_API(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_LOAD(char * filename, UINT24 address, UINT24 size);
