@@ -84,6 +84,33 @@ cleanup:
 	}
 }
 
+void expectEq(char * check, int actual, int expected) {
+	bool pass = actual == expected;
+	printf("%s: %s", check, pass ? "PASS" : "FAIL");
+	if (!pass) {
+		printf("\n\r    (expected %d == %d)", expected, actual);
+	}
+	printf("\n\r");
+}
+
+void expectNotEq(char * check, int actual, int expected) {
+	bool pass = actual != expected;
+	printf("%s: %s", check, pass ? "PASS" : "FAIL");
+	if (!pass) {
+		printf("\n\r    (expected %d != %d)", expected, actual);
+	}
+	printf("\n\r");
+}
+
+void expectStrEq(char * check, char * actual, char * expected) {
+	bool pass = strcmp(actual, expected) == 0;
+	printf("%s: %s", check, pass ? "PASS" : "FAIL");
+	if (!pass) {
+		printf("\n\r    (expected \"%s\" == \"%s\")", expected, actual);
+	}
+	printf("\n\r");
+}
+
 void path_tests() {
 	FRESULT fr;
 	DIR dir;
@@ -99,37 +126,45 @@ void path_tests() {
 	// which will all need to be rewritten
 
 	// check exact behaviour of fatfs APIs on hardware vs emulator
+
 	// what does opendir do when there's no directory
-
-	fr = f_opendir(&dir, "non-existent-directory");
-
-	printf("f_opendir non-existent directory result: %d\r\n", fr);
-
+	expectEq("f_opendir on non-existent directory returns FR_NO_PATH", f_opendir(&dir, "non-existent-directory"), FR_NO_PATH);
 	f_closedir(&dir);
 
 	// what does findfirst do when there's no directory?
-
-	fr = f_findfirst(&dir, &fno, "non-existent-directory", "*");
-
-	printf("f_findfirst non-existent directory result: %d\r\n", fr);
-
+	expectEq("f_findfirst on non-existent directory returns FR_NO_PATH", f_findfirst(&dir, &fno, "non-existent-directory", "*"), FR_NO_PATH);
 	f_closedir(&dir);
 
 	// what does findfirst do when there's no leafname/pattern (empty string)
+	expectEq("f_findfirst empty pattern on valid directory returns FR_OK", f_findfirst(&dir, &fno, "/mos/", ""), FR_OK);
+	f_closedir(&dir);
 
-	fr = f_findfirst(&dir, &fno, "/mos/", "");
-
-	printf("f_findfirst empty pattern result: %d\r\n", fr);
+	expectEq("f_findfirst valid pattern on valid directory returns FR_OK", f_findfirst(&dir, &fno, "/mos/", "*"), FR_OK);
+	f_closedir(&dir);
+	expectNotEq("  the returned filename should not be empty", fno.fname[0], 0);
 
 	// what does findfirst do when there's no matching pattern
+	expectEq("f_findfirst on valid directory non-existent file returns FR_OK", f_findfirst(&dir, &fno, "/mos/", "non-existent-file"), FR_OK);
+	f_closedir(&dir);
+	expectStrEq("  the returned filename should be empty", fno.fname, "");
 
-	fr = f_findfirst(&dir, &fno, "/mos/", "non-existent-file");
+	// check what f_stat returns - first of all when there's no pattern
+	expectEq("f_stat on non-existent directory returns FR_NO_PATH", f_stat("/non-existent-directory/file", &fno), FR_NO_PATH);
+	f_closedir(&dir);
+	expectStrEq("  the returned filename should be empty", fno.fname, "");
 
-	printf("f_findfirst non-existent file result: %d\r\n", fr);
+	expectEq("f_stat on non-existent file returns FR_NO_FILE", f_stat("/mos/non-existent-file", &fno), FR_NO_FILE);
+	f_closedir(&dir);
+	expectStrEq("  the returned filename should be empty", fno.fname, "");
 
-	// can we just use fstat when we don't have a pattern?
-	// what does fstat do when there is a pattern?
+	// what does f_stat do when there is a pattern?
+	expectEq("f_stat on non-existent directory with leaf pattern returns FR_NO_PATH", f_stat("/non-existent-directory/*", &fno), FR_NO_PATH);
+	f_closedir(&dir);
+	expectStrEq("  the returned filename should be empty", fno.fname, "");
 
+	expectEq("f_stat on valid directory with a leaf pattern returns FR_INVALID_NAME", f_stat("/mos/*", &fno), FR_INVALID_NAME);
+	f_closedir(&dir);
+	expectStrEq("  the returned filename should be empty", fno.fname, "");
 }
 
 #endif /* DEBUG */
