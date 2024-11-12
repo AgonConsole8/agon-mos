@@ -99,6 +99,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Delete",		&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Dir",		&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
 	{ "Disc",		&mos_cmdDISC,		false,	NULL,		NULL },
+	{ "Do",			&mos_cmdDO,			true,	HELP_DO_ARGS,		HELP_DO },
 	{ "Echo",		&mos_cmdECHO,		false,	HELP_ECHO_ARGS,		HELP_ECHO },
 	{ "Erase",		&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Exec",		&mos_cmdEXEC,		true,	HELP_EXEC_ARGS,		HELP_EXEC },
@@ -499,6 +500,17 @@ int mos_cmdDIR(char * ptr) {
 		}
 	}
 	return mos_DIR(path, longListing);
+}
+
+// DO command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdDO(char * ptr) {
+	// Call mos_exec with in_mos set to true, which allows for OSCLI commands to use full run path
+	return mos_exec(ptr, true, 0);
 }
 
 // ECHO command

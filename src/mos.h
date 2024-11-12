@@ -75,6 +75,7 @@ int		mos_cmdCREDITS(char *ptr);
 int		mos_cmdDEL(char * ptr);
 int		mos_cmdDIR(char * ptr);
 int		mos_cmdDISC(char *ptr);
+int		mos_cmdDO(char *ptr);
 int		mos_cmdECHO(char *ptr);
 int		mos_cmdEXEC(char * ptr);
 int		mos_cmdHELP(char *ptr);
@@ -155,6 +156,9 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_DELETE			"Delete a file or folder (must be empty)\r\n"
 #define HELP_DELETE_ARGS	"[-f] <filename>"
+
+#define HELP_DO				"Run the given command, after transformation\r\n"
+#define HELP_DO_ARGS		"<command>"
 
 #define HELP_ECHO			"Echo sends a string to the VDU, after transformation\r\n"
 #define HELP_ECHO_ARGS		"<string>"
