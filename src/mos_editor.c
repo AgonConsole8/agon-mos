@@ -38,23 +38,11 @@ extern volatile BYTE keycount;					// In globals.asm
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
 
-extern BYTE cursorX;
-extern BYTE cursorY;
 extern BYTE scrcols;
 
 // Storage for the command history
 //
 static char	* cmd_history[cmd_historyDepth];
-
-// Get the current cursor position from the VPD
-//
-void getCursorPos() {
-	vpd_protocol_flags &= 0xFE;					// Clear the semaphore flag
-	putch(23);									// Request the cursor position
-	putch(0);
-	putch(VDP_cursor);
-	wait_VDP(0x01);								// Wait until the semaphore has been set, or a timeout happens
-}
 
 // Get the current screen dimensions from the VDU
 //
@@ -82,33 +70,13 @@ void readPalette(BYTE entry, BOOL wait) {
 // Move cursor left
 //
 void doLeftCursor() {
-	getCursorPos();
-	if(cursorX > 0) {
-		putch(0x08);
-	}
-	else {
-		while(cursorX < (scrcols - 1)) {
-			putch(0x09);
-			cursorX++;
-		}
-		putch(0x0B);
-	}
+	putch(0x08);
 }
 
 // Move Cursor Right
 // 
 void doRightCursor() {
-	getCursorPos();
-	if(cursorX < (scrcols - 1)) {
-		putch(0x09);
-	}
-	else {
-		while(cursorX > 0) {
-			putch(0x08);
-			cursorX--;
-		}
-		putch(0x0A);
-	}
+	putch(0x09);
 }
 
 // Insert a character in the input string
@@ -180,12 +148,12 @@ BOOL deleteCharacter(char *buffer, int insertPos, int len) {
 	int count = 0;
 	if (insertPos > 0) {
 		doLeftCursor();
-		for(i = insertPos - 1; i < len; i++, count++) {
+		for (i = insertPos - 1; i < len; i++, count++) {
 			BYTE b = buffer[i+1];
 			buffer[i] = b;
 			putch(b ? b : ' ');
 		}
-		for(i = 0; i < count; i++) {
+		for (i = 0; i < count; i++) {
 			doLeftCursor();
 		}
 		return 1;
@@ -199,7 +167,7 @@ void waitKey() {
 	BYTE	c;
 	do {
 		c = keycount;				
-		while(c == keycount);		// Wait for a key event
+		while (c == keycount);		// Wait for a key event
 	} while (keydown == 0);			// Loop until we get a key down value (keydown = 1)
 }
 
