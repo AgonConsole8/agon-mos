@@ -1500,7 +1500,14 @@ UINT24 mos_SAVE(char * filename, UINT24 address, UINT24 size) {
 	FIL		fil;
 	UINT	br;	
 	char *	expandedFilename = NULL;
-	FRESULT	fr = getResolvedPath(filename, &expandedFilename);
+	FRESULT	fr;
+
+	// if the filename contains a wildcard then return an error
+	if (mos_strcspn(filename, "*?") != strlen(filename)) {
+		return FR_INVALID_PARAMETER;
+	}
+
+	fr = getResolvedPath(filename, &expandedFilename);
 
 	if (fr == FR_OK || fr == FR_NO_FILE) {
 		fr = f_open(&fil, expandedFilename, FA_WRITE | FA_CREATE_NEW);
