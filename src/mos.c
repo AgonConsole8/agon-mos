@@ -735,17 +735,14 @@ int mos_cmdSAVE(char * ptr) {
 //
 int mos_cmdDEL(char * ptr) {
 	FRESULT	fr;
-	DIR dir;
-	static FILINFO fno;
-	char *dirPath = NULL;
-	char *pattern = NULL;
-	BOOL usePattern = FALSE;
-	BOOL force = FALSE;
-	char *filename;
-	char *lastSeparator;
-	char verify[7];
-
-	// TODO use resolvePath as appropriate
+	FRESULT	unlinkResult;
+	BOOL	verbose;
+	BOOL	force = FALSE;
+	char *	filename;
+	char	verify[7];
+	char *	resolvedPath;
+	int		maxLength = 0;
+	int		length = 0;
 
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
@@ -758,98 +755,65 @@ int mos_cmdDEL(char * ptr) {
 		}
 	}
 
-	fr = FR_INT_ERR;
-
-	lastSeparator = strrchr(filename, '/');
-
-	if (strchr(filename, '*') != NULL) {
-		usePattern = TRUE;
-		if (filename[0] == '/' && strchr(filename + 1, '/') == NULL) {
-			dirPath = mos_strdup("/");
-			if (!dirPath) return FR_INT_ERR;
-			if (strchr(filename + 1, '*') != NULL) {
-				pattern = mos_strdup(filename + 1);
-				if (!pattern) goto cleanup;
-			}
-		} else if (lastSeparator != NULL) {
-			dirPath = mos_strndup(filename, lastSeparator - filename);
-			if (!dirPath) return FR_INT_ERR;
-
-			pattern = mos_strdup(lastSeparator + 1);
-			if (!pattern) {
-				umm_free(dirPath);
-				return FR_INT_ERR;
-			}
-		} else {
-			dirPath = mos_strdup(".");
-			pattern = mos_strdup(filename);
-			if (!dirPath || !pattern) {
-				if (dirPath) umm_free(dirPath);
-				if (pattern) umm_free(pattern);
-				return FR_INT_ERR;
-			}
-		}
-	} else {
-		dirPath = mos_strdup(filename);
-		if (!dirPath) return FR_INT_ERR;
-	}	
-
-	if (usePattern) {
-		fr = f_opendir(&dir, dirPath);
-		if (fr != FR_OK) goto cleanup;
-
-		fr = f_findfirst(&dir, &fno, dirPath, pattern);
-		while (fr == FR_OK && fno.fname[0] != '\0') {
-			size_t fullPathLen = strlen(dirPath) + strlen(fno.fname) + 2;
-			char *fullPath = umm_malloc(fullPathLen);
-			if (!fullPath) {
-				fr = FR_INT_ERR;
-				break;
-			}
-
-			sprintf(fullPath, "%s/%s", dirPath, fno.fname);  // Construct full path
-
-			if (!force) {
-				INT24 retval;
-				// we could potentially support "All" here, and when detected changing `force` to true
-				printf("Delete %s? (Yes/No/Cancel) ", fullPath);
-				retval = mos_EDITLINE(&verify, sizeof(verify), 13);
-				printf("\n\r");
-				if (retval == 13) {
-					if (strcasecmp(verify, "Cancel") == 0 || strcasecmp(verify, "C") == 0) {
-						printf("Cancelled.\r\n");
-						umm_free(fullPath);
-						break;
-					}
-					if (strcasecmp(verify, "Yes") == 0 || strcasecmp(verify, "Y") == 0) {
-						printf("Deleting %s.\r\n", fullPath);
-						fr = f_unlink(fullPath);
-					}
-				} else {
-					printf("Cancelled.\r\n");
-					umm_free(fullPath);
-					break;
-				}
-			} else {
-				printf("Deleting %s\r\n", fullPath);
-				fr = f_unlink(fullPath);
-			}
-			umm_free(fullPath);
-
-			if (fr != FR_OK) break;
-			fr = f_findnext(&dir, &fno);
-		}
-
-		f_closedir(&dir);
-		printf("\r\n");
-	} else {
-		fr = f_unlink(filename);
+	// Verbose kicks in when we our filename can potentially match multiple files
+	verbose = mos_strcspn(filename, "*?:") != strlen(filename);
+	if (!force) {
+		// set force if we are matching single files
+		force = !verbose;
 	}
 
-	cleanup:
-		if (dirPath) umm_free(dirPath);
-		if (pattern) umm_free(pattern);
+	// Work out our maximum path length
+	fr = resolvePath(filename, NULL, &maxLength);
+	if (!(fr == FR_OK || fr == FR_NO_FILE)) {
 		return fr;
+	}
+
+	resolvedPath = umm_malloc(maxLength);
+	if (!resolvedPath) {
+		return FR_INT_ERR;
+	}
+	*resolvedPath = '\0';
+
+	length = maxLength;
+	fr = resolvePath(filename, resolvedPath, &length);
+	unlinkResult = fr;
+
+	while (fr == FR_OK) {
+		// We have a resolved path - either to a file or a directory
+		if (!force) {
+			INT24 retval;
+			// we could potentially support "All" here, and when detected changing `force` to true
+			printf("Delete %s? (Yes/No/Cancel) ", resolvedPath);
+			retval = mos_EDITLINE(&verify, sizeof(verify), 13);
+			printf("\n\r");
+			if (retval == 13) {
+				if (strcasecmp(verify, "Cancel") == 0 || strcasecmp(verify, "C") == 0) {
+					printf("Cancelled.\r\n");
+					break;
+				}
+				if (strcasecmp(verify, "Yes") == 0 || strcasecmp(verify, "Y") == 0) {
+					printf("Deleting %s\r\n", resolvedPath);
+					unlinkResult = f_unlink(resolvedPath);
+				}
+			} else {
+				printf("Cancelled.\r\n");
+				break;
+			}
+		} else {
+			if (verbose) {
+				printf("Deleting %s\r\n", resolvedPath);
+			}
+			unlinkResult = f_unlink(resolvedPath);
+		}
+
+		// On any unlink error, break out of the loop
+		if (unlinkResult != FR_OK) break;
+		length = maxLength;
+		fr = resolvePath(filename, resolvedPath, &length);
+	}
+
+	umm_free(resolvedPath);
+	return unlinkResult;
 }
 
 // JMP <addr> command
