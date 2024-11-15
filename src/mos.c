@@ -2666,7 +2666,7 @@ int writeYear(char * buffer) {
 	rtc_unpack(&rtc, &t);
 
 	writeBuffer[0] = yr - EPOCH_YEAR;
-	writeBuffer[1] = t.month;
+	writeBuffer[1] = t.month + 1;
 	writeBuffer[2] = t.day;
 	writeBuffer[3] = t.hour;
 	writeBuffer[4] = t.minute;
@@ -2746,7 +2746,7 @@ int writeTime(char * buffer) {
 	rtc_unpack(&rtc, &t);
 
 	writeBuffer[0] = t.year - EPOCH_YEAR;
-	writeBuffer[1] = t.month;
+	writeBuffer[1] = t.month + 1;
 	writeBuffer[2] = t.day;
 	writeBuffer[3] = hr;
 	writeBuffer[4] = min;
