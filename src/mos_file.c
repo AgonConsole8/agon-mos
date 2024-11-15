@@ -396,6 +396,7 @@ int getResolvedPath(char * source, char ** resolvedPath) {
 		if (*resolvedPath == NULL) {
 			return MOS_OUT_OF_MEMORY;
 		}
+		**resolvedPath = '\0';
 		result = resolvePath(source, *resolvedPath, &length);
 	}
 	return result;
