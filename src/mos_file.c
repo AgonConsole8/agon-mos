@@ -99,8 +99,8 @@ int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * lengt
 					// compose full path, including pattern if present, to allow for "save" to work
 					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", hasPattern ? srcPattern : "");
 				} else {
-					// Not enough space to store the full path - maybe return a memory error?
-					result = FR_INT_ERR;
+					// Not enough space to store the full path
+					result = MOS_OUT_OF_MEMORY;
 				}
 				*length = pathLength;
 			}
@@ -118,8 +118,8 @@ int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * lengt
 				if (*length >= pathLength) {
 					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
 				} else {
-					// Not enough space to store the full path - maybe return a memory error?
-					result = FR_INT_ERR;
+					// Not enough space to store the full path
+					result = MOS_OUT_OF_MEMORY;
 				}
 				*length = pathLength;
 				break;
@@ -128,7 +128,7 @@ int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * lengt
 			// Construct a full path to compare against "after"
 			char * fullpath = umm_malloc(pathLength);
 			if (fullpath == NULL) {
-				result = FR_INT_ERR;
+				result = MOS_OUT_OF_MEMORY;
 				break;
 			}
 			sprintf(fullpath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
@@ -183,7 +183,7 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 		int resolvedLength = 0;
 
 		if (prefixToken == NULL) {
-			return FR_INT_ERR;
+			return MOS_OUT_OF_MEMORY;
 		}
 
 		// If we don't have a resolvePath, then reset the length
@@ -196,7 +196,7 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 			after = mos_strdup(resolvedPath);
 			if (after == NULL) {
 				umm_free(prefixToken);
-				return FR_INT_ERR;
+				return MOS_OUT_OF_MEMORY;
 			}
 		}
 
@@ -221,7 +221,7 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 			int prefixResult;
 			char * testPath = umm_malloc((prefixPtr - prefixPath) + (path ? leafname - path : 0) + 2);
 			if (testPath == NULL) {
-				result = FR_INT_ERR;
+				result = MOS_OUT_OF_MEMORY;
 				brokenOut = true;
 				break;
 			}
@@ -318,9 +318,7 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 			}
 			return FR_OK;
 		} else {
-			// return FR_INVALID_NAME;
-			return FR_NOT_ENOUGH_CORE;
-			// return FR_INT_ERR;
+			return MOS_OUT_OF_MEMORY;
 		}
 	}
 	*leafname = '\0';
@@ -333,9 +331,7 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 	*leafname = leafChar;
 	if (result == FR_OK) {
 		if (strlen(resolved) + strlen(leafname) + 1 > length) {
-			// return FR_INVALID_NAME;
-			return FR_NOT_ENOUGH_CORE;
-			// return FR_INT_ERR;
+			return MOS_OUT_OF_MEMORY;
 		}
 		if (leafChar != '\0') {
 			sprintf(resolved, "%s/%s", resolved, leafname);
@@ -398,7 +394,7 @@ int getResolvedPath(char * source, char ** resolvedPath) {
 		length++;
 		*resolvedPath = umm_malloc(length);
 		if (*resolvedPath == NULL) {
-			return FR_INT_ERR;
+			return MOS_OUT_OF_MEMORY;
 		}
 		result = resolvePath(source, *resolvedPath, &length);
 	}

@@ -291,7 +291,7 @@ int mos_runBinFile(char * filepath, char * args) {
 	fullyResolvedPath = umm_malloc(pathLen);
 	if (fullyResolvedPath == NULL) {
 		umm_free(resolvedPath);
-		return FR_INT_ERR;
+		return MOS_OUT_OF_MEMORY;
 	}
 
 	result = resolveRelativePath(resolvedPath, fullyResolvedPath, pathLen);
@@ -365,7 +365,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		// Check if this command has an alias
 		aliasToken = umm_malloc(cmdLen + 7);
 		if (aliasToken == NULL) {
-			return FR_INT_ERR;
+			return MOS_OUT_OF_MEMORY;
 		}
 		sprintf(aliasToken, "Alias$%.*s", cmdLen, command);
 		if (aliasToken[strlen(aliasToken) - 1] == '.') {
@@ -770,7 +770,7 @@ int mos_cmdDEL(char * ptr) {
 
 	resolvedPath = umm_malloc(maxLength);
 	if (!resolvedPath) {
-		return FR_INT_ERR;
+		return MOS_OUT_OF_MEMORY;
 	}
 	*resolvedPath = '\0';
 
@@ -1022,7 +1022,7 @@ int mos_cmdSETMACRO(char * ptr) {
 	}
 
 	newValue = mos_strdup(ptr);
-	if (!newValue) return FR_INT_ERR;
+	if (!newValue) return MOS_OUT_OF_MEMORY;
 
 	result = createOrUpdateSystemVariable(token, MOS_VAR_MACRO, newValue);
 
@@ -1546,7 +1546,7 @@ UINT24 mos_TYPE(char * filename) {
 	char *	buffer = umm_malloc(size);
 
 	if (!buffer) {
-		return FR_INT_ERR;
+		return MOS_OUT_OF_MEMORY;
 	}
 
 	fr = getResolvedPath(filename, &expandedFilename);
@@ -2022,7 +2022,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
             pattern = mos_strdup(srcPath);
         }
         if (!srcDir || !pattern) {
-            fr = FR_INT_ERR; // Out of memory
+            fr = MOS_OUT_OF_MEMORY; // Out of memory
             goto cleanup;
         }
         usePattern = TRUE;
@@ -2047,7 +2047,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
             fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
-                fr = FR_INT_ERR; // Out of memory
+                fr = MOS_OUT_OF_MEMORY; // Out of memory
                 if (fullSrcPath) umm_free(fullSrcPath);
                 if (fullDstPath) umm_free(fullDstPath);
                 break;
@@ -2075,7 +2075,7 @@ UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
 			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
 			fullDstPath = umm_malloc(fullDstPathLen);
 			if (!fullDstPath) {
-				fr = FR_INT_ERR;
+				fr = MOS_OUT_OF_MEMORY;
 				goto cleanup;
 			}
 			srcFilename = strrchr(srcPath, '/');
@@ -2155,12 +2155,12 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             pattern = mos_strdup(srcPath);
         }
         if (!srcDir || !pattern) {
-            fr = FR_INT_ERR;
+            fr = MOS_OUT_OF_MEMORY;
             goto cleanup;
         }
     } else {
         srcDir = mos_strdup(srcPath);
-        if (!srcDir) return FR_INT_ERR;
+        if (!srcDir) return MOS_OUT_OF_MEMORY;
     }
 
     if (usePattern) {
@@ -2179,7 +2179,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
             fullDstPath = umm_malloc(dstPathLen);
 
             if (!fullSrcPath || !fullDstPath) {
-                fr = FR_INT_ERR;
+                fr = MOS_OUT_OF_MEMORY;
                 goto file_cleanup;
             }
 
@@ -2220,7 +2220,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
         size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
         fullDstPath = umm_malloc(fullDstPathLen);
         if (!fullDstPath) {
-			fr = FR_INT_ERR;
+			fr = MOS_OUT_OF_MEMORY;
 			goto cleanup;
 		}
         srcFilename = strrchr(srcPath, '/');
@@ -2307,7 +2307,7 @@ UINT24 mos_EXEC(char * filename) {
 	int		line =  0;
 
 	if (!buffer) {
-		return FR_INT_ERR;
+		return MOS_OUT_OF_MEMORY;
 	}
 	fr = getResolvedPath(filename, &expandedPath);
 	if (fr == FR_OK) {

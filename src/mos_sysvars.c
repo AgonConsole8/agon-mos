@@ -162,6 +162,9 @@ t_mosTransInfo * gsInit(void * source, void * parent) {
 
 	// Set up a t_mosTransInfo object
 	t_mosTransInfo * transInfo = umm_malloc(sizeof(t_mosTransInfo));
+	if (transInfo == NULL) {
+		return NULL;
+	}
 	transInfo->source = source;
 	transInfo->parent = parent;
 	transInfo->type = MOS_VAR_MACRO;
@@ -298,7 +301,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 								t_mosTransInfo * newTransInfo = umm_malloc(sizeof(t_mosTransInfo));
 								*end = '>';
 								if (newTransInfo == NULL) {
-									result = FR_INT_ERR;
+									result = MOS_OUT_OF_MEMORY;
 								} else {
 									newTransInfo->source = var->value;
 									newTransInfo->parent = current;
@@ -380,6 +383,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 // - FR_INVALID_PARAMETER if source is NULL
 // - FR_INT_ERR if an internal error occurred
 // - FR_BAD_STRING if a bad string was encountered
+// - MOS_OUT_OF_MEMORY if memory allocation failed
 //
 int gsTrans(char * source, char * dest, int destLen, int * read) {
 	int remaining = destLen;
@@ -726,7 +730,7 @@ t_mosEvalResult * evaluateExpression(char * source) {
 		case MOS_VAR_STRING: {
 			result->result = mos_strdup(var->value);
 			if (result->result == NULL) {
-				result->status = FR_INT_ERR;
+				result->status = MOS_OUT_OF_MEMORY;
 			}
 			result->type = MOS_VAR_STRING;
 			break;
