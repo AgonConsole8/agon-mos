@@ -18,8 +18,18 @@ char * getFilepathPrefixEnd(char * filepath) {
 
 // Utility function to scan a filepath to find the leafname (last part)
 char * getFilepathLeafname(char * filepath) {
-	char * leafname = filepath;
-	while (extractString(&filepath, &leafname, ":/", EXTRACT_FLAG_NO_TERMINATOR)) {}
+	// scan backwards from the end of the string to find the last colon or slash, or beginning of string
+	char * leafname = filepath + strlen(filepath);
+	while (leafname > filepath) {
+		if (leafname[-1] == ':' || leafname[-1] == '/') {
+			break;
+		}
+		leafname--;
+	}
+	// check for special cases where we should return an empty string
+	if ((leafname[0] == '.') && (leafname[1] == '\0' || (leafname[1] == '.' && leafname[2] == '\0'))) {
+		return filepath + strlen(filepath);
+	}
 	return leafname;
 }
 
@@ -32,6 +42,108 @@ int checkFileExists(char * path, char * leafname, FILINFO * fileinfo) {
 	// check on real hardware whether this is needed there
 	if (fileinfo->fname[0] == '\0') {
 		result = FR_NO_FILE;
+	}
+	return result;
+}
+
+// matchRawPath matches a source path pattern
+// returning back a filled in destPath if it matches
+int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * length, char * after) {
+	FILINFO fileinfo;
+	DIR dir;
+	int result = FR_NO_FILE;
+	int findResult;
+	bool hasAfter = after != NULL && after[0] != '\0';
+	// if we don't have an "after" we should find our first match, so set found to true
+	bool found = !hasAfter;
+	bool hasPattern;
+	bool insertSlash = (strlen(srcPath) > 0 && srcPath[strlen(srcPath) - 1] != '/');
+	int lengthAdjust = insertSlash ? 2 : 1;
+
+	if (destPath == NULL) {
+		// we are working out the maximum length
+		*length = 0;
+	}
+	// Work around emulator not liking empty patterns
+	if (srcPattern != NULL && srcPattern[0] == '\0') {
+		srcPattern = NULL;
+	}
+	hasPattern = srcPattern != NULL;
+
+	findResult = f_findfirst(&dir, &fileinfo, srcPath, srcPattern);
+	while (findResult == FR_OK) {
+		int pathLength = strlen(srcPath) + strlen(fileinfo.fname) + lengthAdjust;
+		if (fileinfo.fname[0] == '\0') {
+			// Reached end of matches (no more files)
+			if (hasPattern) {
+				pathLength += strlen(srcPattern);
+			}
+			if (!destPath) {
+				// we are just working out the maximum length
+				if (pathLength > *length) {
+					*length = pathLength;
+				}
+				break;
+			}
+			// if we were searching for an "after" and we have not found, then we need to return empty path
+			if (hasAfter) {
+				if (found) {
+					// we've already set our destPath to be empty, so just break
+					break;
+				}
+				// TODO should we return FR_NO_PATH here?
+				// we have an "after", but we haven't found it
+				// right now this will be returning "no file", but will be leaving the destPath intact
+			} else {
+				if (*length >= pathLength) {
+					// compose full path, including pattern if present, to allow for "save" to work
+					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", hasPattern ? srcPattern : "");
+				} else {
+					// Not enough space to store the full path - maybe return a memory error?
+					result = FR_INT_ERR;
+				}
+				*length = pathLength;
+			}
+			break;
+		}
+
+		if (found) {
+			result = FR_OK;
+			if (destPath == NULL) {
+				// we are just working out the maximum length
+				if (pathLength > *length) {
+					*length = pathLength;
+				}
+			} else {
+				if (*length >= pathLength) {
+					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
+				} else {
+					// Not enough space to store the full path - maybe return a memory error?
+					result = FR_INT_ERR;
+				}
+				*length = pathLength;
+				break;
+			}
+		} else {
+			// Construct a full path to compare against "after"
+			char * fullpath = umm_malloc(pathLength);
+			if (fullpath == NULL) {
+				result = FR_INT_ERR;
+				break;
+			}
+			sprintf(fullpath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
+			found = (pmatch(after, fullpath, 0) == 0);
+			if (found && destPath != NULL) {
+				// clear our destPath to allow detection of when after was last item in a path
+				destPath[0] = '\0';
+			}
+			umm_free(fullpath);
+		}
+		findResult = f_findnext(&dir, &fileinfo);
+	}
+	f_closedir(&dir);
+	if (findResult == FR_NO_PATH) {
+		result = FR_NO_PATH;
 	}
 	return result;
 }
@@ -141,31 +253,29 @@ int resolvePath(char * filepath, char ** resolvedPath, int * length) {
 	path = filepath;
 
 	if (path != leafname) {
-		leafChar = *(leafname - 1);
-		*(leafname - 1) = '\0';
-		result = checkFileExists(path, leafname, &fileinfo);
+		// We're copying our leafname here to allow for `/leafname` to be resolved
+		// as otherwise our search path would become an empty string
+		// we _might_ be able to do this differently
+
+		// copy our leafname, and temporarily terminate path
+		char * leafCopy = mos_strdup(leafname);
+		if (leafCopy == NULL) {
+			return FR_INT_ERR;
+		}
+		if (*leafname != '\0') {
+			leafChar = *leafname;
+			*leafname = '\0';
+		}
+
+		result = matchRawPath(path, *leafCopy == '\0' ? NULL : leafCopy, resolvedPath ? *resolvedPath : NULL, length, NULL);
+
+		umm_free(leafCopy);
 	} else {
-		result = checkFileExists(".", leafname, &fileinfo);
+		result = matchRawPath(".", leafname, resolvedPath ? *resolvedPath : NULL, length, NULL);
 	}
 
-	if (result == FR_OK || result == FR_NO_FILE) {
-		char * fname = result == FR_OK ? fileinfo.fname : leafname;
-		bool hasPath = path != leafname;
-		int len = strlen(fname) + 1;
-		if (hasPath) {
-			len += leafname - path;
-		}
-		if (*length >= len) {
-			if (hasPath) {
-				sprintf(*resolvedPath, "%s/%s", path, fname);
-			} else {
-				sprintf(*resolvedPath, "%s", fname);
-			}
-		}
-		*length = len;
-	}
 	if (leafChar != '\0') {
-		*(leafname - 1) = leafChar;
+		*leafname = leafChar;
 	}
 
 	return result;
@@ -179,10 +289,15 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 	char leafChar;
 
 	leafname = getFilepathLeafname(path);
+	leafChar = *leafname;
 	if (leafname == path) {
 		// only have a leafname, so just return cwd + leafname
 		if (length >= strlen(path) + strlen(cwd) + 1) {
-			sprintf(resolved, "%s/%s", cwd, path);
+			if (leafChar == '\0') {
+				sprintf(resolved, "%s", cwd);
+			} else {
+				sprintf(resolved, "%s/%s", cwd, path);
+			}
 			return FR_OK;
 		} else {
 			// return FR_INVALID_NAME;
@@ -190,7 +305,6 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 			// return FR_INT_ERR;
 		}
 	}
-	leafChar = *leafname;
 	*leafname = '\0';
 
 	result = f_chdir(path);
@@ -205,7 +319,9 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 			return FR_NOT_ENOUGH_CORE;
 			// return FR_INT_ERR;
 		}
-		sprintf(resolved, "%s/%s", resolved, leafname);
+		if (leafChar != '\0') {
+			sprintf(resolved, "%s/%s", resolved, leafname);
+		}
 	}
 	// restore cwd
 	f_chdir(cwd);

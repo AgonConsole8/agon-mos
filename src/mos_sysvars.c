@@ -18,7 +18,7 @@ t_mosSystemVariable * mosSystemVariables = NULL;
 // Returns:
 // - var will be updated to point to the variable found, or the variable before the first match
 // - 0 if a match was found
-// - 1 if no match was found
+// - -1 if no match was found
 // - pattern match score if a partial match was found
 // 
 int getSystemVariable(char *pattern, t_mosSystemVariable **var) {

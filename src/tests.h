@@ -5,9 +5,9 @@
 
 #if DEBUG > 0
 
-void malloc_grind();
+void malloc_grind(bool verbose);
 
-void path_tests();
+void path_tests(bool verbose);
 
 #endif /* DEBUG */
 

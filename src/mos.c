@@ -1438,24 +1438,33 @@ int mos_cmdHELP(char *ptr) {
 int mos_cmdTEST(char *ptr) {
 	char * testName;
 	bool ran = false;
+	bool verbose = false;
 	while (extractString(&ptr, &testName, NULL, 0)) {
+		if (strcasecmp(testName, "verbose") == 0) {
+			verbose = true;
+		}
+		if (strcasecmp(testName, "-v") == 0) {
+			verbose = true;
+		}
 		if (strcasecmp(testName, "mem") == 0) {
 			ran = true;
-			malloc_grind();
+			malloc_grind(verbose);
 		}
 		if (strcasecmp(testName, "path") == 0) {
 			ran = true;
-			path_tests();
+			path_tests(verbose);
 		}
 		if (strcasecmp(testName, "all") == 0) {
 			ran = true;
-			malloc_grind();
-			path_tests();
+			malloc_grind(verbose);
+			path_tests(verbose);
 			break;
 		}
 	}
 	if (!ran) {
-		printf("No tests run.\n\rAvailable tests are 'mem' and 'path', or 'all' to run all.\r\n");
+		printf("No tests run.\n\r");
+		printf("Available tests are 'mem' and 'path', or 'all' to run all.\r\n");
+		printf("Run with 'verbose' or '-v' to get more detailed output.\r\n");
 	}
 	return FR_OK;
 }
