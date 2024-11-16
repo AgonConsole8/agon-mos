@@ -281,10 +281,16 @@ int mos_runBinFile(char * filepath, char * args) {
 	UINT24 addr = MOS_defaultLoadAddress;
 	int result = getResolvedPath(filepath, &resolvedPath);
 
+	#if DEBUG > 0
 	createOrUpdateSystemVariable("LastApp$RunPath", MOS_VAR_STRING, mos_strdup(filepath));
+	#endif /* DEBUG */
 	if (result != FR_OK) {
 		return result;
 	}
+
+	#if DEBUG > 0
+	createOrUpdateSystemVariable("LastApp$UnresolvedRun", MOS_VAR_STRING, mos_strdup(resolvedPath));
+	#endif /* DEBUG */
 
 	// Fully resolved path allocation - size is very conservative
 	pathLen = strlen(resolvedPath) + strlen(cwd) + 1;

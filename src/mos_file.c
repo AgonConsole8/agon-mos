@@ -10,10 +10,7 @@
 
 // Utility function to scan a filepath to find end of a prefix (colon)
 char * getFilepathPrefixEnd(char * filepath) {
-	if (strchr(filepath, ':') != NULL) {
-		return strchr(filepath, ':');
-	}
-	return NULL;
+	return strchr(filepath, ':');
 }
 
 // Utility function to scan a filepath to find the leafname (last part)
@@ -38,9 +35,8 @@ int checkFileExists(char * path, char * leafname, FILINFO * fileinfo) {
 	DIR dir;
 	int result = f_findfirst(&dir, fileinfo, path, leafname);
 	f_closedir(&dir);
-	// TODO emulator is reporting FR_OK when leafname is not found
-	// check on real hardware whether this is needed there
 	if (fileinfo->fname[0] == '\0') {
+		// f_findfirst returns FR_OK with an empty filename for matching path but no file found
 		result = FR_NO_FILE;
 	}
 	return result;
@@ -235,6 +231,10 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 				after = NULL;
 			}
 
+			if ((prefixResult == FR_OK || prefixResult == FR_NO_FILE) && *length < resolvedLength) {
+				*length = resolvedLength;
+			}
+
 			if (prefixResult == FR_NO_FILE && directoryExists == NULL) {
 				// Cache first matching directory
 				directoryExists = prefixPath;
@@ -243,9 +243,6 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 			umm_free(testPath);
 			if (prefixResult == FR_OK) {
 				// we found a definite match
-				if (*length < resolvedLength) {
-					*length = resolvedLength;
-				}
 				result = FR_OK;
 				if (resolvedPath != NULL) {
 					brokenOut = true;
@@ -289,12 +286,15 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 	path = filepath;
 
 	if (path != leafname) {
-		char leafChar = *(leafname - 1);
-		*(leafname - 1) = '\0';
-		// if we've set our path to be empty then our full path must have started with a slash
-		result = matchRawPath(*path == '\0' ? "/" : path, leafname, resolvedPath, length, resolvedPath);		
-		*(leafname - 1) = leafChar;
+		// extract path from filepath and do a match
+		path = mos_strndup(filepath, leafname - filepath);
+		if (path == NULL) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		result = matchRawPath(path, leafname, resolvedPath, length, resolvedPath);		
+		umm_free(path);
 	} else {
+		// no path element means we are looking for a file in the current directory
 		result = matchRawPath(".", leafname, resolvedPath, length, resolvedPath);
 	}
 
