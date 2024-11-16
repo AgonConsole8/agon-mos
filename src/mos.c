@@ -1601,22 +1601,6 @@ UINT24 mos_CD_API(char *path) {
 	return fr;
 }
 
-
-// Check if a path is a directory
-BOOL isDirectory(char *path) {
-	FILINFO fil;
-	FRESULT fr;
-
-	if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0) {
-		return TRUE;
-	}
-
-	// check if destination is a directory
-	fr = f_stat(path, &fil);
-
-	return (fr == FR_OK) && fil.fname[0] && (fil.fattrib & AM_DIR);
-}
-
 static UINT24 get_num_dirents(const char* path, int* cnt) {
     FRESULT        fr;
     DIR            dir;
@@ -1965,6 +1949,7 @@ cleanup:
 UINT24 mos_DEL(char * filename) {
 	char * expandedPath = NULL;
 	// TODO set flag on expandPath to ensure leafname doesn't get replaced/expanded
+	// Or alternatively the DEL API (which this is) should reject wildcards
 	FRESULT	fr = expandPath(filename, &expandedPath);
 	if (fr == FR_OK) {
 		fr = f_unlink(expandedPath);
@@ -2122,142 +2107,92 @@ UINT24 mos_COPY_API(char *srcPath, char *dstPath) {
 // - verbose: Print progress messages
 // Returns:
 // - FatFS return code
+// - MOS_OUT_OF_MEMORY if memory allocation fails
 // 
 UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
-    FRESULT fr;
-    FIL fsrc, fdst;
-    DIR dir;
-    static FILINFO fno;
-    BYTE buffer[1024];
-    UINT br, bw;
-    char *srcDir = NULL, *pattern = NULL, *fullSrcPath = NULL, *fullDstPath = NULL, *srcFilename = NULL;
-	char *asteriskPos, *lastSeparator;
-    BOOL usePattern = FALSE;
+	FRESULT fr;
+	FRESULT copyResult;
+	char * resolvedDestPath = NULL;
+	char * fullSrcPath = NULL;
+	int maxLength = 0;
+	int length = 0;
+	BOOL usePattern = FALSE;
+	BOOL targetIsDir = FALSE;
+	BOOL addSlash = FALSE;
 
-	// TODO add in path resolution
-	// Analysis needed to work out exactly how to handle wildcards, and when/how to expand paths
+	if (mos_strcspn(dstPath, "*?") != strlen(dstPath)) {
+		// Destination path cannot include wildcards
+		return FR_INVALID_PARAMETER;
+	}
+	// establish whether src has a pattern
+	// NB if target is not a directory only first match will be copied
+	usePattern = mos_strcspn(srcPath, "*?:") != strlen(srcPath);
 
-    if (strchr(dstPath, '*') != NULL) {
-        return FR_INVALID_PARAMETER; // Wildcards not allowed in destination path
-    }
+	fr = getResolvedPath(dstPath, &resolvedDestPath);
+	if (fr != FR_OK && fr != FR_NO_FILE) {
+		// Destination path must either be a directory, or a non-existant file
+		umm_free(resolvedDestPath);
+		return fr;
+	}
+	targetIsDir = isDirectory(resolvedDestPath);
+	if (!targetIsDir && fr == FR_OK) {
+		// Destination path (file) already exists - we don't support overwriting, yet
+		umm_free(resolvedDestPath);
+		return FR_EXIST;
+	}
+	if (targetIsDir) {
+		addSlash = dstPath[strlen(dstPath) - 1] != '/';
+	}
 
-    asteriskPos = strchr(srcPath, '*');
-    lastSeparator = asteriskPos ? strrchr(srcPath, '/') : NULL;
+	fr = resolvePath(srcPath, NULL, &maxLength);
+	if (fr != FR_OK) {
+		// we only support copying files - a resolved source path returning `no file` or `no path` is an error
+		umm_free(resolvedDestPath);
+		return fr;
+	}
+	fullSrcPath = umm_malloc(maxLength + 1);
+	if (!fullSrcPath) {
+		umm_free(resolvedDestPath);
+		return MOS_OUT_OF_MEMORY;
+	}
+	*fullSrcPath = '\0';
 
-    if (asteriskPos != NULL) {
-        usePattern = TRUE;
-        if (lastSeparator != NULL) {
-            srcDir = mos_strndup(srcPath, lastSeparator - srcPath + 1); // Include '/'
-            pattern = mos_strdup(asteriskPos);
-        } else {
-            srcDir = mos_strdup("");
-            pattern = mos_strdup(srcPath);
-        }
-        if (!srcDir || !pattern) {
-            fr = MOS_OUT_OF_MEMORY;
-            goto cleanup;
-        }
-    } else {
-        srcDir = mos_strdup(srcPath);
-        if (!srcDir) return MOS_OUT_OF_MEMORY;
-    }
+	length = maxLength;
+	fr = resolvePath(srcPath, fullSrcPath, &length);
+	copyResult = fr;
 
-    if (usePattern) {
-		if (!isDirectory(dstPath)) {
-			fr = FR_INVALID_PARAMETER;
-			goto cleanup;
-		}
-        fr = f_opendir(&dir, srcDir);
-        if (fr != FR_OK) goto cleanup;
-
-        fr = f_findfirst(&dir, &fno, srcDir, pattern);
-        while (fr == FR_OK && fno.fname[0] != '\0') {
-            size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
-            size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-            fullSrcPath = umm_malloc(srcPathLen);
-            fullDstPath = umm_malloc(dstPathLen);
-
-            if (!fullSrcPath || !fullDstPath) {
-                fr = MOS_OUT_OF_MEMORY;
-                goto file_cleanup;
-            }
-
-            sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
-            sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), fno.fname);
-
-            fr = f_open(&fsrc, fullSrcPath, FA_READ);
-            if (fr != FR_OK) goto file_cleanup;
-            fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
-            if (fr != FR_OK) {
-                f_close(&fsrc);
-                goto file_cleanup;
-            }
-
-			if (verbose) printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
-            while (1) {
-                fr = f_read(&fsrc, buffer, sizeof(buffer), &br);
-                if (br == 0 || fr != FR_OK) break;
-                fr = f_write(&fdst, buffer, br, &bw);
-                if (bw < br || fr != FR_OK) break;
-            }
-
-            f_close(&fsrc);
-            f_close(&fdst);
-
-        file_cleanup:
-            if (fullSrcPath) umm_free(fullSrcPath);
-            if (fullDstPath) umm_free(fullDstPath);
-            fullSrcPath = NULL;
-            fullDstPath = NULL;
-
-            if (fr != FR_OK) break;
-            fr = f_findnext(&dir, &fno);
-        }
-
-        f_closedir(&dir);
-    } else {
-        size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-        fullDstPath = umm_malloc(fullDstPathLen);
-        if (!fullDstPath) {
+	while (fr == FR_OK) {
+		// Build our destination path in fullDstPath
+		char * srcLeafname = getFilepathLeafname(fullSrcPath);
+		int dstLen = strlen(resolvedDestPath) + (targetIsDir ? strlen(srcLeafname) : 0) + 2;
+		char * fullDstPath = umm_malloc(dstLen);
+		if (!fullDstPath) {
 			fr = MOS_OUT_OF_MEMORY;
-			goto cleanup;
+			break;
 		}
-        srcFilename = strrchr(srcPath, '/');
-        srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
-		if (isDirectory(dstPath)) {
-			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
+		// skip copying if source is a directory (possibly encountered via a pattern match)
+		if (!isDirectory(fullSrcPath)) {
+			sprintf(fullDstPath, "%s%s%s", resolvedDestPath, addSlash ? "/" : "", targetIsDir ? srcLeafname : "");
+
+			// Copy the file
+			if (verbose) printf("Copying %s to %s\r\n", fullSrcPath, fullDstPath);
+			copyResult = copyFile(fullSrcPath, fullDstPath);
+			umm_free(fullDstPath);
+			if (copyResult != FR_OK) break;
+		}
+
+		if (usePattern && targetIsDir) {
+			// get next matching source, if there is one
+			length = maxLength;
+			fr = resolvePath(srcPath, fullSrcPath, &length);
 		} else {
-			strcpy(fullDstPath, dstPath);
+			break;
 		}
+	}
 
-        fr = f_open(&fsrc, srcPath, FA_READ);
-        if (fr != FR_OK) {
-			goto cleanup;
-        }
-        fr = f_open(&fdst, fullDstPath, FA_WRITE | FA_CREATE_NEW);
-        if (fr != FR_OK) {
-            f_close(&fsrc);
-			goto cleanup;
-        }
-
-		if (verbose) printf("Copying %s to %s\r\n", srcPath, fullDstPath);
-        while (1) {
-            fr = f_read(&fsrc, buffer, sizeof(buffer), &br);
-            if (br == 0 || fr != FR_OK) break;
-            fr = f_write(&fdst, buffer, br, &bw);
-            if (bw < br || fr != FR_OK) break;
-        }
-
-        f_close(&fsrc);
-        f_close(&fdst);
-    }
-
-cleanup:
-    if (srcDir) umm_free(srcDir);
-    if (pattern) umm_free(pattern);
-    if (fullSrcPath) umm_free(fullSrcPath);
-    if (fullDstPath) umm_free(fullDstPath);
-    return fr;
+	umm_free(fullSrcPath);
+	umm_free(resolvedDestPath);
+	return copyResult;
 }
 
 

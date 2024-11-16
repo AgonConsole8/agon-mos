@@ -109,7 +109,6 @@ UINT24	mos_SAVE(char * filename, UINT24 address, UINT24 size);
 UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD_API(char * path);
 UINT24	mos_CD(char * path);
-BOOL isDirectory(char *path);
 UINT24	mos_DIR_API(char * path);
 UINT24	mos_DIR(char * path, BOOL longListing);
 UINT24	mos_DEL(char * filename);

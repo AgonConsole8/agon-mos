@@ -8,6 +8,21 @@
 #include "mos_file.h"
 #include "mos_sysvars.h"
 
+// Check if a path is a directory - path must be resolved
+BOOL isDirectory(char *path) {
+	FILINFO fil;
+	FRESULT fr;
+
+	if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0) {
+		return TRUE;
+	}
+
+	// check if destination is a directory
+	fr = f_stat(path, &fil);
+
+	return (fr == FR_OK) && fil.fname[0] && (fil.fattrib & AM_DIR);
+}
+
 // Utility function to scan a filepath to find end of a prefix (colon)
 char * getFilepathPrefixEnd(char * filepath) {
 	return strchr(filepath, ':');
@@ -28,18 +43,6 @@ char * getFilepathLeafname(char * filepath) {
 		return filepath + strlen(filepath);
 	}
 	return leafname;
-}
-
-// checkFileExists checks whether a file exists at the given path
-int checkFileExists(char * path, char * leafname, FILINFO * fileinfo) {
-	DIR dir;
-	int result = f_findfirst(&dir, fileinfo, path, leafname);
-	f_closedir(&dir);
-	if (fileinfo->fname[0] == '\0') {
-		// f_findfirst returns FR_OK with an empty filename for matching path but no file found
-		result = FR_NO_FILE;
-	}
-	return result;
 }
 
 // matchRawPath matches a source path pattern
@@ -402,4 +405,38 @@ int getResolvedPath(char * source, char ** resolvedPath) {
 		result = resolvePath(source, *resolvedPath, &length);
 	}
 	return result;
+}
+
+int copyFile(char * source, char * dest) {
+	FIL src, dst;
+	FRESULT fr;
+	UINT br, bw;
+	BYTE * buffer;
+
+	buffer = umm_malloc(1024);
+	if (!buffer) {
+		return MOS_OUT_OF_MEMORY;
+	}
+
+	fr = f_open(&src, source, FA_READ);
+	if (fr == FR_OK) {
+		fr = f_open(&dst, dest, FA_WRITE | FA_CREATE_NEW);
+		if (fr == FR_OK) {
+			while (1) {
+				fr = f_read(&src, buffer, sizeof(buffer), &br);
+				if (fr != FR_OK || br == 0) {
+					break;
+				}
+				fr = f_write(&dst, buffer, br, &bw);
+				if (fr != FR_OK || bw < br) {
+					break;
+				}
+			}
+			f_close(&dst);
+		}
+		f_close(&src);
+	}
+
+	umm_free(buffer);
+	return fr;
 }
