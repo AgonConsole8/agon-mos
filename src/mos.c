@@ -1291,14 +1291,7 @@ int	mos_cmdCLS(char *ptr) {
 // - MOS error code
 //
 int	mos_cmdMOUNT(char *ptr) {
-	int fr;
-
-	fr = mos_mount();
-	if (fr != FR_OK) {
-		return fr;
-	}
-	f_getcwd(cwd, sizeof(cwd)); //Update full path.
-	return 0;
+	return mos_mount();
 }
 
 void printCommandInfo(t_mosCommand * cmd, BOOL full) {
@@ -2614,8 +2607,12 @@ UINT8 fat_EOF(FIL * fp) {
 // - fatfs error code
 //
 int mos_mount(void) {
-	int ret = f_mount(&fs, "", 1);			// Mount the SD card
-	f_getcwd(cwd, sizeof(cwd)); //Update full path.
+	int ret = f_mount(&fs, "", 1);		// Mount the SD card
+	if (ret == FR_OK) {
+		f_getcwd(cwd, sizeof(cwd)); 	// Update current working directory
+	} else {
+		strcpy(cwd, "No SD card present");
+	}
 	return ret;
 }
 

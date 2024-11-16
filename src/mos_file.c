@@ -243,7 +243,9 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 			umm_free(testPath);
 			if (prefixResult == FR_OK) {
 				// we found a definite match
-				*length = resolvedLength;
+				if (*length < resolvedLength) {
+					*length = resolvedLength;
+				}
 				result = FR_OK;
 				if (resolvedPath != NULL) {
 					brokenOut = true;

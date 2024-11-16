@@ -47,7 +47,7 @@ extern int _len_data;
 typedef enum {
 	MOS_INVALID_COMMAND = 20,	/* (20) Command could not be understood */
 	MOS_INVALID_EXECUTABLE, 	/* (21) Executable file format not recognised */
-	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error NB this is currently unused */
+	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error */
 	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
 	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
 	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
