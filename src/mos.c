@@ -742,6 +742,7 @@ int mos_cmdSAVE(char * ptr) {
 int mos_cmdDEL(char * ptr) {
 	FRESULT	fr;
 	FRESULT	unlinkResult;
+	DIR		dir;
 	BOOL	verbose;
 	BOOL	force = FALSE;
 	char *	filename;
@@ -749,6 +750,7 @@ int mos_cmdDEL(char * ptr) {
 	char *	resolvedPath;
 	int		maxLength = 0;
 	int		length = 0;
+	BYTE	index = 0;
 
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
@@ -781,7 +783,7 @@ int mos_cmdDEL(char * ptr) {
 	*resolvedPath = '\0';
 
 	length = maxLength;
-	fr = resolvePath(filename, resolvedPath, &length);
+	fr = newResolvePath(filename, resolvedPath, &length, &index, &dir);
 	unlinkResult = fr;
 
 	while (fr == FR_OK) {
@@ -815,7 +817,7 @@ int mos_cmdDEL(char * ptr) {
 		// On any unlink error, break out of the loop
 		if (unlinkResult != FR_OK) break;
 		length = maxLength;
-		fr = resolvePath(filename, resolvedPath, &length);
+		fr = newResolvePath(filename, resolvedPath, &length, &index, &dir);
 	}
 
 	umm_free(resolvedPath);

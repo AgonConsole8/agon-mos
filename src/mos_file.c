@@ -45,6 +45,83 @@ char * getFilepathLeafname(char * filepath) {
 	return leafname;
 }
 
+// Resolve directory path (including prefix resolution) for a given srcPath
+// Index specifies which prefix to use - ignored when path doesn't use a prefix
+// NB this is purely string manipulation, no filesystem access, so no checking to see if path exists
+//
+int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchIndex) {
+	char * path = getFilepathPrefixEnd(srcPath);
+	char * leafname = getFilepathLeafname(srcPath);
+	int dirLength = leafname - (path ? (path + 1) : srcPath);
+
+	if (path != NULL) {
+		// we have a prefix, so resolve it
+		char * prefix;
+		char * prefixPtr;	// Pointer to iterate over prefix
+		char * prefixPath;	// Pointer to extract each path from prefix
+		char * prefixToken = umm_malloc(path - srcPath + 6);
+		int prefixIndex = 0;
+		int prefixPathLength;
+		bool found = false;
+
+		if (!prefixToken) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		sprintf(prefixToken, "%.*s$Path", path - srcPath, srcPath);
+
+		prefix = expandVariableToken(prefixToken);
+		umm_free(prefixToken);
+		if (prefix == NULL) {
+			if (dir != NULL && *length > 0) {
+				*dir = '\0';
+			}
+			return FR_NO_PATH;
+		}
+		path++;		// Skip the colon
+
+		prefixPtr = prefix;
+
+		found = extractString(&prefixPtr, &prefixPath, ", ;", 0);
+		while (found && prefixIndex < searchIndex) {
+			prefixIndex++;
+			found = extractString(&prefixPtr, &prefixPath, ", ;", 0);
+		}
+
+		if (!found) {
+			// no prefix at this index
+			umm_free(prefix);
+			if (dir != NULL && *length > 0) {
+				*dir = '\0';
+			}
+			return FR_NO_PATH;
+		}
+
+		prefixPathLength = strlen(prefixPath) + dirLength + 1;
+
+		// we have our prefix, so copy it to our dir
+		if (dir != NULL && prefixPathLength <= *length) {
+			sprintf(dir, "%s%.*s", prefixPath, dirLength, path);
+		}
+		*length = prefixPathLength;
+		umm_free(prefix);
+	} else {
+		// no prefix, so just copy the path
+		if (searchIndex != 0) {
+			// we don't have a prefix, so we can't have an index
+			if (dir != NULL && *length > 0) {
+				*dir = '\0';
+			}
+			return FR_NO_PATH;
+		}
+		if (dir != NULL && dirLength <= *length) {
+			sprintf(dir, "%.*s", dirLength, srcPath);
+		}
+		*length = dirLength;
+	}
+
+	return FR_OK;
+}
+
 // matchRawPath matches a source path pattern
 // returning back a filled in destPath if it matches
 int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * length, char * after) {
@@ -301,6 +378,141 @@ int resolvePath(char * filepath, char * resolvedPath, int * length) {
 		result = matchRawPath(".", leafname, resolvedPath, length, resolvedPath);
 	}
 
+	return result;
+}
+
+
+// newResolvePath resolves a path, replacing path prefix and leafname with actual values
+// if a DIR object is passed in, it will be used to find the next match
+// together with the index parameter (for prefix resolution)
+int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir) {
+	int result = FR_OK;
+	DIR * localDir = NULL;
+	FILINFO fileinfo;
+	BYTE prefixIndex = index ? *index : 0;
+	bool newSearch = prefixIndex == 0;
+	char * leafname = getFilepathLeafname(filepath);
+
+	if (dir == NULL) {
+		localDir = umm_malloc(sizeof(DIR));
+		if (localDir == NULL) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		dir = localDir;
+		newSearch = true;
+	}
+
+	if (!newSearch) {
+		result = f_findnext(dir, &fileinfo);
+		if (result != FR_OK) {
+			// something is broken
+			umm_free(localDir);
+			return result;
+		}
+		if (fileinfo.fname[0] == '\0') {
+			// we need to move on to the next directory
+			newSearch = true;
+			result = FR_NO_PATH;	// default our result to no path
+			if (resolvedPath && *length > 0) {
+				*resolvedPath = '\0';
+			}
+		} else {
+			// Match found, so fill in resolved path
+			int pathLength = 0;
+			// our prefixIndex should be the prefix *after* the one we are using, or zero if none set
+			result = getDirectoryForPath(filepath, NULL, &pathLength, prefixIndex > 0 ? prefixIndex - 1 : 0);
+			if (result != FR_OK) {
+				// something went wrong
+				umm_free(localDir);
+				return result;
+			}
+			pathLength += strlen(fileinfo.fname);
+
+			if (!resolvedPath) {
+				// we are just working out the length
+				if (pathLength > *length) {
+					*length = pathLength;
+				}
+			} else {
+				if (pathLength <= *length) {
+					result = getDirectoryForPath(filepath, resolvedPath, &pathLength, prefixIndex > 0 ? prefixIndex - 1 : 0);
+					if (result != FR_OK) {
+						// something went wrong
+						umm_free(localDir);
+						return result;
+					}
+					sprintf(resolvedPath, "%s%s", resolvedPath, fileinfo.fname);
+					*length = pathLength;
+				} else {
+					// not enough space
+					umm_free(localDir);
+					return MOS_OUT_OF_MEMORY;
+				}
+			}
+		}
+	}
+
+	if (newSearch) {
+		char * searchPath = NULL;
+		int pathLength = 0;
+		bool found = false;
+
+		while (!found) {
+			result = getDirectoryForPath(filepath, NULL, &pathLength, prefixIndex);
+			if (result != FR_OK) break;
+			umm_free(searchPath);
+			searchPath = umm_malloc(pathLength);
+			if (searchPath == NULL) {
+				result = MOS_OUT_OF_MEMORY;
+				break;
+			}
+			result = getDirectoryForPath(filepath, searchPath, &pathLength, prefixIndex);
+			if (result != FR_OK) break;
+
+			result = f_findfirst(dir, &fileinfo, searchPath, leafname[0] == '\0' ? NULL : leafname);
+			prefixIndex++;
+
+			if (result != FR_NO_PATH) {
+				found = true;
+				pathLength += strlen(fileinfo.fname);
+				if (result == FR_OK && leafname[0] != '\0' && fileinfo.fname[0] == '\0') {
+					// Searching for a file, but not found in this directory - maybe it's in a later one?
+					int newLength = 0;
+					BYTE testIndex = prefixIndex;
+					int testResult = FR_NO_FILE;
+					result = FR_NO_FILE;
+					while (testResult != FR_OK && testResult != FR_NO_PATH) {
+						testResult = newResolvePath(filepath, NULL, &newLength, &testIndex, NULL);
+					}
+					if (testResult == FR_OK) {
+						// skip to match, and loop back around to fill in result
+						prefixIndex = testIndex - 1;
+						found = false;
+						continue;
+					}
+				}
+				if (resolvedPath) {
+					if (pathLength <= *length) {
+						sprintf(resolvedPath, "%s%s", searchPath, result == FR_NO_FILE ? leafname : fileinfo.fname);
+					} else {
+						result = MOS_OUT_OF_MEMORY;
+					}
+				} else {
+					// we are just working out the length
+					if (pathLength > *length) {
+						*length = pathLength;
+					}
+				}
+			}
+		}
+		umm_free(searchPath);
+	}
+
+	if (index) {
+		*index = prefixIndex;
+	}
+
+	umm_free(localDir);
 	return result;
 }
 
