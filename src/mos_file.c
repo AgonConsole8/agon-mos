@@ -116,116 +116,16 @@ int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchInd
 		if (dir != NULL && dirLength <= *length) {
 			sprintf(dir, "%.*s", dirLength, srcPath);
 		}
-		*length = dirLength;
+		*length = dirLength + 1;
 	}
 
 	return FR_OK;
 }
 
-// matchRawPath matches a source path pattern
-// returning back a filled in destPath if it matches
-int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * length, char * after) {
-	FILINFO fileinfo;
-	DIR dir;
-	int result = FR_NO_FILE;
-	int findResult;
-	bool hasAfter = after != NULL && after[0] != '\0';
-	// if we don't have an "after" we should find our first match, so set found to true
-	bool found = !hasAfter;
-	bool hasPattern;
-	bool insertSlash = (strlen(srcPath) > 0 && srcPath[strlen(srcPath) - 1] != '/');
-	int lengthAdjust = insertSlash ? 2 : 1;
-
-	if (destPath == NULL) {
-		// we are working out the maximum length
-		*length = 0;
-	}
-	// Work around emulator not liking empty patterns
-	if (srcPattern != NULL && srcPattern[0] == '\0') {
-		srcPattern = NULL;
-	}
-	hasPattern = srcPattern != NULL;
-
-	findResult = f_findfirst(&dir, &fileinfo, srcPath, srcPattern);
-	while (findResult == FR_OK) {
-		int pathLength = strlen(srcPath) + strlen(fileinfo.fname) + lengthAdjust;
-		if (fileinfo.fname[0] == '\0') {
-			// Reached end of matches (no more files)
-			if (hasPattern) {
-				pathLength += strlen(srcPattern);
-			}
-			if (!destPath) {
-				// we are just working out the maximum length
-				if (pathLength > *length) {
-					*length = pathLength;
-				}
-				break;
-			}
-			// if we were searching for an "after" and we have not found, then we need to return empty path
-			if (hasAfter) {
-				if (found) {
-					// we've already set our destPath to be empty, so just break
-					break;
-				}
-				// TODO should we return FR_NO_PATH here?
-				// we have an "after", but we haven't found it
-				// right now this will be returning "no file", but will be leaving the destPath intact
-			} else {
-				if (*length >= pathLength) {
-					// compose full path, including pattern if present, to allow for "save" to work
-					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", hasPattern ? srcPattern : "");
-				} else {
-					// Not enough space to store the full path
-					result = MOS_OUT_OF_MEMORY;
-				}
-				*length = pathLength;
-			}
-			break;
-		}
-
-		if (found) {
-			result = FR_OK;
-			if (destPath == NULL) {
-				// we are just working out the maximum length
-				if (pathLength > *length) {
-					*length = pathLength;
-				}
-			} else {
-				if (*length >= pathLength) {
-					sprintf(destPath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
-				} else {
-					// Not enough space to store the full path
-					result = MOS_OUT_OF_MEMORY;
-				}
-				*length = pathLength;
-				break;
-			}
-		} else {
-			// Construct a full path to compare against "after"
-			char * fullpath = umm_malloc(pathLength);
-			if (fullpath == NULL) {
-				result = MOS_OUT_OF_MEMORY;
-				break;
-			}
-			sprintf(fullpath, "%s%s%s", srcPath, insertSlash ? "/" : "", fileinfo.fname);
-			found = (pmatch(after, fullpath, 0) == 0);
-			if (found && destPath != NULL) {
-				// clear our destPath to allow detection of when after was last item in a path
-				destPath[0] = '\0';
-			}
-			umm_free(fullpath);
-		}
-		findResult = f_findnext(&dir, &fileinfo);
-	}
-	f_closedir(&dir);
-	if (findResult == FR_NO_PATH) {
-		result = FR_NO_PATH;
-	}
-	return result;
-}
-
 // resolvePath resolves a path, replacing path prefix and leafname with actual values
 // if resolvedPath is NULL, only the length of the resolved path is returned
+// if a DIR object is passed in, it will be used to find the next match
+// together with the index parameter (for prefix resolution)
 // if resolvedPath is not NULL, it needs to be long enough to hold the resolved path
 // length is set on exit to the length of the resolved path
 // returns:
@@ -234,158 +134,7 @@ int matchRawPath(char * srcPath, char * srcPattern, char * destPath, int * lengt
 // FR_NO_PATH if the path was not found
 // Or an error code if an error occurred
 //
-int resolvePath(char * filepath, char * resolvedPath, int * length) {
-	char * path = NULL;
-	char * leafname = NULL;
-	FILINFO fileinfo;
-	DIR dir;
-	int result = FR_OK;
-
-	// TODO add support for wildcard matching in path
-	// if wildcard is in directory path we'd need to walk path
-	// if it's just in filename we can use f_findfirst on the directory
-
-	path = getFilepathPrefixEnd(filepath);
-	leafname = getFilepathLeafname(path ? path : filepath);
-	if (path != NULL) {
-		// prefix is present, so find matching file
-		char * prefix;		// Our prefix path variable
-		char * prefixPtr;	// Pointer to iterate over prefix
-		char * prefixPath;	// Pointer to start of current prefix path
-		char * prefixToken = umm_malloc(path - filepath + 6);
-		char * directoryExists = NULL;
-		char * after = NULL;
-		bool brokenOut = false;
-		int resolvedLength = 0;
-
-		if (prefixToken == NULL) {
-			return MOS_OUT_OF_MEMORY;
-		}
-
-		// If we don't have a resolvePath, then reset the length
-		if (resolvedPath == NULL) {
-			*length = 0;
-		}
-
-		if (resolvedPath != NULL && *resolvedPath != '\0') {
-			// We have a resolved path, so we need to find the next match
-			after = mos_strdup(resolvedPath);
-			if (after == NULL) {
-				umm_free(prefixToken);
-				return MOS_OUT_OF_MEMORY;
-			}
-		}
-
-		sprintf(prefixToken, "%.*s$Path", path - filepath, filepath);
-		prefix = expandVariableToken(prefixToken);
-		umm_free(prefixToken);
-		if (prefix == NULL) {
-			return FR_NO_PATH;
-		}
-		path++;		// Skip the colon
-
-		// our "path" from our filepath may not exist (might be a leafname)
-		if (path == leafname) {
-			path = NULL;
-		}
-
-		prefixPtr = prefix;
-		// Iterate over path, checking whether we can find a matching file
-		// TODO detection of exhausing all prefixes (via brokenOut) is kinda janky
-		while (extractString(&prefixPtr, &prefixPath, ", ;", 0)) {
-			int resolvedLength = *length;
-			int prefixResult;
-			char * testPath = umm_malloc((prefixPtr - prefixPath) + (path ? leafname - path : 0) + 2);
-			if (testPath == NULL) {
-				result = MOS_OUT_OF_MEMORY;
-				brokenOut = true;
-				break;
-			}
-			sprintf(testPath, "%s%.*s", prefixPath, path ? leafname - path : 0, path);
-
-			prefixResult = matchRawPath(testPath, leafname, resolvedPath, &resolvedLength, after);
-			if (after && prefixResult == FR_NO_FILE && (resolvedPath != NULL && (strlen(resolvedPath) == 0))) {
-				// Reached the end of the directory which must have contained "after",
-				// so we need to remove the "after" to continue searching and get next match
-				umm_free(after);
-				after = NULL;
-			}
-
-			if ((prefixResult == FR_OK || prefixResult == FR_NO_FILE) && *length < resolvedLength) {
-				*length = resolvedLength;
-			}
-
-			if (prefixResult == FR_NO_FILE && directoryExists == NULL) {
-				// Cache first matching directory
-				directoryExists = prefixPath;
-			}
-
-			umm_free(testPath);
-			if (prefixResult == FR_OK) {
-				// we found a definite match
-				result = FR_OK;
-				if (resolvedPath != NULL) {
-					brokenOut = true;
-					break;
-				}
-			}
-		}
-
-		if (!brokenOut && resolvedPath != NULL) {
-			// We didn't find a match in any of our paths, and weren't just working out the length
-			result = FR_NO_PATH;
-		}
-
-		if (result != FR_OK) {
-			if (path == NULL) {
-				path = leafname;
-			}
-			if (directoryExists != NULL) {
-				// File not found, but a directory was, so return path using that dir
-				int resolvedLength = strlen(directoryExists) + 1 + strlen(path);
-				if (resolvedPath != NULL && *length >= resolvedLength) {
-					sprintf(resolvedPath, "%s%s", directoryExists, path);
-				}
-				*length = resolvedLength;
-				result = FR_NO_FILE;
-			}
-		}
-
-		umm_free(after);
-		umm_free(prefix);
-		// Result should reflect whether file was found (FR_OK), or directory was found (FR_NO_FILE), or no match was found (FR_NO_PATH)
-		// for FR_OK and FR_NO_FILE, resolvedPath should be set to the full path to the file
-		if (*length == 0) {
-			result = FR_NO_PATH;
-		}
-		return result;
-	}
-
-	// No prefix
-	// so check for the file at the given path
-	path = filepath;
-
-	if (path != leafname) {
-		// extract path from filepath and do a match
-		path = mos_strndup(filepath, leafname - filepath);
-		if (path == NULL) {
-			return MOS_OUT_OF_MEMORY;
-		}
-		result = matchRawPath(path, leafname, resolvedPath, length, resolvedPath);		
-		umm_free(path);
-	} else {
-		// no path element means we are looking for a file in the current directory
-		result = matchRawPath(".", leafname, resolvedPath, length, resolvedPath);
-	}
-
-	return result;
-}
-
-
-// newResolvePath resolves a path, replacing path prefix and leafname with actual values
-// if a DIR object is passed in, it will be used to find the next match
-// together with the index parameter (for prefix resolution)
-int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir) {
+int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir) {
 	int result = FR_OK;
 	DIR * localDir = NULL;
 	FILINFO fileinfo;
@@ -402,6 +151,10 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 		newSearch = true;
 	}
 
+	if (resolvedPath != NULL && *length > 0) {
+		*resolvedPath = '\0';
+	}
+
 	if (!newSearch) {
 		result = f_findnext(dir, &fileinfo);
 		if (result != FR_OK) {
@@ -413,9 +166,7 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 			// we need to move on to the next directory
 			newSearch = true;
 			result = FR_NO_PATH;	// default our result to no path
-			if (resolvedPath && *length > 0) {
-				*resolvedPath = '\0';
-			}
+			f_closedir(dir);
 		} else {
 			// Match found, so fill in resolved path
 			int pathLength = 0;
@@ -455,18 +206,20 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 	if (newSearch) {
 		char * searchPath = NULL;
 		int pathLength = 0;
+		int basePathLength = 0;
 		bool found = false;
 
 		while (!found) {
-			result = getDirectoryForPath(filepath, NULL, &pathLength, prefixIndex);
+			basePathLength = 0;
+			result = getDirectoryForPath(filepath, NULL, &basePathLength, prefixIndex);
 			if (result != FR_OK) break;
 			umm_free(searchPath);
-			searchPath = umm_malloc(pathLength);
+			searchPath = umm_malloc(basePathLength);
 			if (searchPath == NULL) {
 				result = MOS_OUT_OF_MEMORY;
 				break;
 			}
-			result = getDirectoryForPath(filepath, searchPath, &pathLength, prefixIndex);
+			result = getDirectoryForPath(filepath, searchPath, &basePathLength, prefixIndex);
 			if (result != FR_OK) break;
 
 			result = f_findfirst(dir, &fileinfo, searchPath, leafname[0] == '\0' ? NULL : leafname);
@@ -474,7 +227,6 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 
 			if (result != FR_NO_PATH) {
 				found = true;
-				pathLength += strlen(fileinfo.fname);
 				if (result == FR_OK && leafname[0] != '\0' && fileinfo.fname[0] == '\0') {
 					// Searching for a file, but not found in this directory - maybe it's in a later one?
 					int newLength = 0;
@@ -482,7 +234,7 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 					int testResult = FR_NO_FILE;
 					result = FR_NO_FILE;
 					while (testResult != FR_OK && testResult != FR_NO_PATH) {
-						testResult = newResolvePath(filepath, NULL, &newLength, &testIndex, NULL);
+						testResult = resolvePath(filepath, NULL, &newLength, &testIndex, NULL);
 					}
 					if (testResult == FR_OK) {
 						// skip to match, and loop back around to fill in result
@@ -491,24 +243,47 @@ int newResolvePath(char * filepath, char * resolvedPath, int * length, BYTE * in
 						continue;
 					}
 				}
+				pathLength = basePathLength + (fileinfo.fname[0] == '\0' ? strlen(leafname) : strlen(fileinfo.fname));
 				if (resolvedPath) {
 					if (pathLength <= *length) {
-						sprintf(resolvedPath, "%s%s", searchPath, result == FR_NO_FILE ? leafname : fileinfo.fname);
+						sprintf(resolvedPath, "%s%s", searchPath, fileinfo.fname[0] == '\0' ? leafname : fileinfo.fname);
 					} else {
 						result = MOS_OUT_OF_MEMORY;
 					}
 				} else {
+					int loopResult = FR_OK;
 					// we are just working out the length
 					if (pathLength > *length) {
 						*length = pathLength;
 					}
+					while (loopResult == FR_OK) {
+						loopResult = f_findnext(dir, &fileinfo);
+						if (fileinfo.fname[0] == '\0') {
+							break;
+						}
+						if (loopResult == FR_OK) {
+							int loopPathLength = basePathLength + (fileinfo.fname[0] == '\0' ? strlen(leafname) : strlen(fileinfo.fname));
+							if (loopPathLength > *length) {
+								*length = loopPathLength;
+							}
+						}
+					}
+					// iterate to next path, if one exists
+					if (getDirectoryForPath(filepath, NULL, &basePathLength, prefixIndex) == FR_OK) {
+						found = false;
+					}
+					f_closedir(dir);
 				}
 			}
 		}
 		umm_free(searchPath);
 	}
 
-	if (index) {
+	if (result == FR_NO_PATH && resolvedPath != NULL && *length > 0) {
+		*resolvedPath = '\0';
+	}
+
+	if (index && result != FR_NO_PATH) {
 		*index = prefixIndex;
 	}
 
@@ -606,15 +381,14 @@ bool isMoslet(char * filepath) {
 // Calling function is responsible for freeing the resolvedPath
 int getResolvedPath(char * source, char ** resolvedPath) {
 	int length = 0;
-	int result = resolvePath(source, NULL, &length);
+	int result = resolvePath(source, NULL, &length, NULL, NULL);
 	if (result == FR_OK || result == FR_NO_FILE) {
 		length++;
 		*resolvedPath = umm_malloc(length);
 		if (*resolvedPath == NULL) {
 			return MOS_OUT_OF_MEMORY;
 		}
-		**resolvedPath = '\0';
-		result = resolvePath(source, *resolvedPath, &length);
+		result = resolvePath(source, *resolvedPath, &length, NULL, NULL);
 	}
 	return result;
 }

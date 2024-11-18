@@ -771,7 +771,7 @@ int mos_cmdDEL(char * ptr) {
 	}
 
 	// Work out our maximum path length
-	fr = resolvePath(filename, NULL, &maxLength);
+	fr = resolvePath(filename, NULL, &maxLength, NULL, NULL);
 	if (!(fr == FR_OK || fr == FR_NO_FILE)) {
 		return fr;
 	}
@@ -783,7 +783,7 @@ int mos_cmdDEL(char * ptr) {
 	*resolvedPath = '\0';
 
 	length = maxLength;
-	fr = newResolvePath(filename, resolvedPath, &length, &index, &dir);
+	fr = resolvePath(filename, resolvedPath, &length, &index, &dir);
 	unlinkResult = fr;
 
 	while (fr == FR_OK) {
@@ -817,7 +817,7 @@ int mos_cmdDEL(char * ptr) {
 		// On any unlink error, break out of the loop
 		if (unlinkResult != FR_OK) break;
 		length = maxLength;
-		fr = newResolvePath(filename, resolvedPath, &length, &index, &dir);
+		fr = resolvePath(filename, resolvedPath, &length, &index, &dir);
 	}
 
 	umm_free(resolvedPath);
@@ -2112,15 +2112,17 @@ UINT24 mos_COPY_API(char *srcPath, char *dstPath) {
 // - MOS_OUT_OF_MEMORY if memory allocation fails
 // 
 UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
-	FRESULT fr;
-	FRESULT copyResult;
-	char * resolvedDestPath = NULL;
-	char * fullSrcPath = NULL;
-	int maxLength = 0;
-	int length = 0;
-	BOOL usePattern = FALSE;
-	BOOL targetIsDir = FALSE;
-	BOOL addSlash = FALSE;
+	FRESULT	fr;
+	FRESULT	copyResult;
+	DIR		dir;
+	char *	resolvedDestPath = NULL;
+	char *	fullSrcPath = NULL;
+	int		maxLength = 0;
+	int		length = 0;
+	BYTE	index = 0;
+	BOOL	usePattern = FALSE;
+	BOOL	targetIsDir = FALSE;
+	BOOL	addSlash = FALSE;
 
 	if (mos_strcspn(dstPath, "*?") != strlen(dstPath)) {
 		// Destination path cannot include wildcards
@@ -2146,7 +2148,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 		addSlash = dstPath[strlen(dstPath) - 1] != '/';
 	}
 
-	fr = resolvePath(srcPath, NULL, &maxLength);
+	fr = resolvePath(srcPath, NULL, &maxLength, NULL, NULL);
 	if (fr != FR_OK) {
 		// we only support copying files - a resolved source path returning `no file` or `no path` is an error
 		umm_free(resolvedDestPath);
@@ -2160,7 +2162,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 	*fullSrcPath = '\0';
 
 	length = maxLength;
-	fr = resolvePath(srcPath, fullSrcPath, &length);
+	fr = resolvePath(srcPath, fullSrcPath, &length, &index, &dir);
 	copyResult = fr;
 
 	while (fr == FR_OK) {
@@ -2186,7 +2188,7 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 		if (usePattern && targetIsDir) {
 			// get next matching source, if there is one
 			length = maxLength;
-			fr = resolvePath(srcPath, fullSrcPath, &length);
+			fr = resolvePath(srcPath, fullSrcPath, &length, &index, &dir);
 		} else {
 			break;
 		}
