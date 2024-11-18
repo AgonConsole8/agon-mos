@@ -122,6 +122,70 @@ int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchInd
 	return FR_OK;
 }
 
+int getLengthForResolvedPath(char * filepath, int * length, BYTE * index) {
+	DIR		dir;
+	FILINFO fileinfo;
+	int		result = FR_NO_PATH;
+	int		fileResult;
+	int		basePathLength;
+	int		prefixIndex = index == NULL ? 0 : *index;
+	int		pathResult;
+	char *	searchPath = NULL;
+	char *	leafname = getFilepathLeafname(filepath);
+	bool	hasLeafname = leafname[0] != '\0';
+	BYTE	successIndex = 255;
+
+	pathResult = getDirectoryForPath(filepath, NULL, &basePathLength, prefixIndex);
+	while (pathResult == FR_OK) {
+		searchPath = umm_malloc(basePathLength);
+		if (searchPath == NULL) {
+			result = MOS_OUT_OF_MEMORY;
+			break;
+		}
+		pathResult = getDirectoryForPath(filepath, searchPath, &basePathLength, prefixIndex);
+		if (pathResult != FR_OK) {
+			break;
+		}
+
+		fileResult = f_findfirst(&dir, &fileinfo, searchPath, hasLeafname ? leafname : NULL);
+		while (fileResult == FR_OK) {
+			int loopPathLength = basePathLength;
+			if (hasLeafname && fileinfo.fname[0] == '\0') {
+				fileResult = FR_NO_FILE;
+			}
+			if (fileResult == FR_NO_FILE) {
+				loopPathLength += strlen(leafname);
+			} else {
+				loopPathLength += strlen(fileinfo.fname);
+			}
+			if (result != FR_OK && fileResult == FR_OK) {
+				// We have a positive match for our path, so replace what we may already have
+				// NB this may result in a smaller length being reported
+				*length = loopPathLength;
+			} else if (loopPathLength > *length) {
+				*length = loopPathLength;
+			}
+			if (result != FR_OK) {
+				// "upgrade" result until it becomes OK
+				successIndex = prefixIndex;
+				result = fileResult;
+			}
+			fileResult = f_findnext(&dir, &fileinfo);
+			if (fileinfo.fname[0] == '\0') {
+				break;
+			}
+		}
+		prefixIndex++;
+		umm_free(searchPath);
+		pathResult = getDirectoryForPath(filepath, NULL, &basePathLength, prefixIndex);
+	}
+	if (index != NULL) {
+		*index = successIndex < 255 ? successIndex : prefixIndex;
+	}
+
+	return result;
+}
+
 // resolvePath resolves a path, replacing path prefix and leafname with actual values
 // if resolvedPath is NULL, only the length of the resolved path is returned
 // if a DIR object is passed in, it will be used to find the next match
@@ -140,7 +204,12 @@ int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index
 	FILINFO fileinfo;
 	BYTE prefixIndex = index ? *index : 0;
 	bool newSearch = prefixIndex == 0;
+	bool lengthCheck = resolvedPath == NULL;
 	char * leafname = getFilepathLeafname(filepath);
+
+	if (lengthCheck) {
+		return getLengthForResolvedPath(filepath, length, NULL);
+	}
 
 	if (dir == NULL) {
 		localDir = umm_malloc(sizeof(DIR));
@@ -179,26 +248,19 @@ int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index
 			}
 			pathLength += strlen(fileinfo.fname);
 
-			if (!resolvedPath) {
-				// we are just working out the length
-				if (pathLength > *length) {
-					*length = pathLength;
-				}
-			} else {
-				if (pathLength <= *length) {
-					result = getDirectoryForPath(filepath, resolvedPath, &pathLength, prefixIndex > 0 ? prefixIndex - 1 : 0);
-					if (result != FR_OK) {
-						// something went wrong
-						umm_free(localDir);
-						return result;
-					}
-					sprintf(resolvedPath, "%s%s", resolvedPath, fileinfo.fname);
-					*length = pathLength;
-				} else {
-					// not enough space
+			if (pathLength <= *length) {
+				result = getDirectoryForPath(filepath, resolvedPath, &pathLength, prefixIndex > 0 ? prefixIndex - 1 : 0);
+				if (result != FR_OK) {
+					// something went wrong
 					umm_free(localDir);
-					return MOS_OUT_OF_MEMORY;
+					return result;
 				}
+				sprintf(resolvedPath, "%s%s", resolvedPath, fileinfo.fname);
+				*length = pathLength;
+			} else {
+				// not enough space
+				umm_free(localDir);
+				return MOS_OUT_OF_MEMORY;
 			}
 		}
 	}
@@ -233,46 +295,21 @@ int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index
 					BYTE testIndex = prefixIndex;
 					int testResult = FR_NO_FILE;
 					result = FR_NO_FILE;
-					while (testResult != FR_OK && testResult != FR_NO_PATH) {
-						testResult = resolvePath(filepath, NULL, &newLength, &testIndex, NULL);
-					}
+					testResult = getLengthForResolvedPath(filepath, &newLength, &testIndex);
 					if (testResult == FR_OK) {
 						// skip to match, and loop back around to fill in result
-						prefixIndex = testIndex - 1;
-						found = false;
-						continue;
+						if (testIndex >= prefixIndex) {
+							prefixIndex = testIndex;
+							found = false;
+							continue;
+						}
 					}
 				}
 				pathLength = basePathLength + (fileinfo.fname[0] == '\0' ? strlen(leafname) : strlen(fileinfo.fname));
-				if (resolvedPath) {
-					if (pathLength <= *length) {
-						sprintf(resolvedPath, "%s%s", searchPath, fileinfo.fname[0] == '\0' ? leafname : fileinfo.fname);
-					} else {
-						result = MOS_OUT_OF_MEMORY;
-					}
+				if (pathLength <= *length) {
+					sprintf(resolvedPath, "%s%s", searchPath, fileinfo.fname[0] == '\0' ? leafname : fileinfo.fname);
 				} else {
-					int loopResult = FR_OK;
-					// we are just working out the length
-					if (pathLength > *length) {
-						*length = pathLength;
-					}
-					while (loopResult == FR_OK) {
-						loopResult = f_findnext(dir, &fileinfo);
-						if (fileinfo.fname[0] == '\0') {
-							break;
-						}
-						if (loopResult == FR_OK) {
-							int loopPathLength = basePathLength + (fileinfo.fname[0] == '\0' ? strlen(leafname) : strlen(fileinfo.fname));
-							if (loopPathLength > *length) {
-								*length = loopPathLength;
-							}
-						}
-					}
-					// iterate to next path, if one exists
-					if (getDirectoryForPath(filepath, NULL, &basePathLength, prefixIndex) == FR_OK) {
-						found = false;
-					}
-					f_closedir(dir);
+					result = MOS_OUT_OF_MEMORY;
 				}
 			}
 		}
