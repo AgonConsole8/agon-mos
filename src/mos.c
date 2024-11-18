@@ -1969,7 +1969,16 @@ UINT24 mos_DEL(char * filename) {
 // - FatFS return code
 // 
 UINT24 mos_REN_API(char *srcPath, char *dstPath) {
-	return mos_REN(srcPath, dstPath, FALSE);
+	FRESULT	fr = FR_INT_ERR;
+	char *	expandedSrcPath = expandMacro(srcPath);
+	char *	expandedDstPath = expandMacro(dstPath);
+
+	if (expandedSrcPath && expandedDstPath) {
+		fr = mos_REN(expandedSrcPath, expandedDstPath, FALSE);
+	}
+	umm_free(expandedSrcPath);
+	umm_free(expandedDstPath);
+	return fr;
 }
 
 
@@ -1981,105 +1990,85 @@ UINT24 mos_REN_API(char *srcPath, char *dstPath) {
 // - FatFS return code
 // 
 UINT24 mos_REN(char *srcPath, char *dstPath, BOOL verbose) {
-    FRESULT fr;
-    DIR dir;
-    static FILINFO fno;
-    char *srcDir = NULL, *pattern = NULL, *fullSrcPath = NULL, *fullDstPath = NULL, *srcFilename = NULL;
-	char *asteriskPos, *lastSeparator;
-    BOOL usePattern = FALSE;
+	FRESULT	fr;
+	FRESULT	renResult;
+	DIR		dir;
+	char *	resolvedDestPath = NULL;
+	char *	fullSrcPath = NULL;
+	int		maxLength = 0;
+	int		length = 0;
+	BYTE	index = 0;
+	BOOL	usePattern = FALSE;
+	BOOL	targetIsDir = FALSE;
+	BOOL	addSlash = FALSE;
 
-	// TODO add in path expansion using resolvePath/getResolvedPath
-	// that would need to do iteration over srcPath, but use first expanded dstPath
+	if (mos_strcspn(dstPath, "*?") != strlen(dstPath)) {
+		// Destination path cannot include wildcards
+		return FR_INVALID_PARAMETER;
+	}
+	// establish whether src has a pattern
+	// NB if target is not a directory only first match will be copied
+	usePattern = mos_strcspn(srcPath, "*?:") != strlen(srcPath);
 
-    if (strchr(dstPath, '*') != NULL) {
-        // printf("Wildcards permitted in source only.\r\n");
-        return FR_INVALID_PARAMETER;
-    }
+	fr = getResolvedPath(dstPath, &resolvedDestPath);
+	if (fr != FR_OK && fr != FR_NO_FILE) {
+		// Destination path must either be a directory, or a non-existant file
+		umm_free(resolvedDestPath);
+		return fr;
+	}
+	targetIsDir = isDirectory(resolvedDestPath);
+	if (!targetIsDir && fr == FR_OK) {
+		// Destination path (file) already exists - we don't support overwriting, yet
+		umm_free(resolvedDestPath);
+		return FR_EXIST;
+	}
+	if (targetIsDir) {
+		addSlash = dstPath[strlen(dstPath) - 1] != '/';
+	}
 
-    asteriskPos = strchr(srcPath, '*');
-    lastSeparator = asteriskPos ? strrchr(srcPath, '/') : NULL;
+	fr = resolvePath(srcPath, NULL, &maxLength, NULL, NULL);
+	if (fr != FR_OK) {
+		// source couldn't be resolved, so no file to move
+		umm_free(resolvedDestPath);
+		return fr;
+	}
+	fullSrcPath = umm_malloc(maxLength + 1);
+	if (!fullSrcPath) {
+		umm_free(resolvedDestPath);
+		return MOS_OUT_OF_MEMORY;
+	}
 
-    if (asteriskPos != NULL) {
-        if (lastSeparator != NULL) {
-            srcDir = mos_strndup(srcPath, lastSeparator - srcPath + 1); // Include '/'
-            pattern = mos_strdup(asteriskPos);
-        } else {
-            srcDir = mos_strdup(""); // Empty string for later use as a destination path
-            pattern = mos_strdup(srcPath);
-        }
-        if (!srcDir || !pattern) {
-            fr = MOS_OUT_OF_MEMORY; // Out of memory
-            goto cleanup;
-        }
-        usePattern = TRUE;
-    } else {
-        usePattern = FALSE;
-    }
+	length = maxLength;
+	fr = resolvePath(srcPath, fullSrcPath, &length, &index, &dir);
+	renResult = fr;
 
-    if (usePattern) {
-		if (!isDirectory(dstPath)) {
-			fr = FR_INVALID_PARAMETER;
-			goto cleanup;
+	while (fr == FR_OK) {
+		// Build our destination path in fullDstPath
+		char * srcLeafname = getFilepathLeafname(fullSrcPath);
+		int dstLen = strlen(resolvedDestPath) + (targetIsDir ? strlen(srcLeafname) : 0) + 2;
+		char * fullDstPath = umm_malloc(dstLen);
+		if (!fullDstPath) {
+			fr = MOS_OUT_OF_MEMORY;
+			break;
 		}
-
-        fr = f_opendir(&dir, srcDir);
-        if (fr != FR_OK) goto cleanup;
-
-        fr = f_findfirst(&dir, &fno, srcDir, pattern);
-        while (fr == FR_OK && fno.fname[0] != '\0') {
-            size_t srcPathLen = strlen(srcDir) + strlen(fno.fname) + 1;
-            size_t dstPathLen = strlen(dstPath) + strlen(fno.fname) + 2; // +2 for '/' and null terminator
-			fullSrcPath = umm_malloc(srcPathLen);
-            fullDstPath = umm_malloc(dstPathLen);
-
-            if (!fullSrcPath || !fullDstPath) {
-                fr = MOS_OUT_OF_MEMORY; // Out of memory
-                if (fullSrcPath) umm_free(fullSrcPath);
-                if (fullDstPath) umm_free(fullDstPath);
-                break;
-            }
-
-            sprintf(fullSrcPath, "%s%s", srcDir, fno.fname);
-            sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), fno.fname);
-
-            if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
-			fr = f_rename(fullSrcPath, fullDstPath);
-            umm_free(fullSrcPath);
-            umm_free(fullDstPath);
-            fullSrcPath = NULL;
-            fullDstPath = NULL;
-
-            if (fr != FR_OK) break;
-            fr = f_findnext(&dir, &fno);
-        }
-
-        f_closedir(&dir);
-		
-    } else {
-		if (isDirectory(dstPath)) {
-			// copy into a directory, keeping name
-			size_t fullDstPathLen = strlen(dstPath) + strlen(srcPath) + 2; // +2 for potential '/' and null terminator
-			fullDstPath = umm_malloc(fullDstPathLen);
-			if (!fullDstPath) {
-				fr = MOS_OUT_OF_MEMORY;
-				goto cleanup;
-			}
-			srcFilename = strrchr(srcPath, '/');
-			srcFilename = (srcFilename != NULL) ? srcFilename + 1 : srcPath;
-			sprintf(fullDstPath, "%s%s%s", dstPath, (dstPath[strlen(dstPath) - 1] == '/' ? "" : "/"), srcFilename);
-
-			fr = f_rename(srcPath, fullDstPath);
-			umm_free(fullDstPath);
+		sprintf(fullDstPath, "%s%s%s", resolvedDestPath, addSlash ? "/" : "", targetIsDir ? srcLeafname : "");
+		// Rename the file
+		if (verbose) printf("Moving %s to %s\r\n", fullSrcPath, fullDstPath);
+		renResult = f_rename(fullSrcPath, fullDstPath);
+		umm_free(fullDstPath);
+		if (renResult != FR_OK) break;
+		if (usePattern && targetIsDir) {
+			// get next matching source, if there is one
+			length = maxLength;
+			fr = resolvePath(srcPath, fullSrcPath, &length, &index, &dir);
 		} else {
-			fr = f_rename(srcPath, dstPath);
+			break;
 		}
-		
-    }
+	}
 
-cleanup:
-    if (srcDir) umm_free(srcDir);
-    if (pattern) umm_free(pattern);
-    return fr;
+	umm_free(fullSrcPath);
+	umm_free(resolvedDestPath);
+	return renResult;
 }
 
 // Copy file
@@ -2159,7 +2148,6 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 		umm_free(resolvedDestPath);
 		return MOS_OUT_OF_MEMORY;
 	}
-	*fullSrcPath = '\0';
 
 	length = maxLength;
 	fr = resolvePath(srcPath, fullSrcPath, &length, &index, &dir);
@@ -2169,13 +2157,14 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 		// Build our destination path in fullDstPath
 		char * srcLeafname = getFilepathLeafname(fullSrcPath);
 		int dstLen = strlen(resolvedDestPath) + (targetIsDir ? strlen(srcLeafname) : 0) + 2;
-		char * fullDstPath = umm_malloc(dstLen);
-		if (!fullDstPath) {
-			fr = MOS_OUT_OF_MEMORY;
-			break;
-		}
+
 		// skip copying if source is a directory (possibly encountered via a pattern match)
 		if (!isDirectory(fullSrcPath)) {
+			char * fullDstPath = umm_malloc(dstLen);
+			if (!fullDstPath) {
+				fr = MOS_OUT_OF_MEMORY;
+				break;
+			}
 			sprintf(fullDstPath, "%s%s%s", resolvedDestPath, addSlash ? "/" : "", targetIsDir ? srcLeafname : "");
 
 			// Copy the file
@@ -2183,6 +2172,9 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 			copyResult = copyFile(fullSrcPath, fullDstPath);
 			umm_free(fullDstPath);
 			if (copyResult != FR_OK) break;
+		} else if (verbose) {
+			// Copying directories is not supported, so just print a message
+			printf("Skipping directory %s\r\n", fullSrcPath);
 		}
 
 		if (usePattern && targetIsDir) {
