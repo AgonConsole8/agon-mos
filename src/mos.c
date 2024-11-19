@@ -1603,31 +1603,26 @@ UINT24 mos_CD_API(char *path) {
 	return fr;
 }
 
-static UINT24 get_num_dirents(const char* path, int* cnt) {
-    FRESULT        fr;
-    DIR            dir;
-    static FILINFO fno;
+UINT24 countDirEntries(const char * path, const char * pattern, int * count) {
+	FRESULT		fr;
+	DIR			dir;
+	FILINFO		file;
+	bool		usePattern = pattern != NULL;
 
-    *cnt = 0;
+	*count = 0;
 
-    fr = f_opendir(&dir, path);
-
-    if (fr == FR_OK) {
-        for (;;) {
-            fr = f_readdir(&dir, &fno);
-            if (fr != FR_OK || fno.fname[0] == 0) {
-                if (*cnt == 0 && fr == FR_DISK_ERR) {
-                    fr = FR_NO_PATH;
-                }
-                break; // Break on error or end of dir
-            }
-            *cnt = *cnt + 1;
-        }
-    }
-
-    f_closedir(&dir);
-
-    return fr;
+	if (usePattern) {
+		fr = f_findfirst(&dir, &file, path, pattern);
+	} else {
+		fr = f_opendir(&dir, path);
+		if (fr == FR_OK) fr = f_readdir(&dir, &file);
+	}
+	while (fr == FR_OK && file.fname[0] != 0) {
+		(*count)++;
+		fr = usePattern ? f_findnext(&dir, &file) : f_readdir(&dir, &file);
+	}
+	f_closedir(&dir);
+	return fr;
 }
 
 typedef struct SmallFilInfo {
@@ -1717,228 +1712,215 @@ UINT24	mos_DIRFallback(char * path, BOOL longListing, BOOL hideVolumeInfo) {
 	return fr;
 }
 
+UINT24 displayDirectory(char * dirPath, char * pattern, BYTE flags) {
+	FRESULT		fr;
+	DIR			dir;
+	FILINFO		file;
+	char		volume[12]; // Buffer for volume label
+	int			longestFilename = 0;
+	int			filenameLength = 0;
+	BYTE		textBg;
+	BYTE		textFg = 15;
+	BYTE		dirColour = 2;
+	BYTE		fileColour = 15;
+	SmallFilInfo *	filesInfo = NULL, *fileInfo = NULL;
+	int			entryCount = 0;
+	int			fileNum = 0;
+	bool		usePattern = pattern != NULL;
+	bool		useColour = scrcolours > 2 && vdpSupportsTextPalette;
+	bool		showingCWD = strcmp(dirPath, ".") == 0;
+	bool		longListing = flags & MOS_DIR_LONG_LISTING;				// Only flag we currently support
+	bool		showHidden = flags & MOS_DIR_SHOW_HIDDEN;				// Desired feature
+	bool		hideVolumeInfo = flags & MOS_DIR_HIDE_VOLUME_INFO;		// Copilot suggestion???
+
+	fr = f_getlabel("", volume, 0);
+	if (fr != FR_OK) {
+		return fr;
+	}
+
+	if (useColour) {
+		readPalette(128, TRUE);
+		textFg = scrpixelIndex;
+		fileColour = textFg;
+		readPalette(129, TRUE);
+		textBg = scrpixelIndex;
+		while (dirColour == textBg || dirColour == fileColour) {
+			dirColour = (dirColour + 1) % scrcolours;
+		}
+	}
+
+	fr = f_opendir(&dir, dirPath);
+	if (fr != FR_OK) {
+		return fr;
+	}
+
+	if (!hideVolumeInfo) {
+		printf("Volume: ");
+		if (strlen(volume) > 0) {
+			printf("%s", volume);
+		} else {
+			printf("<No Volume Label>");
+		}
+		printf("\n\r");
+
+		if (showingCWD) f_getcwd(cwd, sizeof(cwd));
+		printf("Directory: %s\r\n\r\n", showingCWD ? cwd : dirPath);
+	}
+
+	fr = countDirEntries(dirPath, pattern, &entryCount);
+	if (entryCount == 0) {
+		printf("No files found\r\n");
+		return FR_OK;
+	}
+	filesInfo = umm_malloc(sizeof(SmallFilInfo) * entryCount);
+	if (!filesInfo) {
+		// TODO fallback doesn't currently support pattern filtering
+		return mos_DIRFallback(dirPath, longListing, TRUE);
+	}
+
+	fr = usePattern ? f_findfirst(&dir, &file, dirPath, pattern) : f_readdir(&dir, &file);
+	while (fr == FR_OK && file.fname[0]) {
+		filesInfo[fileNum].fsize = file.fsize;
+		filesInfo[fileNum].fdate = file.fdate;
+		filesInfo[fileNum].ftime = file.ftime;
+		filesInfo[fileNum].fattrib = file.fattrib;
+		filenameLength = strlen(file.fname) + 1;
+		filesInfo[fileNum].fname = umm_malloc(filenameLength);
+		if (!filesInfo[fileNum].fname) {
+			// Couldn't store filename, so fall back to stack-only directory listing
+			// TODO fallback doesn't currently support pattern filtering
+			fr = mos_DIRFallback(dirPath, longListing, TRUE);
+			while (fileNum > 0) {
+				umm_free(filesInfo[--fileNum].fname);
+			}
+			umm_free(filesInfo);
+			return fr;
+		}
+		strcpy(filesInfo[fileNum].fname, file.fname);
+		if (filenameLength > longestFilename) {
+			longestFilename = filenameLength;
+		}
+		fileNum++;
+
+		fr = usePattern ? f_findnext(&dir, &file) : f_readdir(&dir, &file);
+	}
+	f_closedir(&dir);
+
+	if (fileNum == 0) {
+		printf("No files found\r\n");
+	} else if (fr == FR_OK) {
+		// All file info gathered, so sort and display
+		int column = 0;
+		int maxCols = scrcols / longestFilename;
+
+		qsort(filesInfo, entryCount, sizeof(SmallFilInfo), cmp_filinfo);
+		fileNum = 0;
+
+		while (fileNum < entryCount) {
+			bool isDir;
+			fileInfo = &filesInfo[fileNum];
+			isDir = fileInfo->fattrib & AM_DIR;
+			if (longListing) {
+				int yr = (fileInfo->fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
+				int mo = (fileInfo->fdate & 0x01E0) >> 5;  // Bits  8 to  5
+				int da = (fileInfo->fdate & 0x001F);       // Bits  4 to  0
+				int hr = (fileInfo->ftime & 0xF800) >> 11; // Bits 15 to 11
+				int mi = (fileInfo->ftime & 0x07E0) >> 5;  // Bits 10 to  5
+
+				if (useColour) {
+					printf("\x11%c%04d/%02d/%02d\t%02d:%02d %c %*lu \x11%c%s\n\r", textFg, yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fileInfo->fsize, isDir ? dirColour : fileColour, fileInfo->fname);
+				} else {
+					printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fileInfo->fsize, fileInfo->fname);
+				}
+			} else {
+				if (column == maxCols) {
+					column = 0;
+					printf("\r\n");
+				}
+
+				if (useColour) {
+					printf("\x11%c%-*s", isDir ? dirColour : fileColour, column == (maxCols - 1) ? longestFilename - 1 : longestFilename, fileInfo->fname);
+				} else {
+					printf("%-*s", column == (maxCols - 1) ? longestFilename - 1 : longestFilename, fileInfo->fname);
+				}
+				column++;
+			}
+			fileNum++;
+		}
+		if (!longListing) printf("\r\n");
+		if (useColour) {
+			printf("\x11%c", textFg);
+		}
+	}
+
+	// Clear up our memory
+	while (fileNum > 0) {
+		umm_free(filesInfo[--fileNum].fname);
+	}
+	umm_free(filesInfo);
+
+	return fr;
+}
+
 
 // Directory listing
 // Returns:
 // - FatFS return code
 //
 UINT24 mos_DIR(char* inputPath, BOOL longListing) {
-    FRESULT        fr;
-    DIR            dir;
-    char *         dirPath = NULL, *pattern = NULL;
-    BOOL           usePattern = FALSE;
-    BOOL           useColour = scrcolours > 2 && vdpSupportsTextPalette;
-    char           str[12]; // Buffer for volume label
-    int            yr, mo, da, hr, mi;
-    int            longestFilename = 0;
-    int            filenameLength = 0;
-    static FILINFO filinfo;
-    BYTE           textBg;
-    BYTE           textFg = 15;
-    BYTE           dirColour = 2;
-    BYTE           fileColour = 15;
-    SmallFilInfo * fnos = NULL, *fno = NULL;
-    int            num_dirents, fno_num;
+	FRESULT	fr, pathResult;
+	char *	leafname = getFilepathLeafname(inputPath);
+	int		pathLength = 0;
+	BYTE	pathIndex = 0;
 
-    fr = f_getlabel("", str, 0);
-    if (fr != FR_OK) {
-        return fr;
-    }
+	pathResult = getDirectoryForPath(inputPath, NULL, &pathLength, pathIndex);
+	fr = pathResult;
 
-	// TODO use getResolvedPath here to expand the inputPath
+	while (pathResult == FR_OK) {
+		// Get the current path
+		char * sourcePath = NULL;
+		bool showingPath = false;
+		char * currentPath = umm_malloc(pathLength);
+		if (!currentPath) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		pathResult = getDirectoryForPath(inputPath, currentPath, &pathLength, pathIndex);
 
-	// This is very gah - complicated stuff
-	// so this needs to be analysed and simplified
+		showingPath = pathResult == FR_OK && isDirectory(currentPath);
 
-    if (strchr(inputPath, '/') == NULL && strchr(inputPath, '*') != NULL) {
-        dirPath = mos_strdup(".");
-        if (!dirPath) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
-            goto cleanup;
-		}
-        pattern = mos_strdup(inputPath);
-        if (!pattern) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
-            goto cleanup;
-		}
-        usePattern = TRUE;
-    } else if (strcmp(inputPath, ".") == 0) {
-        dirPath = mos_strdup(".");
-        if (!dirPath) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
-            goto cleanup;
-		}
-    } else if (inputPath[0] == '/' && strchr(inputPath + 1, '/') == NULL) {
-        dirPath = mos_strdup("/");
-        if (!dirPath) {
-			fr = mos_DIRFallback(inputPath, longListing, FALSE);
-            goto cleanup;
-		}
-        if (strchr(inputPath + 1, '*') != NULL) {
-            pattern = mos_strdup(inputPath + 1);
-            if (!pattern) {
-				fr = mos_DIRFallback(inputPath, longListing, FALSE);
-                goto cleanup;
+		if (showingPath) {
+			// Work out if we are targetting an explicit directory with our leafname
+			sourcePath = umm_malloc(pathLength + strlen(leafname) + 2);
+			if (!sourcePath) {
+				umm_free(currentPath);
+				return MOS_OUT_OF_MEMORY;
 			}
-            usePattern = TRUE;
-        }
-    } else {
-        char* lastSeparator = strrchr(inputPath, '/');
-        if (lastSeparator != NULL && *(lastSeparator + 1) != '\0') {
-            dirPath = mos_strndup(inputPath, lastSeparator - inputPath + 1);
-            if (!dirPath) {
-				fr = mos_DIRFallback(inputPath, longListing, FALSE);
-                goto cleanup;
+			sprintf(sourcePath, "%s%s", currentPath, leafname);
+
+			if (isDirectory(sourcePath)) {
+				// Display directory at sourcePath, no pattern
+				pathResult = displayDirectory(sourcePath, NULL, (longListing ? MOS_DIR_LONG_LISTING : 0) | MOS_DIR_SHOW_HIDDEN);
+			} else {
+				// Display directory at currentPath, using leafname as pattern
+				pathResult = displayDirectory(currentPath, leafname, (longListing ? MOS_DIR_LONG_LISTING : 0) | MOS_DIR_SHOW_HIDDEN);
 			}
-            dirPath[lastSeparator - inputPath + 1] = '\0';
-            pattern = mos_strdup(lastSeparator + 1);
-            if (!pattern) {
-				fr = mos_DIRFallback(inputPath, longListing, FALSE);
-                goto cleanup;
+			if (fr != FR_OK) {
+				fr = pathResult;
 			}
-            usePattern = TRUE;
-        } else {
-            dirPath = mos_strdup(inputPath);
-            if (!dirPath) {
-				fr = mos_DIRFallback(inputPath, longListing, FALSE);
-                goto cleanup;
-			}
-        }
-    }
 
-    if (useColour) {
-        readPalette(128, TRUE);
-        textFg = scrpixelIndex;
-        fileColour = textFg;
-        readPalette(129, TRUE);
-        textBg = scrpixelIndex;
-        while (dirColour == textBg || dirColour == fileColour) {
-            dirColour = (dirColour + 1) % scrcolours;
-        }
-    }
-
-    fno_num = 0;
-    fr = f_opendir(&dir, dirPath);
-
-    if (fr == FR_OK) {
-        printf("Volume: ");
-        if (strlen(str) > 0) {
-            printf("%s", str);
-        } else {
-            printf("<No Volume Label>");
-        }
-        printf("\n\r");
-
-        if (strcmp(dirPath, ".") == 0) {
-            f_getcwd(cwd, sizeof(cwd));
-            printf("Directory: %s\r\n\r\n", cwd);
-        } else
-            printf("Directory: %s\r\n\r\n", dirPath);
-
-		fr = get_num_dirents(dirPath, &num_dirents);
-
-		if (num_dirents == 0) {
-			printf("No files found\r\n");
-			goto cleanup;
+			umm_free(sourcePath);
 		}
 
-		fnos = umm_malloc(sizeof(SmallFilInfo) * num_dirents);
-		if (!fnos) {
-			fr = mos_DIRFallback(inputPath, longListing, TRUE);
-			goto cleanup;
+		umm_free(currentPath);
+
+		pathIndex++;
+		pathResult = getDirectoryForPath(inputPath, NULL, &pathLength, pathIndex);
+		if (showingPath && pathResult == FR_OK) {
+			printf("\r\n\n\r");
 		}
-
-        if (usePattern) {
-            fr = f_findfirst(&dir, &filinfo, dirPath, pattern);
-        } else {
-            fr = f_readdir(&dir, &filinfo);
-        }
-
-        while (fr == FR_OK && filinfo.fname[0]) {
-            fnos[fno_num].fsize = filinfo.fsize;
-            fnos[fno_num].fdate = filinfo.fdate;
-            fnos[fno_num].ftime = filinfo.ftime;
-            fnos[fno_num].fattrib = filinfo.fattrib;
-            filenameLength = strlen(filinfo.fname) + 1;
-            fnos[fno_num].fname = umm_malloc(filenameLength);
-			if (!fnos[fno_num].fname) {
-				fr = mos_DIRFallback(inputPath, longListing, TRUE);
-				while (fno_num > 0) {
-					umm_free(fnos[--fno_num].fname);
-				}
-				goto cleanup;
-			}
-            strcpy(fnos[fno_num].fname, filinfo.fname);
-            if (filenameLength > longestFilename) {
-                longestFilename = filenameLength;
-            }
-            fno_num++;
-
-            if (usePattern) {
-                fr = f_findnext(&dir, &filinfo);
-            } else {
-                fr = f_readdir(&dir, &filinfo);
-            }
-
-            if (!usePattern && filinfo.fname[0] == 0)
-                break;
-        }
 	}
-    f_closedir(&dir);
 
-    if (fr == FR_OK) {
-        int col = 0;
-        int maxCols = scrcols / longestFilename;
-
-		num_dirents = fno_num;
-		qsort(fnos, num_dirents, sizeof(SmallFilInfo), cmp_filinfo);
-        fno_num = 0;
-
-        for (; fno_num < num_dirents; fno_num++) {
-            fno = &fnos[fno_num];
-            if (longListing) {
-                yr = (fno->fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
-                mo = (fno->fdate & 0x01E0) >> 5;  // Bits  8 to  5
-                da = (fno->fdate & 0x001F);       // Bits  4 to  0
-                hr = (fno->ftime & 0xF800) >> 11; // Bits 15 to 11
-                mi = (fno->ftime & 0x07E0) >> 5;  // Bits 10 to  5
-
-                if (useColour) {
-                    BOOL isDir = fno->fattrib & AM_DIR;
-                    printf("\x11%c%04d/%02d/%02d\t%02d:%02d %c %*lu \x11%c%s\n\r", textFg, yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fno->fsize, isDir ? dirColour : fileColour, fno->fname);
-                } else {
-                    printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno->fattrib & AM_DIR ? 'D' : ' ', 8, fno->fsize, fno->fname);
-                }
-            } else {
-                if (col == maxCols) {
-                    col = 0;
-                    printf("\r\n");
-                }
-
-                if (useColour) {
-                    printf("\x11%c%-*s", fno->fattrib & AM_DIR ? dirColour : fileColour, col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
-                } else {
-                    printf("%-*s", col == (maxCols - 1) ? longestFilename - 1 : longestFilename, fno->fname);
-                }
-                col++;
-            }
-            umm_free(fno->fname);
-        }
-    }
-
-    if (!longListing) {
-        printf("\r\n");
-    }
-    umm_free(fnos);
-
-    if (useColour) {
-        printf("\x11%c", textFg);
-    }
-
-cleanup:
-    if (pattern) umm_free(pattern);
-    if (dirPath) umm_free(dirPath);
-    return fr;
+	return fr;
 }
 
 

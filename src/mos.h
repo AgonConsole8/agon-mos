@@ -141,6 +141,13 @@ extern BOOL	sdcardDelay;
 
 UINT8	fat_EOF(FIL * fp);
 
+
+#define MOS_DIR_LONG_LISTING		1
+#define MOS_DIR_SHOW_HIDDEN			2
+#define MOS_DIR_SHOW_SYSTEM			4
+#define MOS_DIR_HIDE_VOLUME_INFO	8
+
+
 #define HELP_CAT			"Directory listing of the current directory\r\n"
 #define HELP_CAT_ARGS		"[-l] <path>"
 
