@@ -1951,13 +1951,16 @@ UINT24 mos_DIR(char* inputPath, BYTE flags) {
 //
 UINT24 mos_DEL(char * filename) {
 	char * expandedPath = NULL;
-	// TODO set flag on expandPath to ensure leafname doesn't get replaced/expanded
-	// Or alternatively the DEL API (which this is) should reject wildcards
-	FRESULT	fr = expandPath(filename, &expandedPath);
-	if (fr == FR_OK) {
-		fr = f_unlink(expandedPath);
+	FRESULT	fr;
+	if (mos_strcspn(filename, "*?") == strlen(filename)) {
+		fr = expandPath(filename, &expandedPath);
+		if (fr == FR_OK) {
+			fr = f_unlink(expandedPath);
+		}
+		umm_free(expandedPath);
+	} else {
+		fr = FR_INVALID_PARAMETER;
 	}
-	umm_free(expandedPath);
 	return fr;
 }
 
