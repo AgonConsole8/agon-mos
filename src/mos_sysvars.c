@@ -308,6 +308,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 									newTransInfo->type = var->type;
 									*transInfo = newTransInfo;
 									*end = '>';
+									current->source = end + 1;
 									switch (var->type) {
 										case MOS_VAR_NUMBER: {
 											// extraData will track the highest power of 10 divisor
