@@ -110,7 +110,7 @@ UINT24	mos_TYPE(char * filename);
 UINT24	mos_CD_API(char * path);
 UINT24	mos_CD(char * path);
 UINT24	mos_DIR_API(char * path);
-UINT24	mos_DIR(char * path, BOOL longListing);
+UINT24	mos_DIR(char * path, BYTE flags);
 UINT24	mos_DEL(char * filename);
 UINT24	mos_REN_API(char *srcPath, char *dstPath);
 UINT24	mos_REN(char *srcPath, char *dstPath, BOOL verbose);
@@ -148,8 +148,14 @@ UINT8	fat_EOF(FIL * fp);
 #define MOS_DIR_HIDE_VOLUME_INFO	8
 
 
-#define HELP_CAT			"Directory listing of the current directory\r\n"
-#define HELP_CAT_ARGS		"[-l] <path>"
+#define HELP_CAT			"Directory listing of the current directory\r\n" \
+							"The path can be a pattern to restrict which files are listed\r\n" \
+							"Flags to control the display:\r\n" \
+							"  -l: Long listing format\r\n" \
+							"  -a: Show hidden files\r\n" \
+							"  -s: Show system files\r\n" \
+							"  -v: Hide volume information\r\n"
+#define HELP_CAT_ARGS		"[-l] [-a] [-s] [-v] <path>"
 
 #define HELP_CD				"Change current directory\r\n"
 #define HELP_CD_ARGS		"<path>"

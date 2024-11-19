@@ -491,7 +491,7 @@ int mos_cmdDISC(char *ptr) {
 // - MOS error code
 //
 int mos_cmdDIR(char * ptr) {
-	BOOL	longListing = FALSE;
+	BYTE	flags = 0;
 	char *	path;
 
 	for (;;) {
@@ -499,13 +499,33 @@ int mos_cmdDIR(char * ptr) {
 			path = ".";
 			break;
 		}
-		if (strcasecmp(path, "-l") == 0) {
-			longListing = TRUE;
+		if (path[0] == '-') {
+			// we have flag(s)
+			path++;
+			while (path[0]) {
+				switch(path[0]) {
+					case 'l':
+						flags |= MOS_DIR_LONG_LISTING;
+						break;
+					case 'a':
+						flags |= MOS_DIR_SHOW_HIDDEN;
+						break;
+					case 's':
+						flags |= MOS_DIR_SHOW_SYSTEM;
+						break;
+					case 'v':
+						flags |= MOS_DIR_HIDE_VOLUME_INFO;
+						break;
+					default:
+						printf("Invalid flag: %c\n\r", path[0]);
+				}
+				path++;
+			}
 		} else {
 			break;
 		}
 	}
-	return mos_DIR(path, longListing);
+	return mos_DIR(path, flags);
 }
 
 // DO command
@@ -697,7 +717,7 @@ int mos_cmdLOAD(char * ptr) {
 }
 
 // EXEC <filename>
-//   Run a batch file containing MOS commands
+//	Run a batch file containing MOS commands
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
@@ -1170,8 +1190,8 @@ int mos_cmdVDU(char *ptr) {
 		}
 
 		if (is_word) {
-			putch(value & 0xFF); // write LSB
-			putch(value >> 8);   // write MSB
+			putch(value & 0xFF);	// write LSB
+			putch(value >> 8);		// write MSB
 		} else {
 			putch(value);
 		}
@@ -1273,7 +1293,7 @@ int mos_cmdCREDITS(char *ptr) {
 // - MOS error code
 //
 int mos_cmdTYPE(char * ptr) {
-	char *  filename;
+	char *	filename;
 
 	if (!extractString(&ptr, &filename, NULL, 0)) {
 		return FR_INVALID_PARAMETER;
@@ -1345,7 +1365,7 @@ void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
 // Returns:
-// -  0: Success
+// - 0: Success
 //
 int mos_cmdHELP(char *ptr) {
 	int i;
@@ -1603,14 +1623,15 @@ UINT24 mos_CD_API(char *path) {
 	return fr;
 }
 
-UINT24 countDirEntries(const char * path, const char * pattern, int * count) {
+UINT24 countDirEntries(const char * path, const char * pattern, BYTE flags, int * count) {
 	FRESULT		fr;
 	DIR			dir;
 	FILINFO		file;
 	bool		usePattern = pattern != NULL;
+	bool		showHidden = flags & MOS_DIR_SHOW_HIDDEN;
+	bool		showSystem = flags & MOS_DIR_SHOW_SYSTEM;
 
 	*count = 0;
-
 	if (usePattern) {
 		fr = f_findfirst(&dir, &file, path, pattern);
 	} else {
@@ -1618,7 +1639,9 @@ UINT24 countDirEntries(const char * path, const char * pattern, int * count) {
 		if (fr == FR_OK) fr = f_readdir(&dir, &file);
 	}
 	while (fr == FR_OK && file.fname[0] != 0) {
-		(*count)++;
+		if ((showHidden || !(file.fattrib & AM_HID)) && (showSystem || !(file.fattrib & AM_SYS))) {
+			(*count)++;
+		}
 		fr = usePattern ? f_findnext(&dir, &file) : f_readdir(&dir, &file);
 	}
 	f_closedir(&dir);
@@ -1626,21 +1649,21 @@ UINT24 countDirEntries(const char * path, const char * pattern, int * count) {
 }
 
 typedef struct SmallFilInfo {
-    FSIZE_t fsize;   /* File size */
-    WORD    fdate;   /* Modified date */
-    WORD    ftime;   /* Modified time */
-    BYTE    fattrib; /* File attribute */
-    char*   fname;   /* umm_malloc'ed */
+	FSIZE_t	fsize;		/* File size */
+	WORD	fdate;		/* Modified date */
+	WORD	ftime;		/* Modified time */
+	BYTE	fattrib;	/* File attribute */
+	char *	fname;		/* umm_malloc'ed */
 } SmallFilInfo;
 
 static int cmp_filinfo(const SmallFilInfo* a, const SmallFilInfo* b) {
-    if ((a->fattrib & AM_DIR) == (b->fattrib & AM_DIR)) {
-        return strcasecmp(a->fname, b->fname);
-    } else if (a->fattrib & AM_DIR) {
-        return -1;
-    } else {
-        return 1;
-    }
+	if ((a->fattrib & AM_DIR) == (b->fattrib & AM_DIR)) {
+		return strcasecmp(a->fname, b->fname);
+	} else if (a->fattrib & AM_DIR) {
+		return -1;
+	} else {
+		return 1;
+	}
 }
 
 // Directory listing, for MOS API compatibility
@@ -1652,57 +1675,64 @@ UINT24 mos_DIR_API(char* path) {
 	char *	expandedPath = expandMacro(path);
 
 	if (!expandedPath) return FR_INT_ERR;
-	fr = mos_DIR(expandedPath, TRUE);
+	fr = mos_DIR(expandedPath, MOS_DIR_LONG_LISTING | MOS_DIR_SHOW_HIDDEN);
 	umm_free(expandedPath);
 	return fr;
 }
 
-UINT24	mos_DIRFallback(char * path, BOOL longListing, BOOL hideVolumeInfo) {
+UINT24	mos_DIRFallback(char * dirPath, char * pattern, BYTE flags) {
 	FRESULT	fr;
-	DIR	  	dir;
-	static 	FILINFO  fno;
-	int		yr, mo, da, hr, mi;
-	char 	str[12];
-	int 	col = 0;
+	DIR		dir;
+	static	FILINFO	file;
+	char	volume[12];
+	int		col = 0;
+	bool	showingCWD = dirPath[0] == 0 || strcmp(dirPath, ".") == 0 || strcmp(dirPath, "./") == 0;
+	bool	longListing = flags & MOS_DIR_LONG_LISTING;
+	bool	showHidden = flags & MOS_DIR_SHOW_HIDDEN;
+	bool	showSystem = flags & MOS_DIR_SHOW_SYSTEM;
+	bool	hideVolumeInfo = flags & MOS_DIR_HIDE_VOLUME_INFO;
+	bool	usePattern = pattern != NULL;
 
 	if (!hideVolumeInfo) {
-		fr = f_getlabel("", str, 0);
-		if (fr != 0) {
+		fr = f_getlabel("", volume, 0);
+		if (fr != FR_OK) {
 			return fr;
-		}	
-		printf("Volume: ");
-		if (strlen(str) > 0) {
-			printf("%s", str);
-		} else {
-			printf("<No Volume Label>");
 		}
-		printf("\n\r\n\r");
+		printf("Volume: %s\n\r", volume[0] ? volume : "<No Volume Label>");
+		if (showingCWD) f_getcwd(cwd, sizeof(cwd));
+		printf("Directory: %s\r\n\r\n", showingCWD ? cwd : dirPath);
 	}
 
-	fr = f_opendir(&dir, path);
-	if (fr == FR_OK) {
-		for (;;) {
-			fr = f_readdir(&dir, &fno);
-			if (fr != FR_OK || fno.fname[0] == 0) {
-				break;  // Break on error or end of dir
-			}
-			if (longListing) {
-				yr = (fno.fdate & 0xFE00) >>  9;	// Bits 15 to  9, from 1980
-				mo = (fno.fdate & 0x01E0) >>  5;	// Bits  8 to  5
-				da = (fno.fdate & 0x001F);			// Bits  4 to  0
-				hr = (fno.ftime & 0xF800) >> 11;	// Bits 15 to 11
-				mi = (fno.ftime & 0x07E0) >>  5;	// Bits 10 to  5
+	fr = f_opendir(&dir, dirPath);
+	if (fr != FR_OK) {
+		return fr;
+	}
 
-				printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, fno.fattrib & AM_DIR ? 'D' : ' ', 8, fno.fsize, fno.fname);
+	fr = usePattern ? f_findfirst(&dir, &file, dirPath, pattern) : f_readdir(&dir, &file);
+	while (fr == FR_OK && file.fname[0]) {
+		if ((showHidden || !(file.fattrib & AM_HID)) && (showSystem || !(file.fattrib & AM_SYS))) {
+			if (longListing) {
+				int yr = (file.fdate & 0xFE00) >>  9;	// Bits 15 to  9, from 1980
+				int mo = (file.fdate & 0x01E0) >>  5;	// Bits  8 to  5
+				int da = (file.fdate & 0x001F);			// Bits  4 to  0
+				int hr = (file.ftime & 0xF800) >> 11;	// Bits 15 to 11
+				int mi = (file.ftime & 0x07E0) >>  5;	// Bits 10 to  5
+
+				printf("%04d/%02d/%02d\t%02d:%02d %c%c%c %*lu %s\n\r",
+					yr + 1980, mo, da, hr, mi,
+					file.fattrib & AM_DIR ? 'D' : ' ', file.fattrib & AM_HID ? 'H' : ' ', file.fattrib & AM_SYS ? 'S' : ' ',
+					8, file.fsize, file.fname
+				);
 			} else {
-				if (col + strlen(fno.fname) + 2 >= scrcols) {
+				if (col + strlen(file.fname) + 2 >= scrcols) {
 					printf("\r\n");
 					col = 0;
 				}
-                printf("%s  ", fno.fname);
-				col += strlen(fno.fname) + 2;
+				printf("%s  ", file.fname);
+				col += strlen(file.fname) + 2;
 			}
 		}
+		fr = usePattern ? f_findnext(&dir, &file) : f_readdir(&dir, &file);
 	}
 	if (!longListing) {
 		printf("\r\n");
@@ -1728,10 +1758,11 @@ UINT24 displayDirectory(char * dirPath, char * pattern, BYTE flags) {
 	int			fileNum = 0;
 	bool		usePattern = pattern != NULL;
 	bool		useColour = scrcolours > 2 && vdpSupportsTextPalette;
-	bool		showingCWD = strcmp(dirPath, ".") == 0;
-	bool		longListing = flags & MOS_DIR_LONG_LISTING;				// Only flag we currently support
-	bool		showHidden = flags & MOS_DIR_SHOW_HIDDEN;				// Desired feature
-	bool		hideVolumeInfo = flags & MOS_DIR_HIDE_VOLUME_INFO;		// Copilot suggestion???
+	bool		showingCWD = dirPath[0] == 0 || strcmp(dirPath, ".") == 0 || strcmp(dirPath, "./") == 0;
+	bool		longListing = flags & MOS_DIR_LONG_LISTING;
+	bool		showHidden = flags & MOS_DIR_SHOW_HIDDEN;
+	bool		showSystem = flags & MOS_DIR_SHOW_SYSTEM;
+	bool		hideVolumeInfo = flags & MOS_DIR_HIDE_VOLUME_INFO;
 
 	fr = f_getlabel("", volume, 0);
 	if (fr != FR_OK) {
@@ -1755,52 +1786,45 @@ UINT24 displayDirectory(char * dirPath, char * pattern, BYTE flags) {
 	}
 
 	if (!hideVolumeInfo) {
-		printf("Volume: ");
-		if (strlen(volume) > 0) {
-			printf("%s", volume);
-		} else {
-			printf("<No Volume Label>");
-		}
-		printf("\n\r");
-
+		printf("Volume: %s\n\r", volume[0] ? volume : "<No Volume Label>");
 		if (showingCWD) f_getcwd(cwd, sizeof(cwd));
 		printf("Directory: %s\r\n\r\n", showingCWD ? cwd : dirPath);
 	}
 
-	fr = countDirEntries(dirPath, pattern, &entryCount);
+	fr = countDirEntries(dirPath, pattern, flags, &entryCount);
 	if (entryCount == 0) {
 		printf("No files found\r\n");
 		return FR_OK;
 	}
 	filesInfo = umm_malloc(sizeof(SmallFilInfo) * entryCount);
 	if (!filesInfo) {
-		// TODO fallback doesn't currently support pattern filtering
-		return mos_DIRFallback(dirPath, longListing, TRUE);
+		return mos_DIRFallback(dirPath, pattern, flags | MOS_DIR_HIDE_VOLUME_INFO);
 	}
 
 	fr = usePattern ? f_findfirst(&dir, &file, dirPath, pattern) : f_readdir(&dir, &file);
 	while (fr == FR_OK && file.fname[0]) {
-		filesInfo[fileNum].fsize = file.fsize;
-		filesInfo[fileNum].fdate = file.fdate;
-		filesInfo[fileNum].ftime = file.ftime;
-		filesInfo[fileNum].fattrib = file.fattrib;
-		filenameLength = strlen(file.fname) + 1;
-		filesInfo[fileNum].fname = umm_malloc(filenameLength);
-		if (!filesInfo[fileNum].fname) {
-			// Couldn't store filename, so fall back to stack-only directory listing
-			// TODO fallback doesn't currently support pattern filtering
-			fr = mos_DIRFallback(dirPath, longListing, TRUE);
-			while (fileNum > 0) {
-				umm_free(filesInfo[--fileNum].fname);
+		if ((showHidden || !(file.fattrib & AM_HID)) && (showSystem || !(file.fattrib & AM_SYS))) {
+			filesInfo[fileNum].fsize = file.fsize;
+			filesInfo[fileNum].fdate = file.fdate;
+			filesInfo[fileNum].ftime = file.ftime;
+			filesInfo[fileNum].fattrib = file.fattrib;
+			filenameLength = strlen(file.fname) + 1;
+			filesInfo[fileNum].fname = umm_malloc(filenameLength);
+			if (!filesInfo[fileNum].fname) {
+				// Couldn't store filename, so fall back to stack-only directory listing
+				fr = mos_DIRFallback(dirPath, pattern, flags | MOS_DIR_HIDE_VOLUME_INFO);
+				while (fileNum > 0) {
+					umm_free(filesInfo[--fileNum].fname);
+				}
+				umm_free(filesInfo);
+				return fr;
 			}
-			umm_free(filesInfo);
-			return fr;
+			strcpy(filesInfo[fileNum].fname, file.fname);
+			if (filenameLength > longestFilename) {
+				longestFilename = filenameLength;
+			}
+			fileNum++;
 		}
-		strcpy(filesInfo[fileNum].fname, file.fname);
-		if (filenameLength > longestFilename) {
-			longestFilename = filenameLength;
-		}
-		fileNum++;
 
 		fr = usePattern ? f_findnext(&dir, &file) : f_readdir(&dir, &file);
 	}
@@ -1821,23 +1845,30 @@ UINT24 displayDirectory(char * dirPath, char * pattern, BYTE flags) {
 			fileInfo = &filesInfo[fileNum];
 			isDir = fileInfo->fattrib & AM_DIR;
 			if (longListing) {
-				int yr = (fileInfo->fdate & 0xFE00) >> 9;  // Bits 15 to  9, from 1980
-				int mo = (fileInfo->fdate & 0x01E0) >> 5;  // Bits  8 to  5
-				int da = (fileInfo->fdate & 0x001F);       // Bits  4 to  0
-				int hr = (fileInfo->ftime & 0xF800) >> 11; // Bits 15 to 11
-				int mi = (fileInfo->ftime & 0x07E0) >> 5;  // Bits 10 to  5
+				int yr = (fileInfo->fdate & 0xFE00) >> 9;	// Bits 15 to  9, from 1980
+				int mo = (fileInfo->fdate & 0x01E0) >> 5;	// Bits  8 to  5
+				int da = (fileInfo->fdate & 0x001F);		// Bits  4 to  0
+				int hr = (fileInfo->ftime & 0xF800) >> 11;	// Bits 15 to 11
+				int mi = (fileInfo->ftime & 0x07E0) >> 5;	// Bits 10 to  5
 
 				if (useColour) {
-					printf("\x11%c%04d/%02d/%02d\t%02d:%02d %c %*lu \x11%c%s\n\r", textFg, yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fileInfo->fsize, isDir ? dirColour : fileColour, fileInfo->fname);
+					printf("\x11%c%04d/%02d/%02d\t%02d:%02d %c%c%c %*lu \x11%c%s\n\r",
+						textFg, yr + 1980, mo, da, hr, mi,
+						isDir ? 'D' : ' ', fileInfo->fattrib & AM_HID ? 'H' : ' ', fileInfo->fattrib & AM_SYS ? 'S' : ' ',
+						8, fileInfo->fsize, isDir ? dirColour : fileColour, fileInfo->fname
+					);
 				} else {
-					printf("%04d/%02d/%02d\t%02d:%02d %c %*lu %s\n\r", yr + 1980, mo, da, hr, mi, isDir ? 'D' : ' ', 8, fileInfo->fsize, fileInfo->fname);
+					printf("%04d/%02d/%02d\t%02d:%02d %c%c%c %*lu %s\n\r",
+						yr + 1980, mo, da, hr, mi,
+						isDir ? 'D' : ' ', fileInfo->fattrib & AM_HID ? 'H' : ' ', fileInfo->fattrib & AM_SYS ? 'S' : ' ',
+						8, fileInfo->fsize, fileInfo->fname
+					);
 				}
 			} else {
 				if (column == maxCols) {
 					column = 0;
 					printf("\r\n");
 				}
-
 				if (useColour) {
 					printf("\x11%c%-*s", isDir ? dirColour : fileColour, column == (maxCols - 1) ? longestFilename - 1 : longestFilename, fileInfo->fname);
 				} else {
@@ -1867,52 +1898,40 @@ UINT24 displayDirectory(char * dirPath, char * pattern, BYTE flags) {
 // Returns:
 // - FatFS return code
 //
-UINT24 mos_DIR(char* inputPath, BOOL longListing) {
-	FRESULT	fr, pathResult;
+UINT24 mos_DIR(char* inputPath, BYTE flags) {
 	char *	leafname = getFilepathLeafname(inputPath);
 	int		pathLength = 0;
 	BYTE	pathIndex = 0;
-
-	pathResult = getDirectoryForPath(inputPath, NULL, &pathLength, pathIndex);
-	fr = pathResult;
+	FRESULT	fr = FR_NO_PATH;
+	FRESULT pathResult = getDirectoryForPath(inputPath, NULL, &pathLength, pathIndex);
 
 	while (pathResult == FR_OK) {
-		// Get the current path
-		char * sourcePath = NULL;
+		// Get the current path - use a larger buffer to allow for leafname to be appended for testing
 		bool showingPath = false;
-		char * currentPath = umm_malloc(pathLength);
+		char * currentPath = umm_malloc(pathLength + strlen(leafname) + 1);
 		if (!currentPath) {
 			return MOS_OUT_OF_MEMORY;
 		}
 		pathResult = getDirectoryForPath(inputPath, currentPath, &pathLength, pathIndex);
 
 		showingPath = pathResult == FR_OK && isDirectory(currentPath);
-
 		if (showingPath) {
 			// Work out if we are targetting an explicit directory with our leafname
-			sourcePath = umm_malloc(pathLength + strlen(leafname) + 2);
-			if (!sourcePath) {
-				umm_free(currentPath);
-				return MOS_OUT_OF_MEMORY;
-			}
-			sprintf(sourcePath, "%s%s", currentPath, leafname);
-
-			if (isDirectory(sourcePath)) {
+			strcat(currentPath, leafname);
+			if (isDirectory(currentPath)) {
 				// Display directory at sourcePath, no pattern
-				pathResult = displayDirectory(sourcePath, NULL, (longListing ? MOS_DIR_LONG_LISTING : 0) | MOS_DIR_SHOW_HIDDEN);
+				pathResult = displayDirectory(currentPath, NULL, flags);
 			} else {
 				// Display directory at currentPath, using leafname as pattern
-				pathResult = displayDirectory(currentPath, leafname, (longListing ? MOS_DIR_LONG_LISTING : 0) | MOS_DIR_SHOW_HIDDEN);
+				currentPath[pathLength - 1] = '\0';
+				pathResult = displayDirectory(currentPath, leafname, flags);
 			}
 			if (fr != FR_OK) {
 				fr = pathResult;
 			}
-
-			umm_free(sourcePath);
 		}
 
 		umm_free(currentPath);
-
 		pathIndex++;
 		pathResult = getDirectoryForPath(inputPath, NULL, &pathLength, pathIndex);
 		if (showingPath && pathResult == FR_OK) {
@@ -2216,7 +2235,7 @@ UINT24 mos_EXEC(char * filename) {
 	int		size = 256;
 	char *	expandedPath = NULL;
 	char *	buffer = (char *)umm_malloc(size);
-	int		line =  0;
+	int		line = 0;
 
 	if (!buffer) {
 		return MOS_OUT_OF_MEMORY;
@@ -2250,9 +2269,9 @@ UINT24 mos_EXEC(char * filename) {
 // - File handle, or 0 if the file cannot be opened
 // 
 UINT24 mos_FOPEN(char * filename, UINT8 mode) {
-	char *  expandedFilename = NULL;
+	char *	expandedFilename = NULL;
 	int		i;
-	FRESULT fr = expandPath(filename, &expandedFilename);
+	FRESULT	fr = expandPath(filename, &expandedFilename);
 
 	if (fr == FR_OK) {
 		for (i = 0; i < MOS_maxOpenFiles; i++) {
@@ -2383,7 +2402,7 @@ UINT24	mos_FWRITE(UINT8 fh, UINT24 buffer, UINT24 btw) {
 // Returns:
 // - FRESULT
 // 
-UINT8  	mos_FLSEEK(UINT8 fh, UINT32 offset) {
+UINT8	mos_FLSEEK(UINT8 fh, UINT32 offset) {
 	FIL * fo = (FIL *)mos_GETFIL(fh);
 
 	if (fo > 0) {

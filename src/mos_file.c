@@ -13,7 +13,7 @@ BOOL isDirectory(char *path) {
 	FILINFO fil;
 	FRESULT fr;
 
-	if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0) {
+	if (path[0] == '\0' || strcmp(path, ".") == 0 || strcmp(path, "..") == 0 || strcmp(path, "/") == 0 || strcmp(path, "./") == 0 || strcmp(path, "../") == 0) {
 		return TRUE;
 	}
 
