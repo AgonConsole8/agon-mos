@@ -85,6 +85,7 @@ int		mos_cmdLOAD(char * ptr);
 int		mos_cmdMEM(char *ptr);
 int		mos_cmdMKDIR(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
+int		mos_cmdOBEY(char *ptr);
 int		mos_cmdPRINTF(char *ptr);
 int		mos_cmdREN(char *ptr);
 int		mos_cmdRUN(char * ptr);
@@ -160,6 +161,8 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_CD				"Change current directory\r\n"
 #define HELP_CD_ARGS		"<path>"
 
+#define HELP_CLS			"Clear the screen\r\n"
+
 #define HELP_COPY			"Create a copy of a file\r\n"
 #define HELP_COPY_ARGS		"<filename1> <filename2>"
 
@@ -178,6 +181,16 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_EXEC			"Run a batch file containing MOS commands\r\n"
 #define HELP_EXEC_ARGS		"<filename>"
 
+#define HELP_HELP			"Display help on commands.\r\n"
+#define HELP_HELP_ARGS		"[ <command> | all ]"
+
+#define HELP_HOTKEY			"Store a command in one of 12 hotkey slots assigned to F1-F12\r\n\r\n" \
+							"Optionally, the command string can include \"%s\" as a marker\r\n" \
+							"in which case the hotkey command will be built either side.\r\n\r\n" \
+							"HOTKEY without any arguments will list the currently assigned\r\n" \
+							"command strings.\r\n"							
+#define HELP_HOTKEY_ARGS	"<key number> <command string>"
+
 #define HELP_JMP			"Jump to the specified address in memory\r\n"
 #define HELP_JMP_ARGS		"<addr>"
 
@@ -190,6 +203,15 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_MKDIR			"Create a new folder on the SD card\r\n"
 #define HELP_MKDIR_ARGS		"<filename>"
+
+#define HELP_MOUNT			"(Re-)mount the MicroSD card\r\n"
+
+#define HELP_OBEY			"Run an Obey command file\r\n" \
+							"The system variable Obey$Dir is set to the directory of the obey file\r\n" \
+							"and argument substitution is supported using %0 to %9,\r\n" \
+							"%s to substitute in all arguments, or %*<n> for arguments from <n> to end\r\n" \
+							"If the -v flag is used, each line will be echo'd before execution\r\n"
+#define HELP_OBEY_ARGS		"[-v] <filename> [<arguments>]"
 
 #define HELP_PRINTF			"Print a string to the VDU, with common unix-style escapes\r\n"
 #define HELP_PRINTF_ARGS	"<string>"
@@ -245,30 +267,14 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"
 
+#define HELP_TYPE			"Display the contents of a file on the screen\r\n"
+#define HELP_TYPE_ARGS		"<filename>"
+
 #define HELP_UNSET			"Unset deletes a system variable\r\n"
 #define HELP_UNSET_ARGS		"<varname>"
 
 #define HELP_VDU			"Write a stream of characters to the VDP\r\n" \
 							"Character values are converted to bytes before sending\r\n"
 #define HELP_VDU_ARGS		"<char1> <char2> ... <charN>"
-
-#define HELP_TYPE			"Display the contents of a file on the screen\r\n"
-#define HELP_TYPE_ARGS		"<filename>"
-
-#define HELP_HOTKEY			"Store a command in one of 12 hotkey slots assigned to F1-F12\r\n\r\n" \
-							"Optionally, the command string can include \"%s\" as a marker\r\n" \
-							"in which case the hotkey command will be built either side.\r\n\r\n" \
-							"HOTKEY without any arguments will list the currently assigned\r\n" \
-							"command strings.\r\n"
-							
-#define HELP_HOTKEY_ARGS	"<key number> <command string>"
-
-#define HELP_CLS			"Clear the screen\r\n"
-
-#define HELP_MOUNT			"(Re-)mount the MicroSD card\r\n"
-
-#define HELP_HELP			"Display help on a single or all commands.\r\n"
-
-#define HELP_HELP_ARGS		"[ <command> | all ]"
 
 #endif MOS_H

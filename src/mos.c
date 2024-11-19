@@ -113,6 +113,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Mount",		&mos_cmdMOUNT,		false,	NULL,			HELP_MOUNT },
 	{ "Move",		&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "MV",			&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
+	{ "Obey",		&mos_cmdOBEY,		true,	HELP_OBEY_ARGS,		HELP_OBEY },
 	{ "PrintF",		&mos_cmdPRINTF,		false,	HELP_PRINTF_ARGS,	HELP_PRINTF },
 	{ "Rename",		&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
@@ -731,6 +732,105 @@ int mos_cmdEXEC(char *ptr) {
 	}
 	return mos_EXEC(filename);
 }
+
+// Load and run a batch file of MOS commands.
+// Parameters:
+// - filename: The batch file to execute
+// - buffer: Storage for each line to be loaded into and executed from (recommend 256 bytes)
+// - size: Size of buffer (in bytes)
+// Returns:
+// - FatFS return code (of the last command)
+//
+int mos_cmdOBEY(char *ptr) {
+	FRESULT	fr;
+	FIL		fil;
+	int		size = 256;
+	char *	expandedPath = NULL;
+	char *	filename = NULL;
+	char *	directory = NULL;
+	char *	tempDirectory = NULL;
+	char *	absoluteDirectory = NULL;
+	char *	substituted = NULL;
+	char *	buffer = (char *)umm_malloc(size);
+	int		line = 0;
+	int		dirLength = 0;
+	int		absoluteDirLength = 0;
+	bool 	verbose = false;
+
+	if (!buffer) {
+		return MOS_OUT_OF_MEMORY;
+	}
+
+	if (!extractString(&ptr, &filename, NULL, 0)) {
+		umm_free(buffer);
+		return FR_INVALID_PARAMETER;
+	}
+	if (strcasecmp(filename, "-v") == 0) {
+		verbose = true;
+		if (!extractString(&ptr, &filename, NULL, 0)) {
+			umm_free(buffer);
+			return FR_INVALID_PARAMETER;
+		}
+	}
+
+	fr = getResolvedPath(filename, &expandedPath);
+	if (fr == FR_OK) {
+		fr = f_open(&fil, expandedPath, FA_READ);
+	}
+
+	if (fr == FR_OK) fr = getDirectoryForPath(expandedPath, NULL, &dirLength, 0);
+	if (fr == FR_OK) {
+		directory = umm_malloc(dirLength);
+		tempDirectory = umm_malloc(dirLength + strlen(cwd) + 1);
+		if (directory && tempDirectory) {
+			fr = getDirectoryForPath(expandedPath, directory, &dirLength, 0);
+			if (fr == FR_OK) fr = resolveRelativePath(directory, tempDirectory, dirLength + strlen(cwd) + 1);
+			if (fr == FR_OK) {
+				absoluteDirLength = strlen(tempDirectory) + 1;
+				absoluteDirectory = umm_malloc(absoluteDirLength);
+				if (absoluteDirectory) {
+					strcpy(absoluteDirectory, tempDirectory);
+					createOrUpdateSystemVariable("Obey$Dir", MOS_VAR_STRING, absoluteDirectory);
+				} else {
+					fr = MOS_OUT_OF_MEMORY;
+				}
+			}
+		} else {
+			// Failed to allocate memory for obey directory
+			fr = MOS_OUT_OF_MEMORY;
+		}
+		umm_free(tempDirectory);
+		umm_free(directory);
+	}
+	umm_free(expandedPath);
+
+	if (fr == FR_OK) {
+		while (!f_eof(&fil)) {
+			line++;
+			f_gets(buffer, size, &fil);
+			substituted = substituteArguments(buffer, ptr, false);
+			if (!substituted) {
+				fr = MOS_OUT_OF_MEMORY;
+				break;
+			}
+			if (verbose) {
+				printf("Obey: %s", substituted);
+				if (strrchr(substituted, '\n') == NULL) printf("\n");
+				if (strrchr(substituted, '\r') == NULL) printf("\r");
+			}
+			fr = mos_exec(substituted, TRUE, 0);
+			umm_free(substituted);
+			if (fr != FR_OK) {
+				printf("\r\nError executing %s at line %d\r\n", expandedPath, line);
+				break;
+			}
+		}
+	}
+	f_close(&fil);
+	umm_free(buffer);
+	return fr;	
+}
+
 
 // SAVE <filename> <addr> <len> command
 // Parameters:
