@@ -92,25 +92,26 @@ static t_mosCommand mosCommands[] = {
 	{ "Cat",		&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
 	{ "CD",			&mos_cmdCD,			true,	HELP_CD_ARGS,		HELP_CD },
 	{ "CDir",		&mos_cmdCD,			true,	HELP_CD_ARGS,		HELP_CD },
-	{ "CLS",		&mos_cmdCLS,		false,	NULL,			HELP_CLS },
+	{ "CLS",		&mos_cmdCLS,		false,	NULL,				HELP_CLS },
 	{ "Copy",		&mos_cmdCOPY,		true,	HELP_COPY_ARGS,		HELP_COPY },
 	{ "CP",			&mos_cmdCOPY,		true,	HELP_COPY_ARGS,		HELP_COPY },
-	{ "Credits",	&mos_cmdCREDITS,	false,	NULL,			HELP_CREDITS },
+	{ "Credits",	&mos_cmdCREDITS,	false,	NULL,				HELP_CREDITS },
 	{ "Delete",		&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Dir",		&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
-	{ "Disc",		&mos_cmdDISC,		false,	NULL,		NULL },
+	{ "Disc",		&mos_cmdDISC,		false,	NULL,				NULL },
 	{ "Do",			&mos_cmdDO,			true,	HELP_DO_ARGS,		HELP_DO },
 	{ "Echo",		&mos_cmdECHO,		false,	HELP_ECHO_ARGS,		HELP_ECHO },
 	{ "Erase",		&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Exec",		&mos_cmdEXEC,		true,	HELP_EXEC_ARGS,		HELP_EXEC },
 	{ "Help",		&mos_cmdHELP,		false,	HELP_HELP_ARGS,		HELP_HELP },
 	{ "Hotkey",		&mos_cmdHOTKEY,		false,	HELP_HOTKEY_ARGS,	HELP_HOTKEY },
+	{ "If",			&mos_cmdIF,			false,	HELP_IF_ARGS,		HELP_IF },
 	{ "JMP",		&mos_cmdJMP,		true,	HELP_JMP_ARGS,		HELP_JMP },
 	{ "Load",		&mos_cmdLOAD,		true,	HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
-	{ "Mem",		&mos_cmdMEM,		false,	NULL,		HELP_MEM },
+	{ "Mem",		&mos_cmdMEM,		false,	NULL,				HELP_MEM },
 	{ "MkDir",		&mos_cmdMKDIR,		true,	HELP_MKDIR_ARGS,	HELP_MKDIR },
-	{ "Mount",		&mos_cmdMOUNT,		false,	NULL,			HELP_MOUNT },
+	{ "Mount",		&mos_cmdMOUNT,		false,	NULL,				HELP_MOUNT },
 	{ "Move",		&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "MV",			&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "Obey",		&mos_cmdOBEY,		true,	HELP_OBEY_ARGS,		HELP_OBEY },
@@ -386,12 +387,10 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 				return FR_INT_ERR;
 			}
 			command = substituteArguments(aliasTemplate, ptr, true);
+			umm_free(aliasTemplate);
 			if (!command) {
-				umm_free(aliasTemplate);
 				return FR_INT_ERR;
 			}
-
-			umm_free(aliasTemplate);
 			result = mos_exec(command, in_mos, depth + 1);
 			umm_free(command);
 			return result;
@@ -698,6 +697,68 @@ int mos_cmdHOTKEY(char *ptr) {
 	return result;
 }
 
+// IF <condition> THEN <command> [ELSE <command>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdIF(char * ptr) {
+	char * condition = ptr;
+	char * then = NULL;
+	char * elseCmd = NULL;
+	int result = FR_OK;
+	t_mosEvalResult * conditionResult = NULL;
+	bool conditionResultBool = true;
+
+	then = stristr(ptr, " THEN ");
+	if (!then) {
+		return FR_INVALID_PARAMETER;
+	}
+	*then = '\0';
+	then += 6;
+
+	elseCmd = stristr(then, " ELSE ");
+	if (elseCmd) {
+		*elseCmd = '\0';
+		elseCmd += 6;
+	}
+
+	conditionResult = evaluateExpression(condition);
+	if (conditionResult == NULL) {
+		return FR_INT_ERR;
+	}
+
+	if (conditionResult->status == FR_INVALID_PARAMETER) {
+		conditionResultBool = false;
+	} else if (conditionResult->status != FR_OK) {
+		result = conditionResult->status;
+		conditionResultBool = false;
+	} else if (conditionResult->type == MOS_VAR_STRING) {
+		if (strlen(conditionResult->result) == 0) {
+			conditionResultBool = false;
+		}
+		umm_free(conditionResult->result);
+	} else if (conditionResult->type == MOS_VAR_NUMBER) {
+		conditionResultBool = conditionResult->result != 0;
+	} else {
+		// Invalid type - shouldn't happen
+		result = FR_INT_ERR;
+	}
+
+	umm_free(conditionResult);
+
+	if (result == FR_OK) {
+		if (conditionResultBool) {
+			result = mos_exec(then, true, 0);
+		} else if (elseCmd) {
+			result = mos_exec(elseCmd, true, 0);
+		}
+	}
+
+	return result;
+}
+
 // LOAD <filename> <addr> command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -772,6 +833,8 @@ int mos_cmdOBEY(char *ptr) {
 			return FR_INVALID_PARAMETER;
 		}
 	}
+
+	// TODO Consider merging with mos_EXEC - below is very similar
 
 	fr = getResolvedPath(filename, &expandedPath);
 	if (fr == FR_OK) {
@@ -1115,8 +1178,6 @@ int mos_cmdSETEVAL(char * ptr) {
 		return FR_INVALID_PARAMETER;
 	}
 
-	// we need to work out the value of the expression at ptr
-	// and what type it is
 	evaluation = evaluateExpression(ptr);
 	if (evaluation == NULL) {
 		return FR_INT_ERR;
@@ -2217,6 +2278,8 @@ UINT24 mos_COPY(char *srcPath, char *dstPath, BOOL verbose) {
 	BOOL	targetIsDir = FALSE;
 	BOOL	addSlash = FALSE;
 
+	// TODO refactor to use a common function for resolving paths
+	// as this is identical to mos_REN - only the contents of the `while` loop differ
 	if (mos_strcspn(dstPath, "*?") != strlen(dstPath)) {
 		// Destination path cannot include wildcards
 		return FR_INVALID_PARAMETER;
@@ -2340,6 +2403,8 @@ UINT24 mos_EXEC(char * filename) {
 	char *	buffer = (char *)umm_malloc(size);
 	int		line = 0;
 
+	// TODO consider merging this implementation with Obey
+	// it would just need some flags to disable the Obey$Dir and argument substitution
 	if (!buffer) {
 		return MOS_OUT_OF_MEMORY;
 	}

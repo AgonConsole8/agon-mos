@@ -80,6 +80,7 @@ int		mos_cmdECHO(char *ptr);
 int		mos_cmdEXEC(char * ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
+int		mos_cmdIF(char *ptr);
 int		mos_cmdJMP(char * ptr);
 int		mos_cmdLOAD(char * ptr);
 int		mos_cmdMEM(char *ptr);
@@ -190,6 +191,9 @@ UINT8	fat_EOF(FIL * fp);
 							"HOTKEY without any arguments will list the currently assigned\r\n" \
 							"command strings.\r\n"							
 #define HELP_HOTKEY_ARGS	"<key number> <command string>"
+
+#define HELP_IF				"Conditionally executes another command depending on the value of an expression\r\n"
+#define HELP_IF_ARGS		"<expression> THEN <command> [ELSE <command>]"
 
 #define HELP_JMP			"Jump to the specified address in memory\r\n"
 #define HELP_JMP_ARGS		"<addr>"

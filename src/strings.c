@@ -28,6 +28,28 @@ int strcasecmp(const char *s1, const char *s2) {
 	return result;
 }
 
+char * stristr(const char * str, const char * substr) {
+	int i;
+	int c = tolower((unsigned char) * substr);
+	if (c == '\0') {
+		return (char *)str;
+	}
+	for (; *str; str++) {
+		if (tolower((unsigned char)*str) == c) {
+			for (i = 0;;) {
+				if (substr[++i] == '\0') {
+					return (char *) str;
+				}
+				if (tolower((unsigned char)str[i]) != tolower((unsigned char)substr[i])) {
+					break;
+				}
+			}
+		}
+	}
+	return NULL;
+}
+
+
 // Alternative to missing strnlen() in ZDS libraries
 size_t mos_strnlen(const char *s, size_t maxlen) {
 	size_t len = 0;

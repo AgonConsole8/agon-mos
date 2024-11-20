@@ -21,15 +21,17 @@
 #define MATCH_COMMANDS				MATCH_CASE_INSENSITIVE | MATCH_UP_TO_SPACE | MATCH_DOT_AS_STAR | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR
 #define MATCH_COMMANDS_AUTO			MATCH_CASE_INSENSITIVE | MATCH_DOT_AS_STAR | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR
 
-extern int strcasecmp(const char *s1, const char *s2);
+int strcasecmp(const char *s1, const char *s2);
+
+char * stristr(const char * str, const char * substr);
 
 size_t mos_strnlen(const char *s, size_t maxlen);
 
 //Alternative to missing strdup() in ZDS libraries
-char *mos_strdup(const char *s);
+char * mos_strdup(const char *s);
 
 //Alternative to missing strndup() in ZDS libraries
-char *mos_strndup(const char *s, size_t n);
+char * mos_strndup(const char *s, size_t n);
 
 size_t mos_strcspn(const char *s, const char *reject);
 size_t mos_strspn(const char *s, const char *accept);
