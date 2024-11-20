@@ -3,7 +3,7 @@
  * Author:			Dean Belfield
  * Created:			18/09/2022
  * Last Updated:	31/03/2023
- * 
+ *
  * Modinfo:
  * 28/09/2022:		Added clear parameter to mos_EDITLINE
  * 20/02/2023:		Fixed mos_EDITLINE to handle the full CP-1252 character set
@@ -74,7 +74,7 @@ void doLeftCursor() {
 }
 
 // Move Cursor Right
-// 
+//
 void doRightCursor() {
 	putch(0x09);
 }
@@ -92,7 +92,7 @@ void doRightCursor() {
 BOOL insertCharacter(char *buffer, char c, int insertPos, int len, int limit) {
 	int	i;
 	int count = 0;
-	
+
 	if (len < limit) {
 		putch(c);
 		for (i = len; i >= insertPos; i--) {
@@ -106,7 +106,7 @@ BOOL insertCharacter(char *buffer, char c, int insertPos, int len, int limit) {
 			doLeftCursor();
 		}
 		return 1;
-	}	
+	}
 	return 0;
 }
 
@@ -157,7 +157,7 @@ BOOL deleteCharacter(char *buffer, int insertPos, int len) {
 			doLeftCursor();
 		}
 		return 1;
-	}	
+	}
 	return 0;
 }
 
@@ -166,7 +166,7 @@ BOOL deleteCharacter(char *buffer, int insertPos, int len) {
 void waitKey() {
 	BYTE	c;
 	do {
-		c = keycount;				
+		c = keycount;
 		while (c == keycount);		// Wait for a key event
 	} while (keydown == 0);			// Loop until we get a key down value (keydown = 1)
 }
@@ -252,27 +252,32 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 // - The exit key pressed (ESC or CR)
 //
 UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
-	BOOL clear = flags & 0x01;		// Clear the buffer on entry
-	BOOL enableTab = flags & 0x02;	// Enable tab completion (default off)
-	BOOL enableHotkeys = !(flags & 0x04); // Enable hotkeys (default on)
-	BOOL enableHistory = !(flags & 0x08); // Enable history (default on)
-	BYTE keya = 0;					// The ASCII key	
-	BYTE keyc = 0;					// The FabGL keycode
-	BYTE keyr = 0;					// The ASCII key to return back to the calling program
+	BOOL	clear = flags & 0x01;		// Clear the buffer on entry
+	BOOL	enableTab = flags & 0x02;	// Enable tab completion (default off)
+	BOOL	enableHotkeys = !(flags & 0x04); // Enable hotkeys (default on)
+	BOOL	enableHistory = !(flags & 0x08); // Enable history (default on)
+	BYTE	keya = 0;					// The ASCII key
+	BYTE	keyc = 0;					// The FabGL keycode
+	BYTE	keyr = 0;					// The ASCII key to return back to the calling program
+	char	*path = NULL;				// used for tab completion
+	int		limit = bufferLength - 1;	// Max # of characters that can be entered
+	int		insertPos;					// The insert position
+	int		len = 0;					// Length of current input
 
-	int  limit = bufferLength - 1;	// Max # of characters that can be entered
-	int	 insertPos;					// The insert position
-	int  len = 0;					// Length of current input
-	history_no = history_size;		// Ensure our current "history" is the end of the list
+	history_no = history_size;			// Ensure our current "history" is the end of the list
+	getModeInformation();				// Get the current screen dimensions
 
-	getModeInformation();			// Get the current screen dimensions
-	
-	if (clear) {					// Clear the buffer as required
-		buffer[0] = 0;	
+	if (clear) {						// Clear the buffer as required
+		buffer[0] = 0;
 		insertPos = 0;
 	} else {
-		printf("%s", buffer);		// Otherwise output the current buffer
-		insertPos = strlen(buffer);	// And set the insertpos to the end
+		printf("%s", buffer);			// Otherwise output the current buffer
+		insertPos = strlen(buffer);		// And set the insertpos to the end
+	}
+
+	if (enableTab) {
+		path = umm_malloc(bufferLength);
+		if (!path) enableTab = false;
 	}
 
 	// Loop until an exit key is pressed
@@ -293,11 +298,11 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 			case 0x87: {	// END
 				insertPos = gotoEditLineEnd(insertPos, len);
 			} break;
-			
+
 			case 0x92: {	// PgUp
 				historyAction = 2;
 			} break;
-			
+
 			case 0x94: {	// PgDn
 				historyAction = 3;
 			} break;
@@ -312,18 +317,17 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 			case 0xA6: //F8
 			case 0xA7: //F9
 			case 0xA8: //F10
-			case 0xA9: //F11	
+			case 0xA9: //F11
 			case 0xAA: //F12
 			{
-				UINT8 fkey = keyc - 0x9F;
-				if (enableHotkeys && handleHotkey(fkey, buffer, bufferLength, insertPos, len)) {
+				if (enableHotkeys && handleHotkey(keyc - 0x9F, buffer, bufferLength, insertPos, len)) {
 					len = strlen(buffer);
 					insertPos = len;
-					keya = 0x0D;
+					keya = 0x0D;	// auto-return for inserted hotkey
 					// Key was present, so drop through to ASCII key handling
 				} else break; // key wasn't present, so do nothing
-			}	
-			
+			}
+
 			//
 			// Now the ASCII keys
 			//
@@ -333,7 +337,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 						if (insertCharacter(buffer, keya, insertPos, len, limit)) {
 							insertPos++;
 						}
-					} else {				
+					} else {
 						switch (keya) {
 							case 0x0D:		// Enter
 								historyAction = 1;
@@ -378,13 +382,13 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 									historyAction = 2;
 								}
 							} break;
-							
+
 							case 0x09: if (enableTab) { // Tab completion
 								FRESULT fr;
-								char *search_term = NULL;
-								char *path = NULL;
+								char *searchTerm = NULL;
 								const char *termStart = buffer + insertPos;
 								int termLength = 0;
+								int resolveLength;
 
 								// With tab-completion we are completing a "term" in the buffer
 								// start is last space before the insert position, end is the insert position
@@ -393,7 +397,14 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 								termLength = buffer + insertPos - termStart;
 
+								if (termStart == buffer + mos_strspn(buffer, "* ") && termLength == 0) {
+									// don't attempt to complete a zero-length command
+									putch(0x07); // Beep
+									break;
+								}
+
 								// if we're at the start of the buffer, then we're looking for a command, or executable
+								// TODO consider skipping auto-complete for commands if there's no term yet
 								if (
 									termStart == buffer + mos_strspn(buffer, "* ") &&
 									memchr(termStart, '/', termLength) == NULL
@@ -403,14 +414,14 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 									bool matched = false;
 									bool success = false;
 
-									search_term = (char*) umm_malloc(termLength + 10);
-									if (!search_term) {
+									searchTerm = (char*) umm_malloc(termLength + 10);
+									if (!searchTerm) {
 										// umm_malloc failed, so no tab completion for us today
 										break;
 									}
 
-									sprintf(search_term, "Alias$%.*s*", termLength, termStart);
-									if (getSystemVariable(search_term, &var) == 0) {
+									sprintf(searchTerm, "Alias$%.*s*", termLength, termStart);
+									if (getSystemVariable(searchTerm, &var) == 0) {
 										// Matching alias found
 										matched = true;
 										success = insertString(buffer, var->label + 6, strlen(var->label + 6), termLength, insertPos, len, limit, ' ');
@@ -418,8 +429,8 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 
 									if (!matched) {
 										// Internal command?
-										sprintf(search_term, "%.*s.", termLength, termStart);
-										cmd = mos_getCommand(search_term, MATCH_COMMANDS_AUTO);
+										sprintf(searchTerm, "%.*s.", termLength, termStart);
+										cmd = mos_getCommand(searchTerm, MATCH_COMMANDS_AUTO);
 										if (cmd != NULL) {
 											// Matching command found
 											matched = true;
@@ -429,22 +440,23 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 
 									if (!matched) {
 										// Find command in runpath, or given path
+										// TODO think more on this `:` detection once we support runtypes
 										if (memchr(termStart, ':' , termLength) != NULL) {
-											sprintf(search_term, "%.*s*.bin", termLength, termStart);
+											sprintf(searchTerm, "%.*s*.bin", termLength, termStart);
 										} else {
-											sprintf(search_term, "run:%.*s*.bin", termLength, termStart);
+											sprintf(searchTerm, "run:%.*s*.bin", termLength, termStart);
 										}
-										fr = getResolvedPath(search_term, &path);
+										resolveLength = bufferLength;
+										fr = resolvePath(searchTerm, path, &resolveLength, NULL, NULL);
 										if (fr == FR_OK) {
-											char * sourceLeaf = getFilepathLeafname(search_term);
-											int sourceOffset = sourceLeaf - search_term;
+											char * sourceLeaf = getFilepathLeafname(searchTerm);
+											int sourceOffset = sourceLeaf - searchTerm;
 											char * leafname = getFilepathLeafname(path);
 											matched = true;
 											success = insertString(buffer, leafname, strlen(leafname) - 4, strlen(sourceLeaf) - 5, insertPos, len, limit, isDirectory(path) ? '/' : ' ');
 										}
 									}
-									if (path) umm_free(path);
-									umm_free(search_term);
+									umm_free(searchTerm);
 									if (success) {
 										len = strlen(buffer);
 										insertPos = len;
@@ -455,36 +467,37 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 								}
 
 								// if not at start of buffer, then we're doing filename completion
-								search_term = (char*) umm_malloc(termLength + 2);
-
-								if (!search_term) {
+								searchTerm = (char*) umm_malloc(termLength + 2);
+								if (!searchTerm) {
 									// umm_malloc failed, so no tab completion for us today
 									break;
 								}
-								sprintf(search_term, "%.*s*", termLength, termStart);
 
-								fr = getResolvedPath(search_term, &path);
+								sprintf(searchTerm, "%.*s*", termLength, termStart);
+								resolveLength = bufferLength;
+								fr = resolvePath(searchTerm, path, &resolveLength, NULL, NULL);
 								if (fr == FR_OK) {
-									char * sourceLeaf = getFilepathLeafname(search_term);
-									int sourceOffset = sourceLeaf - search_term;
+									char * sourceLeaf = getFilepathLeafname(searchTerm);
+									int sourceOffset = sourceLeaf - searchTerm;
 									char * leafname = getFilepathLeafname(path);
 									if (insertString(buffer, leafname, strlen(leafname), strlen(sourceLeaf) - 1, insertPos, len, limit, isDirectory(path) ? '/' : ' ')) {
 										len = strlen(buffer);
 										insertPos = len;
 									}
+								} else {
+									putch(0x07); // Beep
 								}
 
-								umm_free(path);
-								umm_free(search_term);
+								umm_free(searchTerm);
 							}
-							break;							
-							
+							break;
+
 							case 0x7F: {	// Backspace
 								if (deleteCharacter(buffer, insertPos, len)) {
 									insertPos--;
 								}
 							} break;
-						}					
+						}
 					}
 				}
 			}
@@ -519,6 +532,7 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 	}
 	while (len-- > 0) putch(0x09);	// Then cursor right for the remainder
 
+	if (enableTab) umm_free(path);
 	return keyr;					// Finally return the keycode
 }
 
