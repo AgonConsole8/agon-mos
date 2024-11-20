@@ -719,34 +719,15 @@ t_mosEvalResult * evaluateExpression(char * source) {
 	}
 
 	// Variable lookup worked
-	switch (var->type) {
-		case MOS_VAR_MACRO: {
-			result->result = expandMacro(var->value);
-			if (result->result == NULL) {
-				result->status = FR_INT_ERR;
-			}
-			result->type = MOS_VAR_STRING;
-			break;
-		}
-		case MOS_VAR_STRING: {
-			result->result = mos_strdup(var->value);
-			if (result->result == NULL) {
-				result->status = MOS_OUT_OF_MEMORY;
-			}
-			result->type = MOS_VAR_STRING;
-			break;
-		}
-		case MOS_VAR_NUMBER: {
-			result->result = var->value;
-			result->type = MOS_VAR_NUMBER;
-			break;
-		}
-		default: {
-			// In principle we shouldn't find other variables
-			result->type = var->type;
+	if (var->type == MOS_VAR_NUMBER) {
+		result->type = MOS_VAR_NUMBER;
+		result->result = var->value;
+	} else {
+		result->result = expandVariable(var, false);
+		if (result->result == NULL) {
 			result->status = FR_INT_ERR;
-			break;
 		}
+		result->type = MOS_VAR_STRING;
 	}
 
 	return result;
