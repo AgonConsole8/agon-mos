@@ -81,6 +81,7 @@ int		mos_cmdEXEC(char * ptr);
 int		mos_cmdHELP(char *ptr);
 int		mos_cmdHOTKEY(char *ptr);
 int		mos_cmdIF(char *ptr);
+int		mos_cmdIFTHERE(char *ptr);
 int		mos_cmdJMP(char * ptr);
 int		mos_cmdLOAD(char * ptr);
 int		mos_cmdMEM(char *ptr);
@@ -97,6 +98,7 @@ int		mos_cmdSETEVAL(char *ptr);
 int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
 int		mos_cmdTIME(char *ptr);
+int		mos_cmdTRY(char *ptr);
 int		mos_cmdTYPE(char *ptr);
 int		mos_cmdUNSET(char *ptr);
 int		mos_cmdVDU(char *ptr);
@@ -188,12 +190,15 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_HOTKEY			"Store a command in one of 12 hotkey slots assigned to F1-F12\r\n\r\n" \
 							"Optionally, the command string can include \"%s\" as a marker\r\n" \
 							"in which case the hotkey command will be built either side.\r\n\r\n" \
-							"HOTKEY without any arguments will list the currently assigned\r\n" \
-							"command strings.\r\n"							
+							"Using the Hotkey command without any arguments will list the\r\n" \
+							"currently assigned command strings.\r\n"							
 #define HELP_HOTKEY_ARGS	"<key number> <command string>"
 
 #define HELP_IF				"Conditionally executes another command depending on the value of an expression\r\n"
-#define HELP_IF_ARGS		"<expression> THEN <command> [ELSE <command>]"
+#define HELP_IF_ARGS		"<expression> Then <command> [Else <command>]"
+
+#define HELP_IFTHERE		"Conditionally executes another command depending on the presence of a file or directory\r\n"
+#define HELP_IFTHERE_ARGS	"<filename> Then <command> [Else <command>]"
 
 #define HELP_JMP			"Jump to the specified address in memory\r\n"
 #define HELP_JMP_ARGS		"<addr>"
@@ -268,8 +273,13 @@ UINT8	fat_EOF(FIL * fp);
 #define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified\r\n"
 #define HELP_SHOW_ARGS		"[<variablespec>]"
 
-#define HELP_TIME			"Set and read the ESP32 real-time clock\r\n"
+#define HELP_TIME			"Set and read the VDP's real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"
+
+#define HELP_TRY			"Try executes a command and catches any errors that may occur\r\n" \
+							"The return code for the command is stored in Try$ReturnCode\r\n" \
+							"If an error occurred then Try$Error will be updated with the error string\r\n"
+#define HELP_TRY_ARGS		"<command>"
 
 #define HELP_TYPE			"Display the contents of a file on the screen\r\n"
 #define HELP_TYPE_ARGS		"<filename>"

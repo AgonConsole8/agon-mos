@@ -106,6 +106,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Help",		&mos_cmdHELP,		false,	HELP_HELP_ARGS,		HELP_HELP },
 	{ "Hotkey",		&mos_cmdHOTKEY,		false,	HELP_HOTKEY_ARGS,	HELP_HOTKEY },
 	{ "If",			&mos_cmdIF,			false,	HELP_IF_ARGS,		HELP_IF },
+	{ "IfThere",	&mos_cmdIFTHERE,	false,	HELP_IFTHERE_ARGS,	HELP_IFTHERE },
 	{ "JMP",		&mos_cmdJMP,		true,	HELP_JMP_ARGS,		HELP_JMP },
 	{ "Load",		&mos_cmdLOAD,		true,	HELP_LOAD_ARGS,		HELP_LOAD },
 	{ "LS",			&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
@@ -126,6 +127,7 @@ static t_mosCommand mosCommands[] = {
 	{ "SetMacro",	&mos_cmdSETMACRO,	false,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
 	{ "Show",		&mos_cmdSHOW,		false,	HELP_SHOW_ARGS,		HELP_SHOW },
 	{ "Time",		&mos_cmdTIME,		true,	HELP_TIME_ARGS,		HELP_TIME },
+	{ "Try",		&mos_cmdTRY,		false,	HELP_TRY_ARGS,		HELP_TRY },
 	{ "Type",		&mos_cmdTYPE,		true,	HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "Unset",		&mos_cmdUNSET,		false,	HELP_UNSET_ARGS,	HELP_UNSET },
 	{ "VDU",		&mos_cmdVDU,		true,	HELP_VDU_ARGS,		HELP_VDU },
@@ -539,6 +541,24 @@ int mos_cmdDO(char * ptr) {
 	return mos_exec(ptr, true, 0);
 }
 
+// TRY command
+// This command is broadly similar to `X` in RISC OS, just named nicer, and with a return code variable
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdTRY(char * ptr) {
+	// Call mos_exec with in_mos set to true, which allows for OSCLI commands to use full run path
+	int result = mos_exec(ptr, true, 0);
+
+	createOrUpdateSystemVariable("Try$ReturnCode", MOS_VAR_NUMBER, (void *)result);
+	if (result > 0) {
+		createOrUpdateSystemVariable("Try$Error", MOS_VAR_STRING, mos_strdup(result < mos_errors_count ? mos_errors[result] : "Unknown error"));
+	}
+	return FR_OK;
+}
+
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
@@ -754,6 +774,58 @@ int mos_cmdIF(char * ptr) {
 		} else if (elseCmd) {
 			result = mos_exec(elseCmd, true, 0);
 		}
+	}
+
+	return result;
+}
+
+// IFTHERE <condition> THEN <command> [ELSE <command>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdIFTHERE(char * ptr) {
+	char * filepath = NULL;
+	char * then = NULL;
+	char * elseCmd = NULL;
+	int result = FR_OK;
+	int pathLength = 0;	
+
+	then = stristr(ptr, " THEN ");
+	if (!then) {
+		return FR_INVALID_PARAMETER;
+	}
+	*then = '\0';
+	then += 6;
+
+	elseCmd = stristr(then, " ELSE ");
+	if (elseCmd) {
+		*elseCmd = '\0';
+		elseCmd += 6;
+	}
+
+	filepath = expandMacro(ptr);
+	if (!filepath) {
+		return FR_INVALID_PARAMETER;
+	}
+
+	if (strlen(filepath) == 0) {
+		// No path to check, which we will interpret as "false"
+		result = FR_INVALID_PARAMETER;
+	} else {
+		// check if the file exists
+		result = resolvePath(filepath, NULL, &pathLength, NULL, NULL);
+	}
+	umm_free(filepath);
+
+	if (result == FR_OK) {
+		result = mos_exec(then, true, 0);
+	} else if (elseCmd) {
+		result = mos_exec(elseCmd, true, 0);
+	} else {
+		// No ELSE command, so return OK
+		result = FR_OK;
 	}
 
 	return result;
