@@ -372,33 +372,39 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		ptr = mos_trim(ptr, false);
 		// ptr will now point to the arguments
 
-		// Check if this command has an alias
-		aliasToken = umm_malloc(cmdLen + 7);
-		if (aliasToken == NULL) {
-			return MOS_OUT_OF_MEMORY;
-		}
-		sprintf(aliasToken, "Alias$%.*s", cmdLen, command);
-		if (aliasToken[strlen(aliasToken) - 1] == '.') {
-			aliasToken[strlen(aliasToken) - 1] = '*';
-		}
-		if (getSystemVariable(aliasToken, &alias) == 0) {
-			char * aliasTemplate;
-			umm_free(aliasToken);
-			aliasTemplate = expandVariable(alias, false);
-			if (!aliasTemplate) {
-				return FR_INT_ERR;
+		if (*command == '%') {
+			// Skip alias expansion for commands that start with %
+			command++;
+			cmdLen--;
+		} else {
+			// Check if this command has an alias
+			aliasToken = umm_malloc(cmdLen + 7);
+			if (aliasToken == NULL) {
+				return MOS_OUT_OF_MEMORY;
 			}
-			command = substituteArguments(aliasTemplate, ptr, true);
-			umm_free(aliasTemplate);
-			if (!command) {
-				return FR_INT_ERR;
+			sprintf(aliasToken, "Alias$%.*s", cmdLen, command);
+			if (aliasToken[strlen(aliasToken) - 1] == '.') {
+				aliasToken[strlen(aliasToken) - 1] = '*';
 			}
-			result = mos_exec(command, in_mos, depth + 1);
-			umm_free(command);
-			return result;
-		}
+			if (getSystemVariable(aliasToken, &alias) == 0) {
+				char * aliasTemplate;
+				umm_free(aliasToken);
+				aliasTemplate = expandVariable(alias, false);
+				if (!aliasTemplate) {
+					return FR_INT_ERR;
+				}
+				command = substituteArguments(aliasTemplate, ptr, true);
+				umm_free(aliasTemplate);
+				if (!command) {
+					return FR_INT_ERR;
+				}
+				result = mos_exec(command, in_mos, depth + 1);
+				umm_free(command);
+				return result;
+			}
 
-		umm_free(aliasToken);
+			umm_free(aliasToken);
+		}
 
 		cmd = mos_getCommand(command, MATCH_COMMANDS);
 		func = cmd->func;
