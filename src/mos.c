@@ -393,7 +393,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 				if (!aliasTemplate) {
 					return FR_INT_ERR;
 				}
-				command = substituteArguments(aliasTemplate, ptr, true);
+				command = substituteArguments(aliasTemplate, ptr, false);
 				umm_free(aliasTemplate);
 				if (!command) {
 					return FR_INT_ERR;
@@ -949,7 +949,7 @@ int mos_cmdOBEY(char *ptr) {
 		while (!f_eof(&fil)) {
 			line++;
 			f_gets(buffer, size, &fil);
-			substituted = substituteArguments(buffer, ptr, false);
+			substituted = substituteArguments(buffer, ptr, true);
 			if (!substituted) {
 				fr = MOS_OUT_OF_MEMORY;
 				break;

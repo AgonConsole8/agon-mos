@@ -222,7 +222,7 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 			return 0;
 		}
 
-		substitutedString = substituteArguments(hotkeyString, buffer, true);
+		substitutedString = substituteArguments(hotkeyString, buffer, false);
 		umm_free(hotkeyString);
 		if (!substitutedString) {
 			return 0;

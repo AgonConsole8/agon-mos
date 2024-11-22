@@ -768,7 +768,7 @@ char * getArgument(char * source, int argNo, char ** end) {
 // or %*n meaning all arguments from n onwards
 // or %s as an equivalent to %*0 (all arguments)
 //
-char * substituteArguments(char * source, char * args, bool includeRest) {
+char * substituteArguments(char * source, char * args, bool omitRest) {
 	char * dest;
 	char * destPos;
 	char * argument;
@@ -821,17 +821,17 @@ char * substituteArguments(char * source, char * args, bool includeRest) {
 	}
 
 	// Work out if we have any unused arguments
-	if (maxArg < 99 && includeRest) {
+	if (maxArg < 99 && !omitRest) {
 		// we have a rest argument
 		maxArg++;
 		argument = getArgument(args, maxArg, NULL);
 		if (argument != NULL) {
 			size += strlen(argument);
 		} else {
-			includeRest = false;
+			omitRest = true;
 		}
 	} else {
-		includeRest = false;
+		omitRest = true;
 	}
 
 	dest = umm_malloc(size + 1);
@@ -883,7 +883,7 @@ char * substituteArguments(char * source, char * args, bool includeRest) {
 	}
 
 	// Include any rest args
-	if (includeRest) {
+	if (!omitRest) {
 		// we have a rest argument
 		argument = getArgument(args, maxArg, NULL);
 		if (argument != NULL) {
