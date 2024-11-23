@@ -65,9 +65,12 @@ t_mosSystemVariable * createSystemVariable(char * label, MOSVARTYPE type, void *
 		return NULL;
 	}
 	newVar->label = newLabel;
-	newVar->value = value;
 	newVar->type = type;
-
+	if (type == MOS_VAR_MACRO || type == MOS_VAR_STRING) {
+		newVar->value = mos_strdup(value);
+	} else {
+		newVar->value = value;
+	}
 	newVar->next = NULL;
 
 	return newVar;
@@ -105,11 +108,8 @@ int createOrUpdateSystemVariable(char * label, MOSVARTYPE type, void * value) {
 // update system variable object
 // returns a status code
 int updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * value) {
-	if (var->type == MOS_VAR_MACRO || var->type == MOS_VAR_STRING) {
-		umm_free(var->value);
-	}
-
-	if (var->type == MOS_VAR_CODE) {
+	MOSVARTYPE oldType = var->type;
+	if (oldType == MOS_VAR_CODE) {
 		// Call setter function, if we have a write function
 		if (((t_mosCodeSystemVariable *)var->value)->write != NULL) {
 			return ((t_mosCodeSystemVariable *)var->value)->write(value);
@@ -119,7 +119,18 @@ int updateSystemVariable(t_mosSystemVariable * var, MOSVARTYPE type, void * valu
 	}
 
 	var->type = type;
-	var->value = value;
+	if (type == MOS_VAR_MACRO || type == MOS_VAR_STRING) {
+		char * newValue = mos_strdup(value);
+		if (newValue == NULL) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		if (oldType == MOS_VAR_MACRO || oldType == MOS_VAR_STRING) {
+			umm_free(var->value);
+		}
+		var->value = newValue;
+	} else {
+		var->value = value;
+	}
 	return FR_OK;
 }
 

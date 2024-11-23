@@ -286,14 +286,14 @@ int mos_runBinFile(char * filepath, char * args) {
 	int result = getResolvedPath(filepath, &resolvedPath);
 
 	#if DEBUG > 0
-	createOrUpdateSystemVariable("LastApp$RunPath", MOS_VAR_STRING, mos_strdup(filepath));
+	createOrUpdateSystemVariable("LastApp$RunPath", MOS_VAR_STRING, filepath);
 	#endif /* DEBUG */
 	if (result != FR_OK) {
 		return result;
 	}
 
 	#if DEBUG > 0
-	createOrUpdateSystemVariable("LastApp$UnresolvedRun", MOS_VAR_STRING, mos_strdup(resolvedPath));
+	createOrUpdateSystemVariable("LastApp$UnresolvedRun", MOS_VAR_STRING, resolvedPath);
 	#endif /* DEBUG */
 
 	// Fully resolved path allocation - size is very conservative
@@ -315,7 +315,7 @@ int mos_runBinFile(char * filepath, char * args) {
 		}
 	}
 
-	createOrUpdateSystemVariable("LastApp$Run", MOS_VAR_STRING, mos_strdup(fullyResolvedPath));
+	createOrUpdateSystemVariable("LastApp$Run", MOS_VAR_STRING, fullyResolvedPath);
 
 	umm_free(fullyResolvedPath);
 	umm_free(resolvedPath);
@@ -560,7 +560,7 @@ int mos_cmdTRY(char * ptr) {
 
 	createOrUpdateSystemVariable("Try$ReturnCode", MOS_VAR_NUMBER, (void *)result);
 	if (result > 0) {
-		createOrUpdateSystemVariable("Try$Error", MOS_VAR_STRING, mos_strdup(result < mos_errors_count ? mos_errors[result] : "Unknown error"));
+		createOrUpdateSystemVariable("Try$Error", MOS_VAR_STRING, result < mos_errors_count ? mos_errors[result] : "Unknown error");
 	}
 	return FR_OK;
 }
@@ -716,9 +716,7 @@ int mos_cmdHOTKEY(char *ptr) {
 	hotkeyString = expandMacro(ptr);
 	if (!hotkeyString) return FR_INT_ERR;
 	result = createOrUpdateSystemVariable(label, MOS_VAR_STRING, hotkeyString);
-	if (result != FR_OK) {
-		umm_free(hotkeyString);
-	}
+	umm_free(hotkeyString);
 
 	return result;
 }
@@ -922,28 +920,20 @@ int mos_cmdOBEY(char *ptr) {
 	if (fr == FR_OK) fr = getDirectoryForPath(expandedPath, NULL, &dirLength, 0);
 	if (fr == FR_OK) {
 		directory = umm_malloc(dirLength);
-		tempDirectory = umm_malloc(dirLength + strlen(cwd) + 1);
-		if (directory && tempDirectory) {
+		absoluteDirectory = umm_malloc(dirLength + strlen(cwd) + 1);
+		if (directory && absoluteDirectory) {
 			fr = getDirectoryForPath(expandedPath, directory, &dirLength, 0);
-			if (fr == FR_OK) fr = resolveRelativePath(directory, tempDirectory, dirLength + strlen(cwd) + 1);
+			if (fr == FR_OK) fr = resolveRelativePath(directory, absoluteDirectory, dirLength + strlen(cwd) + 1);
 			if (fr == FR_OK) {
-				absoluteDirLength = strlen(tempDirectory) + 1;
-				absoluteDirectory = umm_malloc(absoluteDirLength);
-				if (absoluteDirectory) {
-					strcpy(absoluteDirectory, tempDirectory);
-					createOrUpdateSystemVariable("Obey$Dir", MOS_VAR_STRING, absoluteDirectory);
-				} else {
-					fr = MOS_OUT_OF_MEMORY;
-				}
+				createOrUpdateSystemVariable("Obey$Dir", MOS_VAR_STRING, absoluteDirectory);
 			}
 		} else {
 			// Failed to allocate memory for obey directory
 			fr = MOS_OUT_OF_MEMORY;
 		}
-		umm_free(tempDirectory);
+		umm_free(absoluteDirectory);
 		umm_free(directory);
 	}
-	umm_free(expandedPath);
 
 	if (fr == FR_OK) {
 		while (!f_eof(&fil)) {
@@ -968,6 +958,7 @@ int mos_cmdOBEY(char *ptr) {
 		}
 	}
 	f_close(&fil);
+	umm_free(expandedPath);
 	umm_free(buffer);
 	return fr;	
 }
@@ -1232,9 +1223,7 @@ int mos_cmdSET(char * ptr) {
 	if (!newValue) return FR_INT_ERR;
 
 	result = createOrUpdateSystemVariable(token, MOS_VAR_STRING, newValue);
-	if (result != FR_OK) {
-		umm_free(newValue);
-	}
+	umm_free(newValue);
 	return result;
 }
 
@@ -1265,6 +1254,9 @@ int mos_cmdSETEVAL(char * ptr) {
 		result = evaluation->status;
 	} else {
 		result = createOrUpdateSystemVariable(token, evaluation->type, evaluation->result);
+		if (evaluation->type == MOS_VAR_STRING) {
+			umm_free(evaluation->result);
+		}
 	}
 	umm_free(evaluation);
 	return result;
@@ -1274,7 +1266,6 @@ int mos_cmdSETEVAL(char * ptr) {
 //
 int mos_cmdSETMACRO(char * ptr) {
 	char *	token;
-	char *	newValue;
 	int		result;
 
 	// "token" is first parameter, which is a string
@@ -1287,15 +1278,7 @@ int mos_cmdSETMACRO(char * ptr) {
 	if (*ptr == '\0') {
 		return FR_INVALID_PARAMETER;
 	}
-
-	newValue = mos_strdup(ptr);
-	if (!newValue) return MOS_OUT_OF_MEMORY;
-
-	result = createOrUpdateSystemVariable(token, MOS_VAR_MACRO, newValue);
-
-	if (result != FR_OK) {
-		umm_free(newValue);
-	}
+	result = createOrUpdateSystemVariable(token, MOS_VAR_MACRO, ptr);
 
 	return result;
 }
@@ -3009,7 +2992,6 @@ static t_mosCodeSystemVariable consoleVar = {
 };
 
 void mos_setupSystemVariables() {
-	char * tempString;
 	// Date/time variables:
 	// Sys$Time
 	// Sys$Date
@@ -3025,14 +3007,11 @@ void mos_setupSystemVariables() {
 	// Current working directory
 	createOrUpdateSystemVariable("Current$Dir", MOS_VAR_CODE, &cwdVar);
 	// Default CLI prompt
-	tempString = mos_strdup("<Current$Dir> *");
-	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, tempString);
+	createOrUpdateSystemVariable("CLI$Prompt", MOS_VAR_MACRO, "<Current$Dir> *");
 
 	// Default paths
-	tempString = mos_strdup("/mos/");
-	createOrUpdateSystemVariable("Moslet$Path", MOS_VAR_STRING, tempString);
-	tempString = mos_strdup("<Moslet$Path>, ./, /bin/");
-	createOrUpdateSystemVariable("Run$Path", MOS_VAR_MACRO, tempString);
+	createOrUpdateSystemVariable("Moslet$Path", MOS_VAR_STRING, "/mos/");
+	createOrUpdateSystemVariable("Run$Path", MOS_VAR_MACRO, "<Moslet$Path>, ./, /bin/");
 
 	// Keyboard and console settings
 	createOrUpdateSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
