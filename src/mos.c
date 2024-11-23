@@ -570,7 +570,7 @@ int mos_cmdTRY(char * ptr) {
 int mos_cmdECHO(char *ptr) {
 	char read;
 	int result;
-	t_mosTransInfo * transInfo = gsInit(ptr, NULL);
+	t_mosTransInfo * transInfo = gsInit(ptr, GSTRANS_FLAG_NO_TRACE);
 
 	while (transInfo != NULL) {
 		result = gsRead(&transInfo, &read);

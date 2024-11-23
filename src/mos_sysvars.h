@@ -18,6 +18,11 @@
 #define EXTRACT_FLAG_OMIT_ENCLOSING_QUOTES	(1 << 5)
 #define EXTRACT_FLAG_OMIT_LEADSKIP	(1 << 6)
 
+#define GSTRANS_FLAG_TERMINATE_SPACE	(1 << 0)
+#define GSTRANS_FLAG_NO_PIPE			(1 << 1)
+#define GSTRANS_FLAG_NO_DOUBLEQUOTE		(1 << 2)
+#define GSTRANS_FLAG_NO_TRACE			(1 << 7)
+
 /**
  * MOS system variable types
  */
@@ -53,6 +58,7 @@ typedef struct {
 	void * parent;		// Pointer to parent trans object (t_mosTransInfo object) we are inserting
 	void * extraData;	// Extra for the current object, as required
 	MOSVARTYPE type;	// Type of variable we are inserting from
+	BYTE flags;			// Flags for the current operation
 } t_mosTransInfo;
 
 typedef struct {
@@ -76,9 +82,12 @@ void	removeSystemVariable(t_mosSystemVariable * var);
 // find parent system variable object (used for deleting)
 t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var);
 
-t_mosTransInfo * gsInit(void * source, void * parent);
+t_mosTransInfo * gsInit(void * source, BYTE flags);
 int		gsRead(t_mosTransInfo ** transInfo, char * read);
-int		gsTrans(char * source, char * dest, int destLen, int * read);
+int		gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags);
+// Utility functions for managing gs-trans chains
+void	gsDispose(t_mosTransInfo ** transInfo);
+void	gsPop(t_mosTransInfo ** transInfo);
 
 bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags);
 

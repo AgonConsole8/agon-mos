@@ -7,7 +7,8 @@
 #include "mos_sysvars.h"
 #include "mos_file.h"
 
-t_mosSystemVariable * mosSystemVariables = NULL;
+t_mosSystemVariable *	mosSystemVariables = NULL;
+t_mosTransInfo * 		trackedTransInfo = NULL;
 
 // Get a system variable
 // Parameters:
@@ -155,19 +156,32 @@ t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var) {
 }
 
 
-t_mosTransInfo * gsInit(void * source, void * parent) {
-	// TODO store pointer to most recent transInfo object
-	// so we can delete all objects in the chain if a new init is called
-	// as an aborted read sequence may leave us with a chain of objects
-
+t_mosTransInfo * gsInit(void * source, BYTE flags) {
 	// Set up a t_mosTransInfo object
 	t_mosTransInfo * transInfo = umm_malloc(sizeof(t_mosTransInfo));
 	if (transInfo == NULL) {
 		return NULL;
 	}
 	transInfo->source = source;
-	transInfo->parent = parent;
+	transInfo->parent = NULL;
 	transInfo->type = MOS_VAR_MACRO;
+	transInfo->flags = flags;
+
+	if (!(flags & GSTRANS_FLAG_NO_DOUBLEQUOTE) && *((char*)source) == '"') {
+		// We have a double-quoted value, so we should skip the first character
+		transInfo->source++;
+	} else {
+		// Not actually a double-quote enclosed source, so we should set the flag
+		transInfo->flags |= GSTRANS_FLAG_NO_DOUBLEQUOTE;
+	}
+
+	if (!(flags & GSTRANS_FLAG_NO_TRACE)) {
+		// This is a tracked trans, so dispose of any previous one
+		if (trackedTransInfo != NULL) {
+			gsDispose(&trackedTransInfo);
+		}
+		trackedTransInfo = transInfo;
+	}
 
 	return transInfo;
 }
@@ -195,14 +209,8 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 		{
 			*read = *current->source++;
 			if (*read == '\0') {
-				// end of the string so dispose of this transInfo object
-				// and move back to the parent
-				if (current->type == MOS_VAR_CODE) {
-					// free cached string, pointer is stored in extraData
-					umm_free(current->extraData);
-				}
-				*transInfo = current->parent;
-				umm_free(current);
+				// end of the string so pop current transInfo object
+				gsPop(transInfo);
 				// return next read from parent
 				result = gsRead(transInfo, read);
 			}
@@ -217,8 +225,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 			// If our divisor is 0, then we have finished
 			if ((int)current->extraData == 0) {
 				*read = '\0';
-				*transInfo = current->parent;
-				umm_free(current);
+				gsPop(transInfo);
 				// return next read from parent
 				result = gsRead(transInfo, read);
 				break;
@@ -233,15 +240,29 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 		case MOS_VAR_MACRO: {
 			*read = *current->source++;
 			switch (*read) {
+				case '"': {
+					if (current->flags & GSTRANS_FLAG_NO_DOUBLEQUOTE) {
+						// we should treat this as a normal character
+						break;
+					}
+					// otherwise we terminate the whole translation
+					*read = '\0';
+					gsDispose(transInfo);
+					result = gsRead(transInfo, read);
+					break;
+				}
 				case '\0': {
 					// end of the macro - move back to the parent
-					*transInfo = current->parent; 
-					umm_free(current);
+					gsPop(transInfo);
 					result = gsRead(transInfo, read);
 					break;
 				}
 
 				case '|': {
+					if (current->flags & GSTRANS_FLAG_NO_PIPE) {
+						// we should treat this as a normal character
+						break;
+					}
 					// interpret pipe-escaped characters
 					if (*current->source == '\0') {
 						// no more characters, so this is an error
@@ -301,12 +322,17 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 								t_mosTransInfo * newTransInfo = umm_malloc(sizeof(t_mosTransInfo));
 								*end = '>';
 								if (newTransInfo == NULL) {
+									gsDispose(transInfo);
 									result = MOS_OUT_OF_MEMORY;
 								} else {
 									newTransInfo->source = var->value;
 									newTransInfo->parent = current;
 									newTransInfo->type = var->type;
+									newTransInfo->flags = current->flags;
 									*transInfo = newTransInfo;
+									if (!(current->flags & GSTRANS_FLAG_NO_TRACE)) {
+										trackedTransInfo = newTransInfo;
+									}
 									*end = '>';
 									current->source = end + 1;
 									switch (var->type) {
@@ -335,6 +361,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 											if (!newValue) {
 												// Variable couldn't be read for some reason
 												*read = '\0';
+												gsDispose(transInfo);
 												return MOS_BAD_STRING;
 											}
 											newTransInfo->source = newValue;
@@ -386,11 +413,11 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 // - FR_BAD_STRING if a bad string was encountered
 // - MOS_OUT_OF_MEMORY if memory allocation failed
 //
-int gsTrans(char * source, char * dest, int destLen, int * read) {
+int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags) {
 	int remaining = destLen;
 	char c;
 	int result;
-	t_mosTransInfo * transInfo = gsInit(source, NULL);
+	t_mosTransInfo * transInfo = gsInit(source, flags | GSTRANS_FLAG_NO_TRACE);
 	// belt and braces - ensure we definitely don't write to NULL
 	if (dest == NULL) {
 		remaining = 0;
@@ -421,6 +448,39 @@ int gsTrans(char * source, char * dest, int destLen, int * read) {
 	}
 
 	return FR_OK;
+}
+
+void gsDispose(t_mosTransInfo ** transInfoPtr) {
+	t_mosTransInfo * transInfo = *transInfoPtr;
+
+	if (transInfo == NULL) {
+		return;
+	}
+	if (!(transInfo->flags & GSTRANS_FLAG_NO_TRACE)) {
+		// This is a tracked transInfo chain, so we must remove tracking
+		trackedTransInfo = NULL;
+	}
+	while (transInfo != NULL) {
+		t_mosTransInfo * next = transInfo->parent;
+		umm_free(transInfo);
+		transInfo = next;
+	}
+	*transInfoPtr = NULL;
+}
+
+void gsPop(t_mosTransInfo ** transInfo) {
+	t_mosTransInfo * current = *transInfo;
+
+	if (current->type == MOS_VAR_CODE) {
+		// free cached string, pointer is stored in extraData
+		umm_free(current->extraData);
+	}
+	*transInfo = current->parent;
+	umm_free(current);
+
+	if (!(current->flags & GSTRANS_FLAG_NO_TRACE)) {
+		trackedTransInfo = *transInfo;
+	}
 }
 
 // Extract a number from a string
@@ -586,7 +646,7 @@ char * expandMacro(char * source) {
 	int read;
 	int result;
 
-	result = gsTrans(source, NULL, 0, &read);
+	result = gsTrans(source, NULL, 0, &read, 0);
 	if (result != FR_OK) {
 		return NULL;
 	}
@@ -594,7 +654,7 @@ char * expandMacro(char * source) {
 	if (dest == NULL) {
 		return NULL;
 	}
-	result = gsTrans(source, dest, read, &read);
+	result = gsTrans(source, dest, read, &read, 0);
 	if (result != FR_OK) {
 		umm_free(dest);
 		return NULL;
