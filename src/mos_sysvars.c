@@ -162,6 +162,10 @@ t_mosTransInfo * gsInit(void * source, BYTE flags) {
 	if (transInfo == NULL) {
 		return NULL;
 	}
+	// NB "active" provides crude detection of a valid (non-expired) transInfo object
+	// it is not foolproof, as a new allocation of a new transInfo object _could_
+	// get allocated to the same address as one previously in use, but this is unlikely
+	sprintf(transInfo->active, "TInfo");
 	transInfo->source = source;
 	transInfo->parent = NULL;
 	transInfo->type = MOS_VAR_MACRO;
@@ -197,6 +201,10 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 	if (current == NULL) {
 		// We have reached the end of the chain
 		return FR_OK;
+	}
+	if (strcmp(current->active, "TInfo") != 0) {
+		// This isn't a valid transInfo object
+		return FR_INT_ERR;
 	}
 
 	*read = '\0';
@@ -325,6 +333,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 									gsDispose(transInfo);
 									result = MOS_OUT_OF_MEMORY;
 								} else {
+									sprintf(newTransInfo->active, "TInfo");
 									newTransInfo->source = var->value;
 									newTransInfo->parent = current;
 									newTransInfo->type = var->type;
@@ -462,6 +471,7 @@ void gsDispose(t_mosTransInfo ** transInfoPtr) {
 	}
 	while (transInfo != NULL) {
 		t_mosTransInfo * next = transInfo->parent;
+		sprintf(transInfo->active, "DEAD");
 		umm_free(transInfo);
 		transInfo = next;
 	}
@@ -471,11 +481,16 @@ void gsDispose(t_mosTransInfo ** transInfoPtr) {
 void gsPop(t_mosTransInfo ** transInfo) {
 	t_mosTransInfo * current = *transInfo;
 
+	if (!current) {
+		return;
+	}
+
 	if (current->type == MOS_VAR_CODE) {
 		// free cached string, pointer is stored in extraData
 		umm_free(current->extraData);
 	}
 	*transInfo = current->parent;
+	sprintf(current->active, "DEAD");
 	umm_free(current);
 
 	if (!(current->flags & GSTRANS_FLAG_NO_TRACE)) {

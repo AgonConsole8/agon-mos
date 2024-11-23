@@ -54,6 +54,7 @@ typedef struct {
  * Variables that are numbers will be temporarily transformed to a string pointed to by source
  */
 typedef struct {
+	char active[6];		// Active mosTransInfo indicator
 	char * source;		// Pointer to current position in source string
 	void * parent;		// Pointer to parent trans object (t_mosTransInfo object) we are inserting
 	void * extraData;	// Extra for the current object, as required
