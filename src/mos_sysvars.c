@@ -763,46 +763,51 @@ char * getArgument(char * source, int argNo, char ** end) {
 	return result;
 }
 
-// substitute in arguments into a source string
-// Source will contain placeholders in the form %n where n is the argument number
-// or %*n meaning all arguments from n onwards
-// or %s as an equivalent to %*0 (all arguments)
+// Substitute arguments into a template string
+// Parameters:
+// - template: The template string
+// - args: The arguments string
+// - dest: The destination buffer (or NULL to just calculate the length)
+// - length: The length of the destination buffer
+// - omitRest: If true, any unused arguments will be omitted
+// Returns:
+// - The length of the substituted string
 //
-char * substituteArguments(char * source, char * args, bool omitRest) {
-	char * dest;
-	char * destPos;
+int subsituteArgs(char * template, char * args, char * dest, int length, bool omitRest) {
+	char * end = template + strlen(template);
 	char * argument;
-	char * argEnd = NULL;
-	char * start = source;
-	char * end = source + strlen(source);
+	int argNo;
+	int argLen = 0;
 	int maxArg = -1;
 	int size = 0;
+	int destRemaining = length;
+	bool copying = (dest != NULL);
 
-	// Work out how long our string will be with substitutions
-	while (start < end) {
-		if (*start == '%') {
-			start++;
-			if (*start == 's') {
-				size += strlen(args);
-				start++;
+	while (template < end) {
+		if (*template == '%') {
+			argument = NULL;
+			template++;
+			if (*template == 's') {
+				template++;
+				argument = args;
+				argLen = strlen(args);
 				maxArg = 99;	// we have used all arguments
-			} else if (*start == '*' && *(start + 1) >= '0' && *(start + 1) <= '9') {
-				int argNo;
-				start++;	// skip the *
-				argNo = *start - '0';
-				start++;	// skip the number
+			} else if (*template == '*' && *(template + 1) >= '0' && *(template + 1) <= '9') {
+				template++;	// skip the *
+				argNo = *template - '0';
+				template++;	// skip the number
 				argument = getArgument(args, argNo, NULL);
 				if (argument != NULL) {
-					size += strlen(argument);
+					argLen = strlen(argument);
 				}
 				maxArg = 99;	// count a rest arg as all arguments
-			} else if (*start >= '0' && *start <= '9') {
-				int argNo;
-				argNo = *start - '0';
-				start++;	// skip the number
+			} else if (*template >= '0' && *template <= '9') {
+				char * argEnd = NULL;
+				argNo = *template - '0';
+				template++;	// skip the number
 				argument = getArgument(args, argNo, &argEnd);
 				if (argument != NULL) {
-					size += argEnd - argument;
+					argLen = argEnd - argument;
 				}
 				if (argNo > maxArg) {
 					maxArg = argNo;
@@ -810,90 +815,71 @@ char * substituteArguments(char * source, char * args, bool omitRest) {
 			} else {
 				// not a valid argument, so just copy the % and move on
 				size++;
-				if (*start == '%') {
-					start++;
+				if (copying) {
+					*dest++ = '%';
+					destRemaining--;
+				}
+				if (*template == '%') {
+					template++;
+				}
+			}
+			if (argument != NULL) {
+				size += argLen;
+				if (copying) {
+					strncpy(dest, argument, argLen < destRemaining ? argLen : destRemaining);
+					dest += argLen;
+					destRemaining -= argLen;
 				}
 			}
 		} else {
 			size++;
-			start++;
+			if (copying) {
+				*dest++ = *template;
+				destRemaining--;
+			}
+			template++;
+		}
+		if (copying && destRemaining <= 0) {
+			// we have run out of space in the destination buffer
+			copying = false;
 		}
 	}
 
-	// Work out if we have any unused arguments
-	if (maxArg < 99 && !omitRest) {
-		// we have a rest argument
-		maxArg++;
-		argument = getArgument(args, maxArg, NULL);
+	// Work out if we have any unused arguments to append
+	if (!omitRest && maxArg < 99) {
+		argument = getArgument(args, maxArg + 1, NULL);
 		if (argument != NULL) {
-			size += strlen(argument);
-		} else {
-			omitRest = true;
+			argLen = strlen(argument);
+			size += argLen;
+			if (copying) {
+				*dest++ = ' ';
+				destRemaining--;
+				strncpy(dest, argument, argLen < destRemaining ? argLen : destRemaining);
+			}
+			copying = false;
 		}
-	} else {
-		omitRest = true;
+	}
+	if (copying) {
+		*dest = '\0';
 	}
 
+	return ++size;
+}
+
+
+// wrapper call for subsituteArgs to return a newly allocated string
+//
+char * substituteArguments(char * source, char * args, bool omitRest) {
+	char * dest;
+	int size = subsituteArgs(source, args, NULL, 0, omitRest);
+	if (size == 0) {
+		return NULL;
+	}
 	dest = umm_malloc(size + 1);
 	if (dest == NULL) {
 		return NULL;
 	}
-
-	start = source;
-	destPos = dest;
-
-	while (start < end) {
-		if (*start == '%') {
-			start++;
-			if (*start == 's') {
-				strcpy(destPos, args);
-				destPos += strlen(args);
-				start++;
-			} else if (*start == '*' && *(start + 1) >= '0' && *(start + 1) <= '9') {
-				int argNo;
-				start++;		// skip the *
-				argNo = *start - '0';
-				start++;		// skip the number
-				argument = getArgument(args, argNo, NULL);
-				if (argument != NULL) {
-					size = strlen(argument);
-					strncpy(destPos, argument, size);
-					destPos += size;
-				}
-			} else if (*start >= '0' && *start <= '9') {
-				int argNo;
-				argNo = *start - '0';
-				start++;		// skip the number
-				argument = getArgument(args, argNo, &argEnd);
-				if (argument != NULL) {
-					size = argEnd - argument;
-					strncpy(destPos, argument, size);
-					destPos += size;
-				}
-			} else {
-				// not a valid argument, so just copy the % and move on
-				*destPos++ = '%';
-				if (*start == '%') {
-					start++;
-				}
-			}
-		} else {
-			*destPos++ = *start++;
-		}
-	}
-
-	// Include any rest args
-	if (!omitRest) {
-		// we have a rest argument
-		argument = getArgument(args, maxArg, NULL);
-		if (argument != NULL) {
-			*destPos++ = ' ';
-			strcpy(destPos, argument);
-			destPos += strlen(argument);
-		}
-	}
-
-	// return the expanded string
-	*destPos = '\0';
+	subsituteArgs(source, args, dest, size, omitRest);
+	dest[size + 1] = '\0';		// is this needed??
 	return dest;
 }
