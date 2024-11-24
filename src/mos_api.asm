@@ -291,6 +291,7 @@ mos_api_block2_size:	EQU 	($ - mos_api_block2_start) / 2
 
 mos_api_not_implemented:
 			LD	HL, 23			; MOS_NOT_IMPLEMENTED
+			LD	A, 23			; MOS_NOT_IMPLEMENTED
 			RET
 
 ; Get keycode
@@ -509,7 +510,7 @@ mos_api_sysvars:	LD	IX, _sysvars
 ; Invoke the line editor
 ; HLU: Address of the buffer
 ; BCU: Buffer length
-;   E: 0 to not clear buffer, 1 to clear
+;   E: flags
 ; Returns:
 ;   A: Key that was used to exit the input loop (CR=13, ESC=27)
 ;
@@ -520,7 +521,7 @@ mos_api_editline:	LD	A, MB		; Check if MBASE is 0
 ;
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
 ;
-			PUSH	DE		; UINT8	  clear
+			PUSH	DE		; UINT8	  flags
 			PUSH	BC		; int 	  bufferLength
 			PUSH	HL		; char	* buffer
 			CALL	_mos_EDITLINE
@@ -536,6 +537,7 @@ mos_api_editline:	LD	A, MB		; Check if MBASE is 0
 ; Returns:
 ;   A: Filehandle, or 0 if couldn't open
 ;
+; TODO: why the push/pop of HL, DE, IX and IY?
 mos_api_fopen:		PUSH	BC
 			PUSH	DE
 			PUSH	HL
@@ -936,7 +938,10 @@ mos_api_getfil:		PUSH	BC		; UINT8 fh
 ; Returns:
 ; DEU: Number of bytes read
 ;
-mos_api_fread:		PUSH	DE		; UINT24 btr
+mos_api_fread:		LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			CALL	NZ, SET_AHL24
+			PUSH	DE		; UINT24 btr
 			PUSH	HL		; UINT24 buffer
 			PUSH	BC		; UINT8 fh
 			CALL	_mos_FREAD
@@ -954,7 +959,10 @@ mos_api_fread:		PUSH	DE		; UINT24 btr
 ; Returns:
 ; DEU: Number of bytes read
 ;
-mos_api_fwrite:		PUSH	DE		; UINT24 btr
+mos_api_fwrite:		LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			CALL	NZ, SET_AHL24
+			PUSH	DE		; UINT24 btr
 			PUSH	HL		; UINT24 buffer
 			PUSH	BC		; UINT8 fh
 			CALL	_mos_FWRITE
@@ -1044,10 +1052,9 @@ ffs_api_fread:		LD	A, MB		; A: MB
 			LD	A, MB		; A: MB
 			CALL	Z, SET_AHL24	; No it's zero, so convert HL to an address in segment A (MB)
 ;
-$$:			EXX		
-			LD	HL, _scratchpad	; Scratchpad RAM
-			PUSH	HL		; UINT * br
-			EXX 
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; UINT * br
 			PUSH	BC		; UINT btr
 			PUSH	DE		; void * buff
 			PUSH	HL		; FILE * fp
@@ -1077,10 +1084,9 @@ ffs_api_fwrite:		LD	A, MB		; A: MB
 			LD	A, MB		; A: MB
 			CALL	Z, SET_AHL24	; No it's zero, so convert HL to an address in segment A (MB)
 ;
-$$:			EXX		
-			LD	HL, _scratchpad	; Scratchpad RAM
-			PUSH	HL		; UINT * bw
-			EXX 
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; UINT * bw
 			PUSH	BC		; UINT btw
 			PUSH	DE		; void * buff
 			PUSH	HL		; FILE * fp
