@@ -55,6 +55,7 @@
 			XREF	_mos_MKDIR_API
 			XREF	_mos_COPY_API
 			XREF	_mos_GETRTC 
+			XREF	_mos_UNPACKRTC 
 			XREF	_mos_SETRTC 
 			XREF	_mos_SETINTVECTOR
 			XREF	_mos_GETFIL
@@ -141,34 +142,35 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_i2c_close	; 0x20
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
+			DW  mos_api_unpackrtc	; 0x23
 
-			DW  mos_api_not_implemented ; 0x23
 			DW  mos_api_not_implemented ; 0x24
 			DW  mos_api_not_implemented ; 0x25
 			DW  mos_api_not_implemented ; 0x26
 			DW  mos_api_not_implemented ; 0x27
-			DW  mos_api_not_implemented ; 0x28
-			DW  mos_api_not_implemented ; 0x29
-			DW  mos_api_not_implemented ; 0x2a
-			DW  mos_api_not_implemented ; 0x2b
-			DW  mos_api_not_implemented ; 0x2c
+
+			DW  mos_api_not_implemented ; 0x28   mos_api_pmatch
+			DW  mos_api_not_implemented ; 0x29   mos_api_getarg ??
+			DW  mos_api_not_implemented ; 0x2a   mos_api_extractstring
+			DW  mos_api_not_implemented ; 0x2b   mos_api_extractnumber
+			DW  mos_api_not_implemented ; 0x2c   mos_api_escapestring   printEscapedString ??
 			DW  mos_api_not_implemented ; 0x2d
 			DW  mos_api_not_implemented ; 0x2e
 			DW  mos_api_not_implemented ; 0x2f
 
-			DW  mos_api_not_implemented ; 0x30
-			DW  mos_api_not_implemented ; 0x31
-			DW  mos_api_not_implemented ; 0x32
-			DW  mos_api_not_implemented ; 0x33
-			DW  mos_api_not_implemented ; 0x34
-			DW  mos_api_not_implemented ; 0x35
-			DW  mos_api_not_implemented ; 0x36
-			DW  mos_api_not_implemented ; 0x37
-			DW  mos_api_not_implemented ; 0x38
-			DW  mos_api_not_implemented ; 0x39
-			DW  mos_api_not_implemented ; 0x3a
-			DW  mos_api_not_implemented ; 0x3b
-			DW  mos_api_not_implemented ; 0x3c
+			DW  mos_api_not_implemented ; 0x30   mos_api_setvarval
+			DW  mos_api_not_implemented ; 0x31   mos_api_readvarval
+			DW  mos_api_not_implemented ; 0x32   mos_api_gsinit
+			DW  mos_api_not_implemented ; 0x33   mos_api_gsread
+			DW  mos_api_not_implemented ; 0x34   mos_api_gstrans
+			DW  mos_api_not_implemented ; 0x35   mos_api_substituteargs
+			DW  mos_api_not_implemented ; 0x36   reserved for mos_api_evaluateexpression
+			DW  mos_api_not_implemented ; 0x37   reserved for something else :)
+			DW  mos_api_not_implemented ; 0x38   mos_api_resolvepath
+			DW  mos_api_not_implemented ; 0x39   mos_api_getdirectoryforpath
+			DW  mos_api_not_implemented ; 0x3a   mos_api_getfilepathleafname
+			DW  mos_api_not_implemented ; 0x3b   mos_api_isdirectory
+			DW  mos_api_not_implemented ; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
 			DW  mos_api_not_implemented ; 0x3d
 			DW  mos_api_not_implemented ; 0x3e
 			DW  mos_api_not_implemented ; 0x3f
@@ -725,6 +727,17 @@ mos_api_getrtc:		LD	A, MB		; Check if MBASE is 0
 			CALL	_mos_GETRTC
 			POP	HL
 			RET 
+
+; Unpack RTC data
+; HLU: Pointer to a buffer to copy the RTC data to
+;
+mos_api_unpackrtc:	LD	A, MB		; Check if MBASE is 0
+			OR	A, A 
+			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
+			PUSH 	HL
+			CALL	_mos_UNPACKRTC
+			POP	HL
+			RET
 
 ; Set the RTC
 ; HLU: Pointer to a buffer with the time data in

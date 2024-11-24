@@ -2692,11 +2692,15 @@ UINT24 mos_OSCLI(char * cmd) {
 UINT8 mos_GETRTC(UINT24 address) {
 	vdp_time_t t;
 
-	rtc_update();
-	rtc_unpack(&rtc, &t);
+	mos_UNPACKRTC((UINT24)&t);
 	rtc_formatDateTime((char *)address, &t);
 
 	return strlen((char *)address);
+}
+
+void mos_UNPACKRTC(UINT24 address) {
+	rtc_update();
+	rtc_unpack(&rtc, (vdp_time_t *)address);
 }
 
 // Set the RTC
