@@ -37,6 +37,8 @@
 			XREF	SET_AHL24
 			XREF	GET_AHL24
 			XREF	SET_ADE24
+			XREF	SET_ABC24
+			XREF	SET_AIX24
 
 			XREF	_mos_OSCLI		; In mos.c
 			XREF	_mos_EDITLINE
@@ -95,6 +97,20 @@
 			XREF	_f_closedir
 			XREF	_f_readdir
 			XREF	_f_getcwd
+
+			XREF	_pmatch			; In strings.c
+
+			XREF	_extractString		; In mos_sysvars.c
+			XREF	_extractNumber
+			; XREF	_escapeString
+			XREF	_setVarVal
+			XREF	_readVarVal
+			XREF	_gsInit
+			XREF	_gsRead
+			XREF	_gsTrans
+			XREF	_substituteArgs
+			; XREF	_evaluateExpression
+			; XREF	_getArgument
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -149,31 +165,31 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW  mos_api_not_implemented ; 0x26
 			DW  mos_api_not_implemented ; 0x27
 
-			DW  mos_api_not_implemented ; 0x28   mos_api_pmatch
-			DW  mos_api_not_implemented ; 0x29   mos_api_getarg ??
-			DW  mos_api_not_implemented ; 0x2a   mos_api_extractstring
-			DW  mos_api_not_implemented ; 0x2b   mos_api_extractnumber
-			DW  mos_api_not_implemented ; 0x2c   mos_api_escapestring   printEscapedString ??
-			DW  mos_api_not_implemented ; 0x2d
-			DW  mos_api_not_implemented ; 0x2e
-			DW  mos_api_not_implemented ; 0x2f
+			DW  mos_api_pmatch			; 0x28
+			DW  mos_api_not_implemented	; 0x29   mos_api_getarg ??
+			DW  mos_api_extractstring	; 0x2a
+			DW  mos_api_extractnumber	; 0x2b   
+			DW  mos_api_not_implemented	; 0x2c   mos_api_escapestring   printEscapedString ??
+			DW  mos_api_not_implemented	; 0x2d
+			DW  mos_api_not_implemented	; 0x2e
+			DW  mos_api_not_implemented	; 0x2f
 
-			DW  mos_api_not_implemented ; 0x30   mos_api_setvarval
-			DW  mos_api_not_implemented ; 0x31   mos_api_readvarval
-			DW  mos_api_not_implemented ; 0x32   mos_api_gsinit
-			DW  mos_api_not_implemented ; 0x33   mos_api_gsread
-			DW  mos_api_not_implemented ; 0x34   mos_api_gstrans
-			DW  mos_api_not_implemented ; 0x35   mos_api_substituteargs
-			DW  mos_api_not_implemented ; 0x36   reserved for mos_api_evaluateexpression
-			DW  mos_api_not_implemented ; 0x37   reserved for something else :)
-			DW  mos_api_not_implemented ; 0x38   mos_api_resolvepath
-			DW  mos_api_not_implemented ; 0x39   mos_api_getdirectoryforpath
-			DW  mos_api_not_implemented ; 0x3a   mos_api_getfilepathleafname
-			DW  mos_api_not_implemented ; 0x3b   mos_api_isdirectory
-			DW  mos_api_not_implemented ; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
-			DW  mos_api_not_implemented ; 0x3d
-			DW  mos_api_not_implemented ; 0x3e
-			DW  mos_api_not_implemented ; 0x3f
+			DW  mos_api_not_implemented	; 0x30   mos_api_setvarval
+			DW  mos_api_not_implemented	; 0x31   mos_api_readvarval
+			DW  mos_api_not_implemented	; 0x32   mos_api_gsinit
+			DW  mos_api_not_implemented	; 0x33   mos_api_gsread
+			DW  mos_api_not_implemented	; 0x34   mos_api_gstrans
+			DW  mos_api_not_implemented	; 0x35   mos_api_substituteargs
+			DW  mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
+			DW  mos_api_not_implemented	; 0x37   reserved for something else :)
+			DW  mos_api_not_implemented	; 0x38   mos_api_resolvepath
+			DW  mos_api_not_implemented	; 0x39   mos_api_getdirectoryforpath
+			DW  mos_api_not_implemented	; 0x3a   mos_api_getfilepathleafname
+			DW  mos_api_not_implemented	; 0x3b   mos_api_isdirectory
+			DW  mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
+			DW  mos_api_not_implemented	; 0x3d
+			DW  mos_api_not_implemented	; 0x3e
+			DW  mos_api_not_implemented	; 0x3f
 
 			DW  mos_api_not_implemented ; 0x40
 			DW  mos_api_not_implemented ; 0x41
@@ -993,6 +1009,98 @@ mos_api_flseek:		PUSH 	DE		; UINT32 offset (msb)
 			POP	BC
 			POP	HL
 			POP	DE
+			RET
+
+
+; MOS String functions
+;
+; Pattern matching
+; HLU: Address of pattern (zero terminated)
+; DEU: Address at string to compare against pattern (zero terminated)
+; C: Flags
+; Returns:
+; - A: File error, or 0 if OK
+; - F: Carry reset indicates no room for file.
+;
+mos_api_pmatch:		LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
+			PUSH	DE		; char * string
+			PUSH	HL		; char * pattern
+			CALL	_pmatch	; Call the C function pmatch
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			RET
+
+; Extract a string, using a given divider
+; HLU: Address of pointer to source string to extract from, will be advanced
+; DEU: Address of pointer for the result (will be within the source string)
+; BCU: Pointer to string for divider matching, or 0 for default (space)
+; A: Flags
+; Depending on flags, the result string will be zero terminated or not
+; source pointer will be updated to point to the next character after result
+; Returns:
+; - A: 0 if OK or -1 if divider not found
+;
+mos_api_extractstring:	
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL, DE and BC are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+			CALL	SET_ABC24
+$$:			PUSH	BC		; char * divider
+			PUSH	DE		; char * buffer
+			PUSH	HL		; char * string
+			CALL	_extractString	; Call the C function extractString
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	AF
+			LD	A, (_scratchpad)
+			CPL			; 1's complement A (invert the bits)
+			RET
+
+; Extract a number, using a given divider
+; HLU: Address of source string to extract from
+; DEU: Address of pointer to "end", both for searching source and position after extract (can be NULL)
+; BCU: Pointer to string for divider matching, or 0 for default (space)
+; IXU: Pointer to address to store 24-bit result value
+; A: Flags
+; Returns:
+; - A: 0 if OK or -1 if divider not found
+;
+mos_api_extractnumber:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+			CALL	SET_ABC24
+			CALL	SET_AIX24
+$$:			PUSH	IX		; UINT24 * result
+			PUSH	BC		; char * divider
+			PUSH	DE		; char ** end
+			PUSH	HL		; char * string
+			CALL	_extractNumber	; Call the C function extractNumber
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	IX
+			POP	AF		; Then pop result back
+			LD	A, (_scratchpad)
+			CPL			; 1's complement A (invert the bits)
 			RET
 
 ; Open a file

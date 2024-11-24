@@ -25,6 +25,8 @@
 			XDEF	SET_AHL24
 			XDEF	GET_AHL24
 			XDEF	SET_ADE24
+			XDEF	SET_ABC24
+			XDEF	SET_AIX24
 			
 			XDEF	__exec16
 			XDEF	__exec24
@@ -77,6 +79,28 @@ SET_ADE24:		EX	DE, HL
 			LD	(HL), A
 			POP	HL
 			EX	DE, HL
+			RET
+
+; Set the MSB of BC (U) to A
+; can't use EX BC, HL as that instruction doesn't exist
+SET_ABC24:		PUSH	HL	; push current HL to stack to save it
+			PUSH	BC
+			LD	HL, 2
+			ADD	HL, SP
+			LD	(HL), A
+			POP	BC
+			POP	HL	; restore HL
+			RET
+
+; Set the MSB of IX (U) to A
+;
+SET_AIX24:		PUSH	HL
+			PUSH	IX
+			LD	HL, 2
+			ADD	HL, SP
+			LD	(HL), A
+			POP	IX
+			POP	HL
 			RET
 
 ; Execute a program in RAM
