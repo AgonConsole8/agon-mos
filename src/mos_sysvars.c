@@ -167,11 +167,17 @@ t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var) {
 }
 
 
-t_mosTransInfo * gsInit(void * source, BYTE flags) {
+int gsInit(void * source, t_mosTransInfo ** transInfoPtr, BYTE flags) {
+	t_mosTransInfo * transInfo;
+
+	if (transInfoPtr == NULL) {
+		return FR_INVALID_PARAMETER;
+	}
+
 	// Set up a t_mosTransInfo object
-	t_mosTransInfo * transInfo = umm_malloc(sizeof(t_mosTransInfo));
+	transInfo = umm_malloc(sizeof(t_mosTransInfo));
 	if (transInfo == NULL) {
-		return NULL;
+		return MOS_OUT_OF_MEMORY;
 	}
 	// NB "active" provides crude detection of a valid (non-expired) transInfo object
 	// it is not foolproof, as a new allocation of a new transInfo object _could_
@@ -198,7 +204,8 @@ t_mosTransInfo * gsInit(void * source, BYTE flags) {
 		trackedTransInfo = transInfo;
 	}
 
-	return transInfo;
+	*transInfoPtr = transInfo;
+	return FR_OK;
 }
 
 int gsRead(t_mosTransInfo ** transInfo, char * read) {
@@ -209,6 +216,9 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 	t_mosTransInfo * current = *transInfo;
 	int result = FR_OK;
 
+	if (read == NULL) {
+		return FR_INVALID_PARAMETER;
+	}
 	if (current == NULL) {
 		// We have reached the end of the chain
 		return FR_OK;
@@ -434,22 +444,23 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 // - MOS_OUT_OF_MEMORY if memory allocation failed
 //
 int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags) {
+	t_mosTransInfo * transInfo;
+	int result;
 	int remaining = destLen;
 	char c;
-	int result;
-	t_mosTransInfo * transInfo = gsInit(source, flags | GSTRANS_FLAG_NO_TRACE);
+
+	if (source == NULL || source == dest || read == NULL) {
+		return FR_INVALID_PARAMETER;
+	}
 	// belt and braces - ensure we definitely don't write to NULL
 	if (dest == NULL) {
 		remaining = 0;
 	}
 	*read = 0;
 
-	if (source == NULL || source == dest) {
-		return FR_INVALID_PARAMETER;
-	}
-
-	if (transInfo == NULL) {
-		return FR_INT_ERR;
+	result = gsInit(source, &transInfo, flags | GSTRANS_FLAG_NO_TRACE);
+	if (result != FR_OK) {
+		return result;
 	}
 
 	while (transInfo != NULL) {
@@ -617,12 +628,14 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 // - source: Pointer to the source string (will be advanced)
 // - result: Pointer to pointer for result string
 // - divider: The token divider string - null for default (space)
+// - flags: Flags to control extraction
 // Returns:
 // - True if successful
 // - False if the string could not be extracted
 // - source will be advanced to point to the end of the string
 // - result point to start of found string and will be null terminated
 //
+// TODO extractNumber and extractString should get similar APIs
 bool extractString(char ** source, char ** result, char * divider, BYTE flags) {
 	char *start = *source;
 	char *endptr = NULL;

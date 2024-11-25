@@ -568,9 +568,13 @@ int mos_cmdTRY(char * ptr) {
 // ECHO command
 //
 int mos_cmdECHO(char *ptr) {
+	t_mosTransInfo * transInfo;
 	char read;
-	int result;
-	t_mosTransInfo * transInfo = gsInit(ptr, GSTRANS_FLAG_NO_TRACE);
+	int result = gsInit(ptr, &transInfo, GSTRANS_FLAG_NO_TRACE);
+
+	if (result != FR_OK) {
+		return result;
+	}
 
 	while (transInfo != NULL) {
 		result = gsRead(&transInfo, &read);

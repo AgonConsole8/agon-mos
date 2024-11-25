@@ -158,106 +158,106 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_i2c_close	; 0x20
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
-			DW  mos_api_unpackrtc	; 0x23
+			DW	mos_api_unpackrtc	; 0x23
 
-			DW  mos_api_not_implemented ; 0x24
-			DW  mos_api_not_implemented ; 0x25
-			DW  mos_api_not_implemented ; 0x26
-			DW  mos_api_not_implemented ; 0x27
+			DW	mos_api_not_implemented	; 0x24
+			DW	mos_api_not_implemented	; 0x25
+			DW	mos_api_not_implemented	; 0x26
+			DW	mos_api_not_implemented	; 0x27
 
-			DW  mos_api_pmatch			; 0x28
-			DW  mos_api_not_implemented	; 0x29   mos_api_getarg ??
-			DW  mos_api_extractstring	; 0x2a
-			DW  mos_api_extractnumber	; 0x2b   
-			DW  mos_api_not_implemented	; 0x2c   mos_api_escapestring   printEscapedString ??
-			DW  mos_api_not_implemented	; 0x2d
-			DW  mos_api_not_implemented	; 0x2e
-			DW  mos_api_not_implemented	; 0x2f
+			DW	mos_api_pmatch		; 0x28
+			DW	mos_api_not_implemented	; 0x29   mos_api_getarg ??
+			DW	mos_api_extractstring	; 0x2a
+			DW	mos_api_extractnumber	; 0x2b   
+			DW	mos_api_not_implemented	; 0x2c   mos_api_escapestring   printEscapedString ??
+			DW	mos_api_not_implemented	; 0x2d
+			DW	mos_api_not_implemented	; 0x2e
+			DW	mos_api_not_implemented	; 0x2f
 
-			DW  mos_api_not_implemented	; 0x30   mos_api_setvarval
-			DW  mos_api_not_implemented	; 0x31   mos_api_readvarval
-			DW  mos_api_not_implemented	; 0x32   mos_api_gsinit
-			DW  mos_api_not_implemented	; 0x33   mos_api_gsread
-			DW  mos_api_not_implemented	; 0x34   mos_api_gstrans
-			DW  mos_api_not_implemented	; 0x35   mos_api_substituteargs
-			DW  mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
-			DW  mos_api_not_implemented	; 0x37   reserved for something else :)
-			DW  mos_api_not_implemented	; 0x38   mos_api_resolvepath
-			DW  mos_api_not_implemented	; 0x39   mos_api_getdirectoryforpath
-			DW  mos_api_not_implemented	; 0x3a   mos_api_getfilepathleafname
-			DW  mos_api_not_implemented	; 0x3b   mos_api_isdirectory
-			DW  mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
-			DW  mos_api_not_implemented	; 0x3d
-			DW  mos_api_not_implemented	; 0x3e
-			DW  mos_api_not_implemented	; 0x3f
+			DW	mos_api_not_implemented	; 0x30   mos_api_setvarval
+			DW	mos_api_not_implemented	; 0x31   mos_api_readvarval
+			DW	mos_api_gsinit		; 0x32
+			DW	mos_api_gsread		; 0x33
+			DW	mos_api_gstrans		; 0x34
+			DW	mos_api_not_implemented	; 0x35   mos_api_substituteargs
+			DW	mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
+			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
+			DW	mos_api_not_implemented	; 0x38   mos_api_resolvepath
+			DW	mos_api_not_implemented	; 0x39   mos_api_getdirectoryforpath
+			DW	mos_api_not_implemented	; 0x3a   mos_api_getfilepathleafname
+			DW	mos_api_not_implemented	; 0x3b   mos_api_isdirectory
+			DW	mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
+			DW	mos_api_not_implemented	; 0x3d
+			DW	mos_api_not_implemented	; 0x3e
+			DW	mos_api_not_implemented	; 0x3f
 
-			DW  mos_api_not_implemented ; 0x40
-			DW  mos_api_not_implemented ; 0x41
-			DW  mos_api_not_implemented ; 0x42
-			DW  mos_api_not_implemented ; 0x43
-			DW  mos_api_not_implemented ; 0x44
-			DW  mos_api_not_implemented ; 0x45
-			DW  mos_api_not_implemented ; 0x46
-			DW  mos_api_not_implemented ; 0x47
-			DW  mos_api_not_implemented ; 0x48
-			DW  mos_api_not_implemented ; 0x49
-			DW  mos_api_not_implemented ; 0x4a
-			DW  mos_api_not_implemented ; 0x4b
-			DW  mos_api_not_implemented ; 0x4c
-			DW  mos_api_not_implemented ; 0x4d
-			DW  mos_api_not_implemented ; 0x4e
-			DW  mos_api_not_implemented ; 0x4f
+			DW	mos_api_not_implemented	; 0x40
+			DW	mos_api_not_implemented	; 0x41
+			DW	mos_api_not_implemented	; 0x42
+			DW	mos_api_not_implemented	; 0x43
+			DW	mos_api_not_implemented	; 0x44
+			DW	mos_api_not_implemented	; 0x45
+			DW	mos_api_not_implemented	; 0x46
+			DW	mos_api_not_implemented	; 0x47
+			DW	mos_api_not_implemented	; 0x48
+			DW	mos_api_not_implemented	; 0x49
+			DW	mos_api_not_implemented	; 0x4a
+			DW	mos_api_not_implemented	; 0x4b
+			DW	mos_api_not_implemented	; 0x4c
+			DW	mos_api_not_implemented	; 0x4d
+			DW	mos_api_not_implemented	; 0x4e
+			DW	mos_api_not_implemented	; 0x4f
 
-			DW  mos_api_not_implemented ; 0x50
-			DW  mos_api_not_implemented ; 0x51
-			DW  mos_api_not_implemented ; 0x52
-			DW  mos_api_not_implemented ; 0x53
-			DW  mos_api_not_implemented ; 0x54
-			DW  mos_api_not_implemented ; 0x55
-			DW  mos_api_not_implemented ; 0x56
-			DW  mos_api_not_implemented ; 0x57
-			DW  mos_api_not_implemented ; 0x58
-			DW  mos_api_not_implemented ; 0x59
-			DW  mos_api_not_implemented ; 0x5a
-			DW  mos_api_not_implemented ; 0x5b
-			DW  mos_api_not_implemented ; 0x5c
-			DW  mos_api_not_implemented ; 0x5d
-			DW  mos_api_not_implemented ; 0x5e
-			DW  mos_api_not_implemented ; 0x5f
+			DW	mos_api_not_implemented	; 0x50
+			DW	mos_api_not_implemented	; 0x51
+			DW	mos_api_not_implemented	; 0x52
+			DW	mos_api_not_implemented	; 0x53
+			DW	mos_api_not_implemented	; 0x54
+			DW	mos_api_not_implemented	; 0x55
+			DW	mos_api_not_implemented	; 0x56
+			DW	mos_api_not_implemented	; 0x57
+			DW	mos_api_not_implemented	; 0x58
+			DW	mos_api_not_implemented	; 0x59
+			DW	mos_api_not_implemented	; 0x5a
+			DW	mos_api_not_implemented	; 0x5b
+			DW	mos_api_not_implemented	; 0x5c
+			DW	mos_api_not_implemented	; 0x5d
+			DW	mos_api_not_implemented	; 0x5e
+			DW	mos_api_not_implemented	; 0x5f
 
-			DW  mos_api_not_implemented ; 0x60
-			DW  mos_api_not_implemented ; 0x61
-			DW  mos_api_not_implemented ; 0x62
-			DW  mos_api_not_implemented ; 0x63
-			DW  mos_api_not_implemented ; 0x64
-			DW  mos_api_not_implemented ; 0x65
-			DW  mos_api_not_implemented ; 0x66
-			DW  mos_api_not_implemented ; 0x67
-			DW  mos_api_not_implemented ; 0x68
-			DW  mos_api_not_implemented ; 0x69
-			DW  mos_api_not_implemented ; 0x6a
-			DW  mos_api_not_implemented ; 0x6b
-			DW  mos_api_not_implemented ; 0x6c
-			DW  mos_api_not_implemented ; 0x6d
-			DW  mos_api_not_implemented ; 0x6e
-			DW  mos_api_not_implemented ; 0x6f
+			DW	mos_api_not_implemented	; 0x60
+			DW	mos_api_not_implemented	; 0x61
+			DW	mos_api_not_implemented	; 0x62
+			DW	mos_api_not_implemented	; 0x63
+			DW	mos_api_not_implemented	; 0x64
+			DW	mos_api_not_implemented	; 0x65
+			DW	mos_api_not_implemented	; 0x66
+			DW	mos_api_not_implemented	; 0x67
+			DW	mos_api_not_implemented	; 0x68
+			DW	mos_api_not_implemented	; 0x69
+			DW	mos_api_not_implemented	; 0x6a
+			DW	mos_api_not_implemented	; 0x6b
+			DW	mos_api_not_implemented	; 0x6c
+			DW	mos_api_not_implemented	; 0x6d
+			DW	mos_api_not_implemented	; 0x6e
+			DW	mos_api_not_implemented	; 0x6f
 
-			DW  mos_api_not_implemented ; 0x70
-			DW  mos_api_not_implemented ; 0x71
-			DW  mos_api_not_implemented ; 0x72
-			DW  mos_api_not_implemented ; 0x73
-			DW  mos_api_not_implemented ; 0x74
-			DW  mos_api_not_implemented ; 0x75
-			DW  mos_api_not_implemented ; 0x76
-			DW  mos_api_not_implemented ; 0x77
-			DW  mos_api_not_implemented ; 0x78
-			DW  mos_api_not_implemented ; 0x79
-			DW  mos_api_not_implemented ; 0x7a
-			DW  mos_api_not_implemented ; 0x7b
-			DW  mos_api_not_implemented ; 0x7c
-			DW  mos_api_not_implemented ; 0x7d
-			DW  mos_api_not_implemented ; 0x7e
-			DW  mos_api_not_implemented ; 0x7f
+			DW	mos_api_not_implemented	; 0x70
+			DW	mos_api_not_implemented	; 0x71
+			DW	mos_api_not_implemented	; 0x72
+			DW	mos_api_not_implemented	; 0x73
+			DW	mos_api_not_implemented	; 0x74
+			DW	mos_api_not_implemented	; 0x75
+			DW	mos_api_not_implemented	; 0x76
+			DW	mos_api_not_implemented	; 0x77
+			DW	mos_api_not_implemented	; 0x78
+			DW	mos_api_not_implemented	; 0x79
+			DW	mos_api_not_implemented	; 0x7a
+			DW	mos_api_not_implemented	; 0x7b
+			DW	mos_api_not_implemented	; 0x7c
+			DW	mos_api_not_implemented	; 0x7d
+			DW	mos_api_not_implemented	; 0x7e
+			DW	mos_api_not_implemented	; 0x7f
 
 mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
@@ -1106,9 +1106,86 @@ $$:			PUSH	IX		; UINT24 * result
 			POP	DE
 			POP	BC
 			POP	IX
-			POP	AF		; Then pop result back
+			POP	AF
 			LD	A, (_scratchpad)
 			CPL			; 1's complement A (invert the bits)
+			RET
+
+; Initialise a GS Trans operation
+; HLU: Pointer to source buffer to translate
+; DEU: Address of pointer used to store trans info
+; A: Flags
+; Returns:
+; - A: Status code
+;
+mos_api_gsinit:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	DE		; t_mosTransInfo ** transInfoPtr
+			PUSH	HL		; char * source
+			CALL	_gsInit		; Call the C function gsInit
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	AF
+			LD	A, (_scratchpad)
+			RET
+
+; Perform a GS Trans "read" operation
+; HLU: Pointer to a char (byte) to store the result
+; DEU: Address of pointer used to store trans info (same pointer as used with gsInit)
+; Returns:
+; - A: Status code
+;
+mos_api_gsread:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	HL		; char * read
+			PUSH	DE		; t_mosTransInfo ** transInfoPtr
+			CALL	_gsRead		; Call the C function gsRead
+			LD	A, L		; Return value in HLU, put in A
+			POP	DE
+			POP	HL
+			RET
+
+; Perform a complete GSTrans operation from source into dest buffer
+; HLU: Pointer to source buffer
+; DEU: Pointer to destination buffer (can be null to just count size)
+; BCU: Length of destination buffer
+; IXU: Pointer to integer to store total number of bytes read/translated
+; A: Flags
+; Returns:
+; - A: Status code
+;
+mos_api_gstrans:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+			CALL	SET_AIX24
+$$:			PUSH	IX		; UINT24 * read
+			PUSH	BC		; UINT24 destLength
+			PUSH	DE		; char * dest
+			PUSH	HL		; char * source
+			CALL	_gsTrans	; Call the C function gstrans
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	IX
+			POP	AF
+			LD	A, (_scratchpad)
 			RET
 
 ; Open a file
