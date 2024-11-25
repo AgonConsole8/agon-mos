@@ -1665,6 +1665,10 @@ int mos_cmdTEST(char *ptr) {
 			ran = true;
 			path_tests(verbose);
 		}
+		if (strcasecmp(testName, "string") == 0) {
+			ran = true;
+			string_tests(verbose);
+		}
 		if (strcasecmp(testName, "all") == 0) {
 			ran = true;
 			malloc_grind(verbose);

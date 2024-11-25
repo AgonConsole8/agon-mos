@@ -627,6 +627,93 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 	return true;
 }
 
+// Extract a string from the source, with the given divider
+// Parameters:
+// - source: Pointer to the source string
+// - end: Pointer to pointer to return end of string
+// - divider: The token divider string - null for default (space)
+// - result: Pointer to pointer for result string
+// - flags: Flags to control extraction
+// Returns:
+// - status code
+// end will point to character after the end of the extracted string
+int newExtractString(char * source, char ** end, char * divider, char ** result, BYTE flags) {
+	char * start = source;
+	char * endptr = NULL;
+	bool findEndQuotes = false;
+
+	if (result == NULL) {
+		return FR_INVALID_PARAMETER;
+	}
+
+	if (divider == NULL) {
+		divider = " ";
+	}
+	if (!(flags & NEW_EXTRACT_FLAG_OMIT_LEADSKIP)) {
+		// skip our source past any start token dividers
+		start = start + mos_strspn(start, divider);
+	}
+
+	if (!(flags & NEW_EXTRACT_FLAG_NO_DOUBLEQUOTE) && *start == '"') {
+		// printf("found double quote\n");
+		// we have a double-quoted value, so we should skip the first character
+		if (!(flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES)) {
+			start++;
+		}
+		findEndQuotes = true;
+	}
+
+	// printf("findEndQuotes: %s, flag was %s\n", findEndQuotes ? "true" : "false", flags & NEW_EXTRACT_FLAG_NO_DOUBLEQUOTE ? "true" : "false");
+
+	if (findEndQuotes) {
+		// iterate thru string to find our end quote
+		// NB quotes can be escaped with \" or ""
+		endptr = start;
+		if (flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES) {
+			endptr++;
+		}
+		while (*endptr != '\0') {
+			if (*endptr == '"') {
+				// skip over escaped quotes
+				if (*(endptr + 1) == '"') {
+					endptr++;
+				} else if (*(endptr - 1) != '\\') {
+					// found end quote
+					break;
+				}
+			}
+			endptr++;
+		}
+		if (*endptr == '\0') {
+			// no end quote found
+			// printf("no end quote found\n");
+			return MOS_BAD_STRING;
+		}
+		// if our next character is neither a divider nor end of string, then we have a bad string
+		if (*(endptr + 1) != '\0' && strchr(divider, *(endptr + 1)) == NULL) {
+			return MOS_BAD_STRING;
+		}
+		if (flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES) {
+			endptr++;
+		}
+	} else {
+		// find the end of the string by next divider
+		endptr = start + mos_strcspn(start, divider);
+	}
+
+	if (*endptr != '\0' && (flags & NEW_EXTRACT_FLAG_AUTO_TERMINATE)) {
+		*endptr = '\0';
+		endptr++;
+	}
+
+	*result = start;
+	if (end != NULL) {
+		*end = endptr;
+	}
+
+	return FR_OK;
+}
+
 // Extract a string
 // Parameters:
 // - source: Pointer to the source string (will be advanced)

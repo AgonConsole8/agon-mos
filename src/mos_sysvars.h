@@ -18,6 +18,12 @@
 #define EXTRACT_FLAG_OMIT_ENCLOSING_QUOTES	(1 << 5)
 #define EXTRACT_FLAG_OMIT_LEADSKIP	(1 << 6)
 
+// New set of extract flags for strings
+#define NEW_EXTRACT_FLAG_AUTO_TERMINATE		(1 << 0)
+#define NEW_EXTRACT_FLAG_OMIT_LEADSKIP		(1 << 1)
+#define NEW_EXTRACT_FLAG_NO_DOUBLEQUOTE		(1 << 2)
+#define NEW_EXTRACT_FLAG_INCLUDE_QUOTES		(1 << 3)
+
 #define GSTRANS_FLAG_TERMINATE_SPACE	(1 << 0)
 #define GSTRANS_FLAG_NO_PIPE			(1 << 1)
 #define GSTRANS_FLAG_NO_DOUBLEQUOTE		(1 << 2)
@@ -91,6 +97,8 @@ void	gsDispose(t_mosTransInfo ** transInfo);
 void	gsPop(t_mosTransInfo ** transInfo);
 
 bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags);
+
+int		newExtractString(char * source, char ** end, char * divider, char ** result, BYTE flags);
 
 bool	extractString(char ** source, char ** result, char * divider, BYTE flags);
 
