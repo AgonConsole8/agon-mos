@@ -229,6 +229,10 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 	}
 
 	*read = '\0';
+	if (!current->parent && (current->flags & GSTRANS_FLAG_TERMINATE_SPACE) && isspace(*current->source)) {
+		gsPop(transInfo);
+		return FR_OK;
+	}
 
 	// Do transformation based on type, if we need to
 	switch (current->type) {
