@@ -111,6 +111,12 @@
 			XREF	_gsTrans
 			XREF	_substituteArgs
 			; XREF	_evaluateExpression
+
+			XREF	_resolvePath		; In mos_file.c
+			XREF	_getDirectoryForPath
+			XREF	_getFilePathLeafName
+			XREF	_isDirectory
+			XREF	_resolveRelativePath
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -182,7 +188,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_substituteargs	; 0x35
 			DW	mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
 			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
-			DW	mos_api_not_implemented	; 0x38   mos_api_resolvepath
+			DW	mos_api_resolvepath	; 0x38
 			DW	mos_api_not_implemented	; 0x39   mos_api_getdirectoryforpath
 			DW	mos_api_not_implemented	; 0x3a   mos_api_getfilepathleafname
 			DW	mos_api_not_implemented	; 0x3b   mos_api_isdirectory
@@ -1087,12 +1093,11 @@ mos_api_extractstring:
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			LD	A, D
-			OR	A, A
-			JR	NZ, $F		; D is not zero so DE may contain an address
-			LD	A, E
-			OR	A, A
-			CALL	Z, SET_ADE24	; DE not zero, so set U to MB
+			LD	A, D		; Check if DE is zero
+			OR	A, E
+			JR	Z, $F		; DE is zero so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
 $$:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; char ** result
@@ -1131,11 +1136,10 @@ mos_api_extractnumber:
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
-			OR	A, A
-			JR	NZ, $F		; D is not zero so DE may contain an address
-			LD	A, E
-			OR	A, A
-			CALL	Z, SET_ADE24	; DE not zero, so set U to MB
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
 $$:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * number
@@ -1213,32 +1217,39 @@ $$:			PUSH	HL		; char * read
 ; HLU: Pointer to source buffer
 ; DEU: Pointer to destination buffer (can be null to just count size)
 ; BCU: Length of destination buffer
-; IXU: Pointer to integer to store total number of bytes read/translated
 ; A: Flags
 ; Returns:
 ; - A: Status code
+; - BCU: Calculated total length of destination string
 ;
+; int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags)
 mos_api_gstrans:
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
+			LD	A, D		; Check if DE is zero
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
 			CALL	SET_ADE24
-			CALL	SET_AIX24
-$$:			PUSH	IX		; UINT24 * read
+$$:			PUSH 	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * read
 			PUSH	BC		; UINT24 destLength
 			PUSH	DE		; char * dest
 			PUSH	HL		; char * source
 			CALL	_gsTrans	; Call the C function gstrans
 			LD	A, L		; Return value in HLU, put in A
-			LD	(_scratchpad), A	; Save the result
+			LD	(_scratchpad + 3), A	; Save the result
 			POP	HL
 			POP	DE
 			POP	BC
-			POP	IX
+			POP	BC
 			POP	AF
-			LD	A, (_scratchpad)
+			LD	A, (_scratchpad + 3)
+			LD	BC, (_scratchpad)
 			RET
 
 ; Substitute arguments into a string from template
@@ -1261,12 +1272,11 @@ mos_api_substituteargs:
 			CALL	SET_AHL24
 			CALL	SET_ADE24
 			EX	(SP), HL	; Swap IX (on stack) with HL, as IX is optional
-			LD	A, H
-			OR	A, A
-			JR	NZ, $F		; H is not zero so HL (was IX) may contain an address
 			LD	A, L
-			OR	A, A
-			CALL	Z, SET_AHL24	; HL (IX) not zero, so set U to MB
+			OR	A, H
+			JR	Z, $F		; HL was zero, so jump ahead
+			LD	A, MB
+			CALL	SET_AHL24	; HL (IX) not zero, so set U to MB
 $$:			EX	(SP), HL
 sub_args_contd:		PUSH	DE		; char * args
 			PUSH	HL		; char * template
@@ -1277,6 +1287,71 @@ sub_args_contd:		PUSH	DE		; char * args
 			POP	IX
 			POP	BC
 			POP	AF
+			LD	BC, (_scratchpad)
+			RET
+
+; All these optional address things need an MB load into A before calling SET_Axx24
+
+; Resolves a path, replacing prefixes and leafnames with actual values
+; HLU: Pointer to the path to resolve
+; DEU: Pointer to the resolved path (optional - omit for count only)
+; BCU: Length of the resolved path buffer
+; IXU: Pointer to the index (integer) of the resolved path
+; IYU: Pointer to a directory object to persist between calls (optional)
+; Returns:
+; - A: Status code
+; - BCU: Length of the resolved path
+; - Index pointed to at IXU, if set, will be updated to the next path index
+;
+; int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir)
+mos_api_resolvepath:
+			LD	(_scratchpad), BC	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, res_path_contd	; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+			PUSH	HL		; push HL so we can use register for working, if we need to
+			; DE is optional, so check if it's zero
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			; IX is optional, so check if it's zero
+			PUSH	IX
+			POP	HL
+			LD	A, H
+			OR	A, L
+			JR	Z, $F		; IX is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_AHL24	; IX not zero, so set U to MB
+$$:			PUSH	HL
+			POP	IX
+			; IY is optional, so check if it's zero
+			PUSH	IY
+			POP	HL
+			LD	A, H
+			OR	A, L
+			JR	Z, $F		; IY is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_AHL24	; IY not zero, so set U to MB
+$$:			PUSH	HL
+			POP	IY
+			POP	HL
+			; OK so we should now have all the addresses set up
+res_path_contd:		PUSH	IY		; DIR * dir
+			PUSH	IX		; BYTE * index
+			LD	IX, _scratchpad
+			PUSH	IX		; int * length
+			PUSH	DE		; char * resolvedPath
+			PUSH	HL		; char * filepath
+			CALL	_resolvePath	; Call the C function resolvePath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	IX
+			POP	IY
 			LD	BC, (_scratchpad)
 			RET
 
