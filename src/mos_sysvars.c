@@ -915,7 +915,7 @@ char * getArgument(char * source, int argNo, char ** end) {
 // Returns:
 // - The length of the substituted string
 //
-int subsituteArgs(char * template, char * args, char * dest, int length, bool omitRest) {
+int substituteArgs(char * template, char * args, char * dest, int length, bool omitRest) {
 	char * end = template + strlen(template);
 	char * argument;
 	int argNo;
@@ -1009,11 +1009,11 @@ int subsituteArgs(char * template, char * args, char * dest, int length, bool om
 }
 
 
-// wrapper call for subsituteArgs to return a newly allocated string
+// wrapper call for substituteArgs to return a newly allocated string
 //
 char * substituteArguments(char * source, char * args, bool omitRest) {
 	char * dest;
-	int size = subsituteArgs(source, args, NULL, 0, omitRest);
+	int size = substituteArgs(source, args, NULL, 0, omitRest);
 	if (size == 0) {
 		return NULL;
 	}
@@ -1021,7 +1021,7 @@ char * substituteArguments(char * source, char * args, bool omitRest) {
 	if (dest == NULL) {
 		return NULL;
 	}
-	subsituteArgs(source, args, dest, size, omitRest);
+	substituteArgs(source, args, dest, size, omitRest);
 	dest[size + 1] = '\0';		// is this needed??
 	return dest;
 }

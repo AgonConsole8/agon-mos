@@ -82,9 +82,9 @@ mos_unpackrtc:		EQU	23h
 ; MOS string functions
 ;
 mos_pmatch:		EQU	28h
-mos_getarg:		EQU	29h	; not implemented, yet
-mos_extractstring:	EQU	2Ah	; alpha - subject to change
-mos_extractnumber:	EQU	2Bh	; alpha - subject to change
+mos_getargument:	EQU	29h
+mos_extractstring:	EQU	2Ah
+mos_extractnumber:	EQU	2Bh
 mos_escapestring:	EQU	2Ch	; not implemented, yet
 
 ; System variables and related functions

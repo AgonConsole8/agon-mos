@@ -100,7 +100,8 @@
 
 			XREF	_pmatch			; In strings.c
 
-			XREF	_extractString		; In mos_sysvars.c
+			XREF	_getArgument		; In mos_sysvars.c
+			XREF	_extractString
 			XREF	_extractNumber
 			; XREF	_escapeString
 			XREF	_setVarVal
@@ -110,7 +111,6 @@
 			XREF	_gsTrans
 			XREF	_substituteArgs
 			; XREF	_evaluateExpression
-			; XREF	_getArgument
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -166,7 +166,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_not_implemented	; 0x27
 
 			DW	mos_api_pmatch		; 0x28
-			DW	mos_api_not_implemented	; 0x29   mos_api_getarg ??
+			DW	mos_api_getargument	; 0x29
 			DW	mos_api_extractstring	; 0x2a
 			DW	mos_api_extractnumber	; 0x2b   
 			DW	mos_api_not_implemented	; 0x2c   mos_api_escapestring   printEscapedString ??
@@ -179,7 +179,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_gsinit		; 0x32
 			DW	mos_api_gsread		; 0x33
 			DW	mos_api_gstrans		; 0x34
-			DW	mos_api_not_implemented	; 0x35   mos_api_substituteargs
+			DW	mos_api_substituteargs	; 0x35
 			DW	mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
 			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
 			DW	mos_api_not_implemented	; 0x38   mos_api_resolvepath
@@ -1045,6 +1045,31 @@ $$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			POP	BC
 			RET
 
+; Extract a (numbered) argument from a string
+; HLU: Pointer to source string
+; BCU: Argument number
+; Returns:
+; - HLU: Address of the argument or zero if not found
+;
+; char * getArgument(char * source, int argNo, char ** end)
+mos_api_getargument:	PUSH	AF		; UINT8 flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			CALL	NZ, SET_AHL24
+			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; char ** end
+			PUSH	BC		; UINT8 argNo
+			PUSH	HL		; char * source
+			CALL	_getArgument	; Call the C function getArgument
+			; HL now contains the argument address
+			POP	BC
+			POP	BC
+			EX	(SP), HL
+			POP	HL
+			POP	AF
+			RET
+
 ; Extract a string, using a given divider
 ; HLU: Pointer to source string to extract from
 ; DEU: Pointer to string for divider matching, or 0 for default (space)
@@ -1063,10 +1088,11 @@ mos_api_extractstring:
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
+			OR	A, A
 			JR	NZ, $F		; D is not zero so DE may contain an address
 			LD	A, E
-			JR	NZ, $F		; E is not zero so DE contains an address
-			CALL	SET_ADE24	; DE not zero, so set U to MB
+			OR	A, A
+			CALL	Z, SET_ADE24	; DE not zero, so set U to MB
 $$:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; char ** result
@@ -1105,10 +1131,11 @@ mos_api_extractnumber:
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
+			OR	A, A
 			JR	NZ, $F		; D is not zero so DE may contain an address
 			LD	A, E
-			JR	NZ, $F		; E is not zero so DE contains an address
-			CALL	SET_ADE24	; DE not zero, so set U to MB
+			OR	A, A
+			CALL	Z, SET_ADE24	; DE not zero, so set U to MB
 $$:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * number
@@ -1212,6 +1239,45 @@ $$:			PUSH	IX		; UINT24 * read
 			POP	IX
 			POP	AF
 			LD	A, (_scratchpad)
+			RET
+
+; Substitute arguments into a string from template
+; HLU: Pointer to template string
+; DEU: Pointer to arguments string
+; BCU: Length of destination buffer
+; IXU: Pointer to destination buffer (can be null to just count size)
+; A: Flags
+; Returns:
+; - BCU: Calculated length of destination string
+;
+; int substituteArgs(char * template, char * args, char * dest, int length, bool omitRest)
+mos_api_substituteargs:
+			PUSH	AF		; BYTE flags (bool omitRest)
+			PUSH	BC		; UINT24 length
+			PUSH	IX		; char * dest
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, sub_args_contd	; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+			EX	(SP), HL	; Swap IX (on stack) with HL, as IX is optional
+			LD	A, H
+			OR	A, A
+			JR	NZ, $F		; H is not zero so HL (was IX) may contain an address
+			LD	A, L
+			OR	A, A
+			CALL	Z, SET_AHL24	; HL (IX) not zero, so set U to MB
+$$:			EX	(SP), HL
+sub_args_contd:		PUSH	DE		; char * args
+			PUSH	HL		; char * template
+			CALL	_substituteArgs	; Call the C function substituteArgs
+			LD	(_scratchpad), HL	; Save the result
+			POP	HL
+			POP	DE
+			POP	IX
+			POP	BC
+			POP	AF
+			LD	BC, (_scratchpad)
 			RET
 
 ; Open a file
