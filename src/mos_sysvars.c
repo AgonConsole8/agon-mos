@@ -637,7 +637,8 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 // Returns:
 // - status code
 // end will point to character after the end of the extracted string
-int newExtractString(char * source, char ** end, char * divider, char ** result, BYTE flags) {
+//
+int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags) {
 	char * start = source;
 	char * endptr = NULL;
 	bool findEndQuotes = false;
@@ -649,27 +650,27 @@ int newExtractString(char * source, char ** end, char * divider, char ** result,
 	if (divider == NULL) {
 		divider = " ";
 	}
-	if (!(flags & NEW_EXTRACT_FLAG_OMIT_LEADSKIP)) {
+	if (!(flags & EXTRACT_FLAG_OMIT_LEADSKIP)) {
 		// skip our source past any start token dividers
 		start = start + mos_strspn(start, divider);
 	}
 
-	if (!(flags & NEW_EXTRACT_FLAG_NO_DOUBLEQUOTE) && *start == '"') {
+	if (!(flags & EXTRACT_FLAG_NO_DOUBLEQUOTE) && *start == '"') {
 		// printf("found double quote\n");
 		// we have a double-quoted value, so we should skip the first character
-		if (!(flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES)) {
+		if (!(flags & EXTRACT_FLAG_INCLUDE_QUOTES)) {
 			start++;
 		}
 		findEndQuotes = true;
 	}
 
-	// printf("findEndQuotes: %s, flag was %s\n", findEndQuotes ? "true" : "false", flags & NEW_EXTRACT_FLAG_NO_DOUBLEQUOTE ? "true" : "false");
+	// printf("findEndQuotes: %s, flag was %s\n", findEndQuotes ? "true" : "false", flags & EXTRACT_FLAG_NO_DOUBLEQUOTE ? "true" : "false");
 
 	if (findEndQuotes) {
 		// iterate thru string to find our end quote
 		// NB quotes can be escaped with \" or ""
 		endptr = start;
-		if (flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES) {
+		if (flags & EXTRACT_FLAG_INCLUDE_QUOTES) {
 			endptr++;
 		}
 		while (*endptr != '\0') {
@@ -693,7 +694,7 @@ int newExtractString(char * source, char ** end, char * divider, char ** result,
 		if (*(endptr + 1) != '\0' && strchr(divider, *(endptr + 1)) == NULL) {
 			return MOS_BAD_STRING;
 		}
-		if (flags & NEW_EXTRACT_FLAG_INCLUDE_QUOTES) {
+		if (flags & EXTRACT_FLAG_INCLUDE_QUOTES) {
 			endptr++;
 		}
 	} else {
@@ -701,7 +702,7 @@ int newExtractString(char * source, char ** end, char * divider, char ** result,
 		endptr = start + mos_strcspn(start, divider);
 	}
 
-	if (*endptr != '\0' && (flags & NEW_EXTRACT_FLAG_AUTO_TERMINATE)) {
+	if (*endptr != '\0' && (flags & EXTRACT_FLAG_AUTO_TERMINATE)) {
 		*endptr = '\0';
 		endptr++;
 	}
@@ -711,56 +712,11 @@ int newExtractString(char * source, char ** end, char * divider, char ** result,
 		*end = endptr;
 	}
 
+	if (start == endptr) {
+		return FR_INVALID_PARAMETER;
+	}
+
 	return FR_OK;
-}
-
-// Extract a string
-// Parameters:
-// - source: Pointer to the source string (will be advanced)
-// - result: Pointer to pointer for result string
-// - divider: The token divider string - null for default (space)
-// - flags: Flags to control extraction
-// Returns:
-// - True if successful
-// - False if the string could not be extracted
-// - source will be advanced to point to the end of the string
-// - result point to start of found string and will be null terminated
-//
-// TODO extractNumber and extractString should get similar APIs
-bool extractString(char ** source, char ** result, char * divider, BYTE flags) {
-	char *start = *source;
-	char *endptr = NULL;
-
-	if (divider == NULL) {
-		divider = " ";
-	}
-
-	if (!(flags & EXTRACT_FLAG_OMIT_LEADSKIP)) {
-		// skip our source past any start token dividers
-		start = start + mos_strspn(start, divider);
-		endptr = start + mos_strcspn(start, divider);
-	} else {
-		if (strchr(divider, *start) != NULL) {
-			endptr = start + 1;
-		} else {
-			endptr = start + mos_strcspn(start, divider);
-		}
-	}
-
-	if (strlen(start) == 0 || endptr == start) {
-		*source = start;
-		return false;
-	}
-
-	if (*endptr != '\0' && !(flags & EXTRACT_FLAG_NO_TERMINATOR)) {
-		*endptr = '\0';
-		endptr++;
-	}
-
-	*result = start;
-	*source = endptr;
-
-	return true;
 }
 
 // Expand a macro string
@@ -776,7 +732,7 @@ char * expandMacro(char * source) {
 	int read;
 	int result;
 
-	result = gsTrans(source, NULL, 0, &read, 0);
+	result = gsTrans(source, NULL, 0, &read, GSTRANS_FLAG_NO_DOUBLEQUOTE);
 	if (result != FR_OK) {
 		return NULL;
 	}
@@ -784,7 +740,7 @@ char * expandMacro(char * source) {
 	if (dest == NULL) {
 		return NULL;
 	}
-	result = gsTrans(source, dest, read, &read, 0);
+	result = gsTrans(source, dest, read, &read, GSTRANS_FLAG_NO_DOUBLEQUOTE);
 	if (result != FR_OK) {
 		umm_free(dest);
 		return NULL;
@@ -931,16 +887,12 @@ char * getArgument(char * source, int argNo, char ** end) {
 	int argCount = 0;
 	char * scanFrom = result;
 
-	// TODO add support for quoted strings
-	// as we are currently only supporting space separated arguments
-	// spaces within quoted strings should not be treated as dividers
-
 	if (end != NULL) {
 		*end = NULL;
 	}
 
 	while (argCount <= argNo) {
-		if (!extractString(&scanFrom, &result, divider, EXTRACT_FLAG_NO_TERMINATOR)) {
+		if (extractString(scanFrom, &scanFrom, divider, &result, EXTRACT_FLAG_INCLUDE_QUOTES)) {
 			return NULL;
 		}
 		argCount++;

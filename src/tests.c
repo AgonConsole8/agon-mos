@@ -553,50 +553,56 @@ void string_tests(bool verbose) {
 	source = umm_malloc(256);
 
 	sprintf(source, "  \"  foo  bar  \"  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE);
-	passed = expectEq("newExtractString on source returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE);
+	passed = expectEq("extractString on source returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  result should be '  foo  bar  '", result, "  foo  bar  ") && passed;
 	passed = expectEq("  end should be at end of string", (int)end - 1, (int)source + strlen(source)) && passed;
 	passed = expectEq("  end (1) should be a space char", (int)(*end), (int)' ') && passed;
 
 	sprintf(source, "  \"  foo  bar  \"  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on source (include quotes) returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on source (include quotes) returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  result should be \"  foo  bar  \"", result, "\"  foo  bar  \"") && passed;
 	passed = expectEq("  end should be at end of string", (int)end - 1, (int)source + strlen(source)) && passed;
 	passed = expectEq("  end (2) should be a space char", (int)(*end), (int)' ') && passed;
 
 	sprintf(source, "  \"  foo  bar  \"");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on source (no extra space) returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on source (no extra space) returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  result should be \"  foo  bar  \"", result, "\"  foo  bar  \"") && passed;
 	passed = expectEq("  end (3) should be a null char", (int)(*end), (int)'\0') && passed;
 
 	sprintf(source, "  \"  foo  bar  \"broken  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on broken source returns MOS_BAD_STRING", fr, MOS_BAD_STRING) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on broken source returns MOS_BAD_STRING", fr, MOS_BAD_STRING) && passed;
 
 	sprintf(source, "  \"  foo  bar  broken  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on source with no close quote returns MOS_BAD_STRING", fr, MOS_BAD_STRING) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on source with no close quote returns MOS_BAD_STRING", fr, MOS_BAD_STRING) && passed;
 
 	sprintf(source, "  \"  foo \"\" bar  \"  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on source returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on source returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  result should be \"  foo \"\" bar  \"", result, "\"  foo \"\" bar  \"") && passed;
 	passed = expectEq("  end (with escape 1) should be at end of string", (int)end - 1, (int)source + strlen(source)) && passed;
 
 	sprintf(source, "  \"  foo \\\" bar  \"  ");
-	fr = newExtractString(source, &end, NULL, &result, NEW_EXTRACT_FLAG_AUTO_TERMINATE | NEW_EXTRACT_FLAG_INCLUDE_QUOTES);
-	passed = expectEq("newExtractString on source returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_INCLUDE_QUOTES);
+	passed = expectEq("extractString on source returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  result should be \"  foo \\\" bar  \"", result, "\"  foo \\\" bar  \"") && passed;
 	passed = expectEq("  end (with escape 2) should be at end of string", (int)end - 1, (int)source + strlen(source)) && passed;
 
 	sprintf(source, "  \"  foo  bar  \"  ");
-	fr = newExtractString(source, &end, NULL, &result, 0);
-	passed = expectEq("newExtractString on source returns FR_OK", fr, FR_OK) && passed;
+	fr = extractString(source, &end, NULL, &result, 0);
+	passed = expectEq("extractString on source returns FR_OK", fr, FR_OK) && passed;
 	// we're not auto-terminating, and not including quotes, so end should point to the closing quote
 	passed = expectEq("  end with no terminate should be a quote char", (int)(*end), (int)'"') && passed;
+
+	sprintf(source, "\"test.obey\" 1 2 3 4");
+	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE);
+	passed = expectEq("extractString on source with divider returns FR_OK", fr, FR_OK) && passed;
+	passed = expectStrEq("  result should be 'test.obey'", result, "test.obey") && passed;
+	passed = expectStrEq("  end should point to ' 1 2 3 4'", end, " 1 2 3 4") && passed;
 
 	if (passed) {
 		printf("\n\rAll tests passed!\r\n");

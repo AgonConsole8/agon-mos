@@ -1046,35 +1046,47 @@ $$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			RET
 
 ; Extract a string, using a given divider
-; HLU: Address of pointer to source string to extract from, will be advanced
-; DEU: Address of pointer for the result (will be within the source string)
-; BCU: Pointer to string for divider matching, or 0 for default (space)
+; HLU: Pointer to source string to extract from, will be advanced
+; DEU: Pointer to string for divider matching, or 0 for default (space)
 ; A: Flags
 ; Depending on flags, the result string will be zero terminated or not
 ; source pointer will be updated to point to the next character after result
 ; Returns:
-; - A: 0 if OK or -1 if divider not found
+; - A: status code
+; - HLU: Address of the result string
+; - DEU: Address of next character after end of result string
 ;
+; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags) {
 mos_api_extractstring:	
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL, DE and BC are 24 bit
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_AHL24
-			CALL	SET_ADE24
-			CALL	SET_ABC24
-$$:			PUSH	BC		; char * divider
-			PUSH	DE		; char * buffer
-			PUSH	HL		; char * string
+			LD	A, D
+			JR	NZ, $F		; D is not zero so DE contains an address
+			LD	A, E
+			JR	NZ, $F		; E is not zero so DE contains an address
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; char ** result
+			PUSH	DE		; char * divider
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; char ** end
+			PUSH	HL		; char * source
 			CALL	_extractString	; Call the C function extractString
-			LD	A, L		; Return value in HLU, put in A
-			LD	(_scratchpad), A	; Save the result
+			LD	A, L		; Save return value in HLU, in A
 			POP	HL
-			POP	DE
-			POP	BC
-			POP	AF
-			LD	A, (_scratchpad)
-			CPL			; 1's complement A (invert the bits)
+			POP	HL
+			POP	HL
+			POP	HL
+			LD	L, A		; keep result so we can
+			POP 	AF		; unpop the AF
+			LD 	A, L		; return status code in A
+			LD	HL, (_scratchpad)	; return result in HLU
+			LD	DE, (_scratchpad + 3)	; return end in DEU
 			RET
 
 ; Extract a number, using a given divider
@@ -1086,6 +1098,7 @@ $$:			PUSH	BC		; char * divider
 ; Returns:
 ; - A: 0 if OK or -1 if divider not found
 ;
+; TODO rewrite this so that it works like extractstring above
 mos_api_extractnumber:
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0

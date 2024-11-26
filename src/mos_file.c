@@ -62,7 +62,7 @@ int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchInd
 		char * prefixToken = umm_malloc(path - srcPath + 6);
 		int prefixIndex = 0;
 		int prefixPathLength;
-		bool found = false;
+		int prefixResult = FR_OK;
 
 		if (!prefixToken) {
 			return MOS_OUT_OF_MEMORY;
@@ -80,15 +80,14 @@ int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchInd
 		path++;		// Skip the colon
 
 		prefixPtr = prefix;
-
-		found = extractString(&prefixPtr, &prefixPath, ", ;", 0);
-		while (found && prefixIndex < searchIndex) {
+		prefixResult = extractString(prefixPtr, &prefixPtr, ", ;", &prefixPath, EXTRACT_FLAG_AUTO_TERMINATE);
+		while (prefixResult == FR_OK && prefixIndex < searchIndex) {
 			prefixIndex++;
-			found = extractString(&prefixPtr, &prefixPath, ", ;", 0);
+			prefixResult = extractString(prefixPtr, &prefixPtr, ", ;", &prefixPath, EXTRACT_FLAG_AUTO_TERMINATE);
 		}
 
-		if (!found) {
-			// no prefix at this index
+		if (prefixResult != FR_OK) {
+			// no prefix at this index, or prefix is broken
 			umm_free(prefix);
 			if (dir != NULL && *length > 0) {
 				*dir = '\0';
@@ -400,7 +399,7 @@ bool isMoslet(char * filepath) {
 	leafChar = *leaf;
 	*leaf = '\0';
 
-	while (extractString(&mosletPath, &checkPath, ", ;", 0)) {
+	while (!extractString(mosletPath, &mosletPath, ", ;", &checkPath, EXTRACT_FLAG_AUTO_TERMINATE)) {
 		if (pmatch(checkPath, filepath, MATCH_BEGINS_WITH | MATCH_CASE_INSENSITIVE | MATCH_DISABLE_HASH | MATCH_DISABLE_STAR) == 0) {
 			// We have a match
 			result = true;

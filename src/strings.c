@@ -116,14 +116,11 @@ int pmatch(const char *pattern, const char *string, uint8_t flags) {
 	if (*pattern == '\0' || (upToSpace && *pattern == ' ') || (beginsWith && dotAsStar && *pattern == '.')) {
 		// if the pattern has been exhausted
 		// return success if the string has also been exhausted, or we are doing a beginsWith test
-		if (beginsWith || (dotAsStar && *pattern == '.')) {
-			return 0; // Match if beginsWith is set
-		}
-		return *string == '\0' ? 0 : -1;
-	} else if (
-		(*pattern == '*' && !disableStar) ||
-		(*pattern == '.' && dotAsStar && *(pattern + 1) <= ' ')
-	) {
+		return (beginsWith || *string == '\0') ? 0 : -1;
+	} else if (*pattern == '.' && dotAsStar && *(pattern + 1) == '\0') {
+		// Dot as star wildcard (supported at end of string only) means one-or-more matching characters
+		return *string == '\0' ? -1 : 0;
+	} else if (*pattern == '*' && !disableStar) {
 		// Skip the globbed wildcard and try to match the rest of the pattern with the current string
 		// or skip one character in the string and try to match again
 		if (pmatch(pattern + 1, string, flags) == 0 || (*string && pmatch(pattern, string + 1, flags) == 0)) {

@@ -342,35 +342,44 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		return FR_OK;
 	}
 
-	// TODO this needs reworking to separate command from arguments
-	// if we have a full filename, we should be able to run it directly
-	// using " ." as a separator for command and arguments is not ideal
-	// it lets us detect abbreviated commands, but prevents us seeing full filenames
-	// an attempt to run `filename.bin` will be interpreted as `filename` with `.bin` as first argument
-	// also consider bypassing command (and alias) matching if we have a direct path to a file
-	// another consideration `cd..` is interpreted as `cd.` with `.` as an argument
-	// this is _probably_ OK, as `cd.` _should_ match to `cdir`, but it is _actually_ matching to `cd`
+	// TODO the code here to separate command from arguments needs reworking
+	// it has become messy, especially with the addition of quoted strings
+	// Will be revisited when we have runtypes, as they will require a different interpretation of `.`
+	// With runtypes, we can look to see if we have a command terminated by `.`, and if so
+	// if the argument does not start with a space, and matches a runtype, then we can run the command
 
 	if (ptr != NULL) {
 		int (*func)(char * ptr);
 		t_mosCommand *cmd;
 		t_mosSystemVariable *alias = NULL;
 		char * aliasToken;
-		char * command;
+		char * commandPtr;
+		char * command = NULL;
 		char * args = NULL;
 		int cmdLen = 0;
 
-		if (!extractString(&ptr, &command, " .", EXTRACT_FLAG_NO_TERMINATOR | EXTRACT_FLAG_OMIT_LEADSKIP)) {
-			// This shouldn't happen
-			return FR_INT_ERR;
+		result = extractString(ptr, &ptr, " .", &commandPtr, EXTRACT_FLAG_OMIT_LEADSKIP | EXTRACT_FLAG_INCLUDE_QUOTES);
+		if (result == FR_INVALID_PARAMETER && *commandPtr == '.') {
+			// single dot (which is interpreted as an empty string) is a valid command
+			result = FR_OK;
 		}
-		cmdLen = ptr - command;
-		if (cmdLen >= 1 && *ptr == '.') {
+		if (result != FR_OK) {
+			// This shouldn't really happen, unless our command string is invalid somehow
+			return result;
+		}
+		if (*ptr == '.') {
 			ptr++;
-			cmdLen++;
+		}
+		cmdLen = ptr - commandPtr;
+		if (*commandPtr == '"' && *(ptr - 1) == '"') {
+			// We have a quoted command, so strip the quotes
+			commandPtr++;
+			*(ptr - 1) = '\0';
+			cmdLen -= 2;
 		}
 		ptr = mos_trim(ptr, false);
 		// ptr will now point to the arguments
+		// printf("command is '%.*s', args '%s'\n\r", cmdLen, commandPtr, ptr ? ptr : "<not found>");
 
 		if (*command == '%') {
 			// Skip alias expansion for commands that start with %
@@ -406,13 +415,23 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			umm_free(aliasToken);
 		}
 
+		command = umm_malloc(cmdLen + 1);
+		if (command == NULL) {
+			return MOS_OUT_OF_MEMORY;
+		}
+		strncpy(command, commandPtr, cmdLen);
+		command[cmdLen] = '\0';
+		// printf("searching for command '%s'\n\r", command);
+
 		cmd = mos_getCommand(command, MATCH_COMMANDS);
+		umm_free(command);
+		command = commandPtr;
 		func = cmd->func;
 		if (cmd != NULL && func != 0) {
 			if (cmd->expandArgs) {
 				args = expandMacro(ptr);
 			}
-			// printf("command is %s\n\r, args '%s'", cmd->name, args);
+			// printf("command is '%s', args '%s'\n\r", cmd->name, args ? args : ptr);
 			result = func(args ? args : ptr);
 			if (cmd->expandArgs) {
 				umm_free(args);
@@ -501,11 +520,15 @@ int mos_cmdDISC(char *ptr) {
 int mos_cmdDIR(char * ptr) {
 	BYTE	flags = 0;
 	char *	path;
+	int		result;
 
 	for (;;) {
-		if (!extractString(&ptr, &path, NULL, 0)) {
+		result = extractString(ptr, &ptr, NULL, &path, EXTRACT_FLAG_AUTO_TERMINATE);
+		if (result == FR_INVALID_PARAMETER) {
 			path = ".";
 			break;
+		} else if (result != FR_OK) {
+			return result;
 		}
 		if (path[0] == '-') {
 			// we have flag(s)
@@ -570,7 +593,7 @@ int mos_cmdTRY(char * ptr) {
 int mos_cmdECHO(char *ptr) {
 	t_mosTransInfo * transInfo;
 	char read;
-	int result = gsInit(ptr, &transInfo, GSTRANS_FLAG_NO_TRACE);
+	int result = gsInit(ptr, &transInfo, GSTRANS_FLAG_NO_DOUBLEQUOTE | GSTRANS_FLAG_NO_TRACE);
 
 	if (result != FR_OK) {
 		return result;
@@ -813,6 +836,7 @@ int mos_cmdIFTHERE(char * ptr) {
 		elseCmd += 6;
 	}
 
+	// TODO this probably needs to be called with the double-quotes flag cleared
 	filepath = expandMacro(ptr);
 	if (!filepath) {
 		return FR_INVALID_PARAMETER;
@@ -848,9 +872,10 @@ int mos_cmdIFTHERE(char * ptr) {
 int mos_cmdLOAD(char * ptr) {
 	char *	filename;
 	UINT24	addr;
+	int result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (result != FR_OK) {
+		return result;
 	}
 	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0)) {
 		addr = MOS_defaultLoadAddress;
@@ -867,11 +892,10 @@ int mos_cmdLOAD(char * ptr) {
 //
 int mos_cmdEXEC(char *ptr) {
 	char *	filename;
+	int result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
-	}
-	return mos_EXEC(filename);
+	if (result == FR_OK) result = mos_EXEC(filename);
+	return result;
 }
 
 // Load and run a batch file of MOS commands.
@@ -902,16 +926,14 @@ int mos_cmdOBEY(char *ptr) {
 		return MOS_OUT_OF_MEMORY;
 	}
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		umm_free(buffer);
-		return FR_INVALID_PARAMETER;
-	}
-	if (strcasecmp(filename, "-v") == 0) {
+	fr = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+	if (fr == FR_OK && strcasecmp(filename, "-v") == 0) {
 		verbose = true;
-		if (!extractString(&ptr, &filename, NULL, 0)) {
-			umm_free(buffer);
-			return FR_INVALID_PARAMETER;
-		}
+		fr = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+	}
+	if (fr != FR_OK) {
+		umm_free(buffer);
+		return fr;
 	}
 
 	// TODO Consider merging with mos_EXEC - below is very similar
@@ -978,12 +1000,12 @@ int mos_cmdSAVE(char * ptr) {
 	char *	filename;
 	UINT24	addr;
 	UINT24	size;
+	int result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (
-		!extractString(&ptr, &filename, NULL, 0) ||
-		!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0) ||
-		!extractNumber(ptr, &ptr, NULL, (int *)&size, 0)
-	) {
+	if (result != FR_OK) {
+		return result;
+	}
+	if (!extractNumber(ptr, &ptr, NULL, (int *)&addr, 0) || !extractNumber(ptr, &ptr, NULL, (int *)&size, 0)) {
 		return FR_INVALID_PARAMETER;
 	}
 	return mos_SAVE(filename, addr, size);
@@ -1008,15 +1030,14 @@ int mos_cmdDEL(char * ptr) {
 	int		length = 0;
 	BYTE	index = 0;
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
-	}
+	fr = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (strcasecmp(filename, "-f") == 0) {
+	if (fr == FR_OK && (strcasecmp(filename, "-f") == 0)) {
 		force = TRUE;
-		if (!extractString(&ptr, &filename, NULL, 0)) {
-			return FR_INVALID_PARAMETER;
-		}
+		fr = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+	}
+	if (fr != FR_OK) {
+		return fr;
 	}
 
 	// Verbose kicks in when we our filename can potentially match multiple files
@@ -1124,9 +1145,10 @@ int mos_cmdRUN(char *ptr) {
 //
 int mos_cmdRUNBIN(char *ptr) {
 	char *	filename = NULL;
+	int 	result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (result != FR_OK) {
+		return result;
 	}
 	ptr = mos_trim(ptr, false);
 	return mos_runBinFile(filename, ptr);
@@ -1140,12 +1162,12 @@ int mos_cmdRUNBIN(char *ptr) {
 //
 int mos_cmdCD(char * ptr) {
 	char *	path;
+	int		result = extractString(ptr, &ptr, NULL, &path, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &path, NULL, 0)) {
+	if (result != FR_OK) {
 		// TODO should we default to the root directory if no path is provided?
-		return FR_INVALID_PARAMETER;
+		return result;
 	}
-
 	return mos_CD(path);
 }
 
@@ -1158,14 +1180,11 @@ int mos_cmdCD(char * ptr) {
 int mos_cmdREN(char *ptr) {
 	char *	filename1;
 	char *	filename2;
+	int 	result = extractString(ptr, &ptr, NULL, &filename1, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (
-		!extractString(&ptr, &filename1, NULL, 0) ||
-		!extractString(&ptr, &filename2, NULL, 0)
-	) {
-		return FR_INVALID_PARAMETER;
-	}
-	return mos_REN(filename1, filename2, TRUE);
+	if (result == FR_OK) result = extractString(ptr, &ptr, NULL, &filename2, EXTRACT_FLAG_AUTO_TERMINATE);
+	if (result == FR_OK) result = mos_REN(filename1, filename2, TRUE);
+	return result;
 }
 
 // COPY <filename1> <filename2> command
@@ -1177,14 +1196,11 @@ int mos_cmdREN(char *ptr) {
 int mos_cmdCOPY(char *ptr) {
 	char *	filename1;
 	char *	filename2;
+	int 	result = extractString(ptr, &ptr, NULL, &filename1, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (
-		!extractString(&ptr, &filename1, NULL, 0) ||
-		!extractString(&ptr, &filename2, NULL, 0)
-	) {
-		return FR_INVALID_PARAMETER;
-	}
-	return mos_COPY(filename1, filename2, TRUE);
+	if (result == FR_OK) result = extractString(ptr, &ptr, NULL, &filename2, EXTRACT_FLAG_AUTO_TERMINATE);
+	if (result == FR_OK) result = mos_COPY(filename1, filename2, TRUE);
+	return result;
 }
 
 // MKDIR <filename> command
@@ -1195,11 +1211,10 @@ int mos_cmdCOPY(char *ptr) {
 //
 int mos_cmdMKDIR(char * ptr) {
 	char *	filename;
+	int result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
-	}
-	return mos_MKDIR(filename);
+	if (result == FR_OK) result = mos_MKDIR(filename);
+	return result;
 }
 
 // SET <varname> <value> command
@@ -1211,11 +1226,10 @@ int mos_cmdMKDIR(char * ptr) {
 int mos_cmdSET(char * ptr) {
 	char *	token;
 	char *	newValue;
-	int 	result;
+	int 	result = extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (result != FR_OK) {
+		return result;
 	}
 
 	mos_trim(ptr, false);
@@ -1236,14 +1250,12 @@ int mos_cmdSET(char * ptr) {
 int mos_cmdSETEVAL(char * ptr) {
 	char *	token;
 	t_mosEvalResult * evaluation = NULL;
-	int		result;
+	int 	result = extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (result != FR_OK) {
+		return result;
 	}
 
-	// make sure we have a value
 	while (isspace(*ptr)) ptr++;
 	if (*ptr == '\0') {
 		return FR_INVALID_PARAMETER;
@@ -1270,11 +1282,10 @@ int mos_cmdSETEVAL(char * ptr) {
 //
 int mos_cmdSETMACRO(char * ptr) {
 	char *	token;
-	int		result;
+	int 	result = extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	// "token" is first parameter, which is a string
-	if (!extractString(&ptr, &token, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (result != FR_OK) {
+		return result;
 	}
 
 	// make sure we have a value
@@ -1304,12 +1315,11 @@ void printEscapedString(char * value) {
 // or only those variables that match the given pattern
 //
 int mos_cmdSHOW(char * ptr) {
-	char *	token;
 	t_mosSystemVariable * var = NULL;
-	int searchResult;
+	char *	token;
+	int		searchResult = extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &token, NULL, 0)) {
-		// Show all variables
+	if (searchResult != FR_OK) {
 		token = "*";
 	}
 
@@ -1346,7 +1356,7 @@ int mos_cmdSHOW(char * ptr) {
 		}
 	}
 
-	return 0;
+	return FR_OK;
 }
 
 // UNSET <varname> command
@@ -1360,10 +1370,10 @@ int mos_cmdSHOW(char * ptr) {
 int mos_cmdUNSET(char * ptr) {
 	char *	token;
 	t_mosSystemVariable * var = NULL;
-	int searchResult;
+	int searchResult = extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &token, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
+	if (searchResult != FR_OK) {
+		return searchResult;
 	}
 
 	searchResult = getSystemVariable(token, &var);
@@ -1386,10 +1396,10 @@ int mos_cmdUNSET(char * ptr) {
 // - MOS error code
 //
 int mos_cmdVDU(char *ptr) {
-	char * token = NULL;
-	char * delimiter = ", ";
+	char *	token = NULL;
+	char *	delimiter = ", ";
 
-	while (extractString(&ptr, &token, delimiter, 0)) {
+	while (!extractString(ptr, &ptr, NULL, &token, EXTRACT_FLAG_AUTO_TERMINATE | EXTRACT_FLAG_NO_DOUBLEQUOTE)) {
 		bool is_word = false;
 		int value;
 		char *endPtr = NULL;
@@ -1520,11 +1530,10 @@ int mos_cmdCREDITS(char *ptr) {
 //
 int mos_cmdTYPE(char * ptr) {
 	char *	filename;
+	int		result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
 
-	if (!extractString(&ptr, &filename, NULL, 0)) {
-		return FR_INVALID_PARAMETER;
-	}
-	return mos_TYPE(filename);
+	if (result == FR_OK) result = mos_TYPE(filename);
+	return result;
 }
 
 // CLS
@@ -1594,19 +1603,22 @@ void printCommandInfo(t_mosCommand * cmd, BOOL full) {
 // - 0: Success
 //
 int mos_cmdHELP(char *ptr) {
-	int i;
-	char *cmd;
+	char *	cmd;
+	int		i;
+	int		result = extractString(ptr, &ptr, NULL, &cmd, EXTRACT_FLAG_AUTO_TERMINATE);
+	bool	hasCmd = result == FR_OK;
 
-	BOOL hasCmd = extractString(&ptr, &cmd, NULL, 0);
-	if (!hasCmd) {
+	if (result == FR_INVALID_PARAMETER) {
 		cmd = "help";
+	} else if (result != FR_OK) {
+		return result;
 	}
 
 	if (strcasecmp(cmd, "all") == 0) {
 		for (i = 0; i < mosCommands_count; ++i) {
 			printCommandInfo(&mosCommands[i], FALSE);
 		}
-		return 0;
+		return FR_OK;
 	}
 
 	do {
@@ -1639,9 +1651,10 @@ int mos_cmdHELP(char *ptr) {
 		if (!found) {
 			printf("Command not found: %s\r\n", cmd);
 		}
-	} while (extractString(&ptr, &cmd, NULL, 0));
+		result = extractString(ptr, &ptr, NULL, &cmd, EXTRACT_FLAG_AUTO_TERMINATE);
+	} while (result == FR_OK);
 
-	return 0;
+	return result == FR_INVALID_PARAMETER ? FR_OK : result;
 }
 
 
@@ -1650,7 +1663,8 @@ int mos_cmdTEST(char *ptr) {
 	char * testName;
 	bool ran = false;
 	bool verbose = false;
-	while (extractString(&ptr, &testName, NULL, 0)) {
+
+	while (extractString(ptr, &ptr, NULL, &testName, EXTRACT_FLAG_AUTO_TERMINATE) == FR_OK) {
 		if (strcasecmp(testName, "verbose") == 0) {
 			verbose = true;
 		}
