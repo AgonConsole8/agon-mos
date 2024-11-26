@@ -1046,25 +1046,24 @@ $$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			RET
 
 ; Extract a string, using a given divider
-; HLU: Pointer to source string to extract from, will be advanced
+; HLU: Pointer to source string to extract from
 ; DEU: Pointer to string for divider matching, or 0 for default (space)
 ; A: Flags
 ; Depending on flags, the result string will be zero terminated or not
-; source pointer will be updated to point to the next character after result
 ; Returns:
 ; - A: status code
 ; - HLU: Address of the result string
 ; - DEU: Address of next character after end of result string
 ;
-; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags) {
+; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags)
 mos_api_extractstring:	
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
-			JR	NZ, $F		; D is not zero so DE contains an address
+			JR	NZ, $F		; D is not zero so DE may contain an address
 			LD	A, E
 			JR	NZ, $F		; E is not zero so DE contains an address
 			CALL	SET_ADE24	; DE not zero, so set U to MB
@@ -1089,39 +1088,53 @@ $$:			PUSH	HL
 			LD	DE, (_scratchpad + 3)	; return end in DEU
 			RET
 
-; Extract a number, using a given divider
-; HLU: Address of source string to extract from
-; DEU: Address of pointer to "end", both for searching source and position after extract (can be NULL)
-; BCU: Pointer to string for divider matching, or 0 for default (space)
-; IXU: Pointer to address to store 24-bit result value
+; Extract a number, using given divider
+; HLU: Pointer to source string to extract from
+; DEU: Pointer to string for divider matching, or 0 for default (space)
 ; A: Flags
 ; Returns:
-; - A: 0 if OK or -1 if divider not found
+; - A: status code
+; - HLU: Number extracted
+; - DEU: Address of next character after end of number
 ;
-; TODO rewrite this so that it works like extractstring above
+; bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags)
 mos_api_extractnumber:
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			CALL	SET_ADE24
-			CALL	SET_ABC24
-			CALL	SET_AIX24
-$$:			PUSH	IX		; UINT24 * result
-			PUSH	BC		; char * divider
-			PUSH	DE		; char ** end
-			PUSH	HL		; char * string
+			LD	A, D
+			JR	NZ, $F		; D is not zero so DE may contain an address
+			LD	A, E
+			JR	NZ, $F		; E is not zero so DE contains an address
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * number
+			PUSH	DE		; char * divider
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; char ** end
+			PUSH	HL		; char * source
 			CALL	_extractNumber	; Call the C function extractNumber
-			LD	A, L		; Return value in HLU, put in A
-			LD	(_scratchpad), A	; Save the result
+			LD	A, L		; Save return value in HLU, in A
 			POP	HL
-			POP	DE
-			POP	BC
-			POP	IX
-			POP	AF
-			LD	A, (_scratchpad)
-			CPL			; 1's complement A (invert the bits)
+			POP	HL
+			POP	HL
+			POP	HL
+			LD	L, A		; keep result so we can
+			POP 	AF		; unpop the AF
+			LD 	A, L		; move return value back to A
+			LD	HL, (_scratchpad)	; return number in HLU
+			LD	DE, (_scratchpad + 3)	; return end in DEU
+			; Return value in A will be true/false
+			; so we need to change to 0 for success, and 19 (invalid parameter) for failure
+			OR	A, A		; Was status value false?
+			JR	Z, $F		; If it is, we need to replace with 19
+			LD	A, 0		; Otherwise, return 0 FR_OK
+			RET
+$$:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
 			RET
 
 ; Initialise a GS Trans operation
