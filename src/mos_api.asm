@@ -114,7 +114,7 @@
 
 			XREF	_resolvePath		; In mos_file.c
 			XREF	_getDirectoryForPath
-			XREF	_getFilePathLeafName
+			XREF	_getFilepathLeafname
 			XREF	_isDirectory
 			XREF	_resolveRelativePath
 			
@@ -189,10 +189,10 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
 			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
 			DW	mos_api_resolvepath	; 0x38
-			DW	mos_api_not_implemented	; 0x39   mos_api_getdirectoryforpath
-			DW	mos_api_not_implemented	; 0x3a   mos_api_getfilepathleafname
-			DW	mos_api_not_implemented	; 0x3b   mos_api_isdirectory
-			DW	mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath  (resolveRelativePath)
+			DW	mos_api_getdirectoryforpath	; 0x39
+			DW	mos_api_getfilepathleafname	; 0x3a 
+			DW	mos_api_isdirectory	; 0x3b
+			DW	mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath (uses resolveRelativePath)
 			DW	mos_api_not_implemented	; 0x3d
 			DW	mos_api_not_implemented	; 0x3e
 			DW	mos_api_not_implemented	; 0x3f
@@ -1354,6 +1354,88 @@ res_path_contd:		PUSH	IY		; DIR * dir
 			POP	IY
 			LD	BC, (_scratchpad)
 			RET
+
+; Get the directory for a given path
+; String only - resolves path prefixes for the given index
+; HLU: Pointer to the path to get the directory for
+; DEU: Pointer to the buffer to store the directory in (optional - omit for count only)
+; BCU: Length of the buffer
+; A: Search index
+; Returns:
+; - A: Status code
+; - BCU: Length of the directory
+;
+; int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchIndex)
+mos_api_getdirectoryforpath:
+			PUSH	AF		; BYTE searchIndex
+			LD	(_scratchpad), BC	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+			; DE is optional, so check if it's zero
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			LD	BC, _scratchpad
+			PUSH	BC		; int * length
+			PUSH	DE		; char * dir
+			PUSH	HL		; char * srcPath
+			CALL	_getDirectoryForPath	; Call the C function getDirectoryForPath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	BC		; (AF push - we will replace)
+			LD	BC, (_scratchpad)
+			RET
+
+; Get the leafname for a given path
+; HLU: Pointer to the path to get the leafname for
+; Returns:
+; - HLU: Pointer to the leafname
+;
+; char * getFilepathLeafname(char * filepath);
+mos_api_getfilepathleafname:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+$$:			PUSH	HL		; char * filepath
+			CALL	_getFilepathLeafname	; Call the C function getFilepathLeafname
+			EX	(SP), HL	; Return value in HLU
+			POP	HL
+			RET
+
+; Check if a given path points to a directory
+; NB this does not do path resolution
+; HLU: Pointer to the path to check
+; Returns:
+; - A: Status code
+mos_api_isdirectory:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+$$:			PUSH	HL		; char * filepath
+			CALL	_isDirectory	; Call the C function isDirectory
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			; return value is true/false, so we need to change to 0 for success, and 19 (invalid parameter) for failure
+			OR	A, A		; Was status value false?
+			JR	Z, $F		; If it is, we need to replace with 5
+			LD	A, 0		; Otherwise, return 0 FR_OK
+			RET
+$$:			LD	A, 5		; Return 5 FR_NO_PATH
+			RET
+
+; Get the absolute version of a (relative) path
+;
+; int resolveRelativePath(char * path, char * resolved, int length);
+; This needs adjusting to allow it to return length, and accept a null resolved buffer
+
 
 ; Open a file
 ; HLU: Pointer to a blank FIL struct
