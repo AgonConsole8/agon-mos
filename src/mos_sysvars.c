@@ -452,6 +452,10 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 						}
 						*read = *current->source | 0x80;
 						current->source++;
+					} else if (*current->source == '|') {
+						// prints a pipe character
+						*read = '|';
+						current->source++;
 					} else if (*current->source >= 0x40 && *current->source < 0x7F) {
 						// characters from &40-7F (letters and some punctuation)
 						// are printed as just their bottom 5 bits
@@ -854,6 +858,67 @@ int extractString(char * source, char ** end, char * divider, char ** result, BY
 	}
 
 	return FR_OK;
+}
+
+int escapeString(char * source, char * dest, int * length) {
+	char * start = source;
+	int result = FR_OK;
+	int destLen = 1;
+	bool countOnly = dest == NULL;
+
+	if (source == NULL) {
+		return FR_INVALID_PARAMETER;
+	}
+
+	// we are counting the length of the escaped string
+	while (*start != '\0') {
+		if (*start < 32 || *start == 127 || *start == '|') ++destLen;
+		destLen++;
+		start++;
+	}
+
+	if (dest != NULL) {
+		int remaining = *length;
+		start = source;
+
+		// we are escaping the string
+		if (remaining <= 0) {
+			return FR_INVALID_PARAMETER;
+		}
+
+		while (*start) {
+			if (*start < 32 || *start == 127 || *start == '|') {
+				if (remaining <= 2) {
+					result = MOS_OUT_OF_MEMORY;
+					*dest++ = '\0';
+					break;
+				}
+				*dest++ = '|';
+				if (*start == 0x7F) {
+					*dest++ = '?';
+				} else if (*start == '|') {
+					*dest++ = '|';
+				} else {
+					*dest++ = *start + 64;
+				}
+				remaining -= 2;
+			} else {
+				*dest++ = *start;
+				remaining--;
+				if (remaining == 1) {
+					*dest = '\0';
+					break;
+				}
+			}
+			start++;
+		}
+		if (start < source + strlen(source) - 1) {
+			result = MOS_OUT_OF_MEMORY;
+		}
+	}
+
+	*length = destLen;
+	return result;
 }
 
 // Expand a macro string

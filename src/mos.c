@@ -1303,6 +1303,12 @@ void printEscapedString(char * value) {
 		if ((unsigned char)*value < 0x20) {
 			putch('|');
 			putch(*value + 0x40);
+		} else if ((unsigned char)*value == 0x7F) {
+			putch('|');
+			putch('?');
+		} else if ((unsigned char)*value == '|') {
+			putch('|');
+			putch('|');
 		} else {
 			putch(*value);
 		}

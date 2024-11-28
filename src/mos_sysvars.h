@@ -97,6 +97,8 @@ bool	extractNumber(char * source, char ** end, char * divider, int * number, BYT
 
 int		extractString(char * source, char ** end, char * divider, char ** result, BYTE flags);
 
+int		escapeString(char * source, char * dest, int * length);
+
 char *	expandMacro(char * source);
 
 char *	expandVariable(t_mosSystemVariable * var, bool showWriteOnly);

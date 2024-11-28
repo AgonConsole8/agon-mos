@@ -103,7 +103,7 @@
 			XREF	_getArgument		; In mos_sysvars.c
 			XREF	_extractString
 			XREF	_extractNumber
-			; XREF	_escapeString
+			XREF	_escapeString
 			XREF	_setVarVal
 			XREF	_readVarVal
 			XREF	_gsInit
@@ -175,7 +175,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_getargument	; 0x29
 			DW	mos_api_extractstring	; 0x2a
 			DW	mos_api_extractnumber	; 0x2b   
-			DW	mos_api_not_implemented	; 0x2c   mos_api_escapestring   printEscapedString ??
+			DW	mos_api_escapestring	; 0x2c
 			DW	mos_api_not_implemented	; 0x2d
 			DW	mos_api_not_implemented	; 0x2e
 			DW	mos_api_not_implemented	; 0x2f
@@ -1166,6 +1166,39 @@ $$:			PUSH	HL
 			LD	A, 0		; Otherwise, return 0 FR_OK
 			RET
 $$:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
+			RET
+
+; Escape a string, converting control characters to be pipe-prefixed
+; HLU: Pointer to source string
+; DEU: Pointer to destination buffer (optional)
+; BCU: Length of destination buffer
+; Returns:
+; - A: Status code
+; - BCU: Length of escaped string
+;
+; int escapeString(char * source, char * dest, int * length)
+mos_api_escapestring:
+			LD	(_scratchpad), BC 	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * length
+			PUSH	DE		; char * dest
+			PUSH	HL		; char * source
+			CALL	_escapeString	; Call the C function escapeString
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	DE
+			POP	BC
+			LD	BC, (HL)	; Return the length
 			RET
 
 ; Set a variable value

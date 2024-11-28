@@ -545,12 +545,15 @@ void path_tests(bool verbose) {
 void string_tests(bool verbose) {
 	bool passed = true;
 	char * source;
+	char * dest;
 	char * end;
 	char * divider;
 	char * result;
+	int length;
 	int fr;
 
 	source = umm_malloc(256);
+	dest = umm_malloc(256);
 
 	sprintf(source, "  \"  foo  bar  \"  ");
 	fr = extractString(source, &end, NULL, &result, EXTRACT_FLAG_AUTO_TERMINATE);
@@ -604,11 +607,29 @@ void string_tests(bool verbose) {
 	passed = expectStrEq("  result should be 'test.obey'", result, "test.obey") && passed;
 	passed = expectStrEq("  end should point to ' 1 2 3 4'", end, " 1 2 3 4") && passed;
 
+	sprintf(source, "Escape|test");
+	fr = escapeString(source, NULL, &length);
+	passed = expectEq("escapeString on source returns FR_OK", fr, FR_OK) && passed;
+	passed = expectEq("  length should be source length + 2", length, strlen(source) + 2) && passed;
+
+	length = strlen(source) + 2;
+	fr = escapeString(source, dest, &length);
+	passed = expectEq("escapeString on source with dest returns FR_OK", fr, FR_OK) && passed;
+	passed = expectStrEq("  dest should be 'Escape||test'", dest, "Escape||test") && passed;
+
+	sprintf(source, "Escape|test%c", (char)7);
+	length = 255;
+	fr = escapeString(source, dest, &length);
+	passed = expectEq("escapeString on source with dest returns FR_OK", fr, FR_OK) && passed;
+	passed = expectStrEq("  dest should be 'Escape||test|G'", dest, "Escape||test|G") && passed;
+	passed = expectEq("  length should be source length + 3", length, strlen(source) + 3) && passed;
+
 	if (passed) {
 		printf("\n\rAll tests passed!\r\n");
 	}
 
 	umm_free(source);
+	umm_free(dest);
 }
 
 #endif /* DEBUG */
