@@ -166,6 +166,143 @@ t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var) {
 	return NULL;
 }
 
+int setVarVal(char * name, void * value, char ** actualName, BYTE * type) {
+	t_mosSystemVariable * var = *actualName ? mosSystemVariables : NULL;
+	int result;
+	bool transInput = *type == MOS_VAR_STRING;
+	bool freeValue = transInput;
+
+	if (*type > MOS_VAR_LITERAL && *type != 255) {
+		// Catch invalid types, and prevent (for now) calling with type of MOS_VAR_CODE
+		return FR_INVALID_PARAMETER;
+	}
+
+	if (*type == MOS_VAR_EXPANDED) {
+		t_mosEvalResult * evalResult = evaluateExpression(value);
+		if (evalResult == NULL) {
+			return FR_INT_ERR;
+		}
+		if (evalResult->status != FR_OK) {
+			result = evalResult->status;
+			umm_free(evalResult);
+			return result;
+		}
+		*type = evalResult->type;
+		value = evalResult->result;
+		if (*type == MOS_VAR_STRING) {
+			freeValue = true;
+		}
+	}
+
+	// When we have an actualName, we are looking for the next occurrence of the variable matching name pattern
+	while (var && var->label != *actualName) {
+		var = var->next;
+	}
+	result = getSystemVariable(name, &var);
+
+	// If type passed to command is -1 (255) then we are deleting the variable
+	if (*type == 255) {
+		if (result == 0) {
+			if (var->type != MOS_VAR_CODE) {
+				removeSystemVariable(var);
+			}
+			return FR_OK;
+		}
+		return FR_INVALID_NAME;
+	}
+
+	if (transInput) {
+		value = expandMacro(value);
+		if (value == NULL) {
+			return FR_INT_ERR;
+		}
+	}
+	if (*type == MOS_VAR_LITERAL) {
+		*type = MOS_VAR_STRING;
+	}
+
+	if (result == -1) {
+		// Variable wasn't found, so we need to create it
+		t_mosSystemVariable * newVar = createSystemVariable(name, *type, value);
+		if (newVar == NULL) {
+			return FR_INT_ERR;
+		}
+		// `var` will be our insertion point
+		insertSystemVariable(newVar, var);
+		var = newVar;
+		result = FR_OK;
+	} else {
+		// Variable was found, so we need to update it with the new type and value
+		result = updateSystemVariable(var, *type, value);
+	}
+	*type = var->type;
+	*actualName = var->label;
+	if (freeValue) {
+		umm_free(value);
+	}
+	return result;
+}
+
+int readVarVal(char * namePattern, void * value, char ** actualName, int * length, BYTE * typeFlag) {
+	t_mosSystemVariable * var = mosSystemVariables;
+	int result;
+	int bufferLen = *length;
+	bool expand = *typeFlag == 3;
+
+	*length = 0;
+
+	// When we have an actualName, we are looking for the next occurrence of the variable matching name pattern
+	while (var && var->label != *actualName) {
+		var = var->next;
+	}
+	result = getSystemVariable(namePattern, &var);
+
+	if (result == -1) {
+		return FR_INVALID_NAME;
+	}
+
+	*actualName = var->label;
+	*typeFlag = var->type;
+	if (var->type == MOS_VAR_CODE) {
+		// reading a code variable auto-expands
+		expand = true;
+	}
+
+	result = FR_OK;
+	if (expand) {
+		char * expanded = expandVariable(var, true);
+		if (expanded == NULL) {
+			// Couldn't expand
+			return FR_INT_ERR;
+		}
+		*length = strlen(expanded);
+		if (value != NULL) {
+			strncpy(value, expanded, bufferLen);
+			if (bufferLen < *length) {
+				result = MOS_OUT_OF_MEMORY;
+			}
+		}
+		umm_free(expanded);
+	} else {
+		if (var->type == MOS_VAR_MACRO || var->type == MOS_VAR_STRING) {
+			*length = strlen(var->value);
+			if (value != NULL) {
+				strncpy(value, var->value, bufferLen);
+				if (bufferLen < *length) {
+					result = MOS_OUT_OF_MEMORY;
+				}
+			}
+		} else {
+			*length = 3;	// Numbers are 3 byte values
+			if (value != NULL) {
+				*(int *)value = (int)var->value;
+			}
+		}
+	}
+
+	return result;
+}
+
 
 int gsInit(void * source, t_mosTransInfo ** transInfoPtr, BYTE flags) {
 	t_mosTransInfo * transInfo;
@@ -833,6 +970,12 @@ int expandPath(char * source, char ** resolvedPath) {
 	return result;
 }
 
+// For this to work as an API, it will need to change
+// it should return a status result value, and accept in parameters to allow this routine to return
+// both a pointer to a buffer for the result value, and a pointer to an integer for the the type of the result
+// the returned type should be a number or a string only
+// the result value should be a pointer to the result, or the number itself
+//
 t_mosEvalResult * evaluateExpression(char * source) {
 	t_mosSystemVariable * var = NULL;
 	int number = 0;

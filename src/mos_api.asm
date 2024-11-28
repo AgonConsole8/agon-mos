@@ -180,8 +180,8 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_not_implemented	; 0x2e
 			DW	mos_api_not_implemented	; 0x2f
 
-			DW	mos_api_not_implemented	; 0x30   mos_api_setvarval
-			DW	mos_api_not_implemented	; 0x31   mos_api_readvarval
+			DW	mos_api_setvarval	; 0x30
+			DW	mos_api_readvarval	; 0x31
 			DW	mos_api_gsinit		; 0x32
 			DW	mos_api_gsread		; 0x33
 			DW	mos_api_gstrans		; 0x34
@@ -1166,6 +1166,92 @@ $$:			PUSH	HL
 			LD	A, 0		; Otherwise, return 0 FR_OK
 			RET
 $$:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
+			RET
+
+; Set a variable value
+; HLU: Pointer to variable name (can include wildcards)
+; DEU: Variable value (number, or pointer to string)
+; IXU: Pointer to variable name (0 for first call)
+; A: Variable type, or -1 (255) to delete the variable
+; Returns:
+; - A: Status code
+; - D: Actual variable type
+; - IXU: Pointer to variable name (for next call)
+;
+; int setVarVal(char * name, void * value, char ** actualName, BYTE * type);
+mos_api_setvarval:
+			LD	(_scratchpad + 3), A	; Save the type
+			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	HL		; Temporary storage
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; BYTE * type
+			LD	IX, _scratchpad
+			PUSH	IX		; char ** actualName
+			PUSH	DE		; void * value
+			PUSH	HL		; char * name
+			CALL	_setVarVal	; Call the C function setVarVal
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	IX		; To be replaced
+			POP	IX
+			POP	IX
+			LD 	IX, _scratchpad
+			LD	D, (IX + 3)	; Return the actual type
+			LD	IX, (IX)	; Return the actual name
+			RET
+
+; Read a variable value
+; HLU: Pointer to variable name (can include wildcards)
+; DEU: Pointer to buffer to store the value (null/0 to read length only)
+; BCU: Length of buffer
+; IXU: Pointer to variable name (0 for first call)
+; A: Flags (3 = expand value into string)
+; Returns:
+; - A: Status code
+; - D: Actual variable type
+; - BCU: Length of variable value
+; - IXU: Pointer to variable name (for next call)
+;
+; int readVarVal(char * namePattern, void * value, char ** actualName, int * length, BYTE * typeFlag)
+mos_api_readvarval:
+			LD	(_scratchpad + 6), A	; Save the flags
+			LD	(_scratchpad + 3), BC	; Save the length
+			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D		; but DE is optional...
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH	HL		; Temporary storage
+			LD	HL, _scratchpad + 6
+			EX	(SP), HL	; BYTE * typeFlag
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; int * length
+			LD	IX, _scratchpad
+			PUSH	IX		; char ** actualName
+			PUSH	DE		; void * value
+			PUSH	HL		; char * namePattern
+			CALL	_readVarVal	; Call the C function readVarVal
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	DE
+			POP	IX		; To be replaced
+			POP	IX
+			POP	IX
+			LD 	IX, _scratchpad
+			LD	D, (IX + 6)	; Return the actual type
+			LD	BC, (IX + 3)	; Return the length
+			LD	IX, (IX)	; Return the actual name
 			RET
 
 ; Initialise a GS Trans operation

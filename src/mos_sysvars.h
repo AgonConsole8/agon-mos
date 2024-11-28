@@ -83,6 +83,9 @@ void	removeSystemVariable(t_mosSystemVariable * var);
 // find parent system variable object (used for deleting)
 t_mosSystemVariable * findParentSystemVariable(t_mosSystemVariable * var);
 
+int		setVarVal(char * name, void * value, char ** actualName, BYTE * type);
+int		readVarVal(char * namePattern, void * value, char ** actualName, int * length, BYTE * typeFlag);
+
 int		gsInit(void * source, t_mosTransInfo ** transInfoPtr, BYTE flags);
 int		gsRead(t_mosTransInfo ** transInfoPtr, char * read);
 int		gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags);
