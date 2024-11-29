@@ -117,7 +117,6 @@ static t_mosCommand mosCommands[] = {
 	{ "RUN", 		&mos_cmdRUN,		HELP_RUN_ARGS,		HELP_RUN },
 	{ "SAVE", 		&mos_cmdSAVE,		HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "SET",		&mos_cmdSET,		HELP_SET_ARGS,		HELP_SET },
-	{ "SHOW",		&mos_cmdSHOW,		HELP_SET_ARGS,		HELP_SET },
 	{ "TIME", 		&mos_cmdTIME,		HELP_TIME_ARGS,		HELP_TIME },
 	{ "TYPE",		&mos_cmdTYPE,		HELP_TYPE_ARGS,		HELP_TYPE },
 	{ "VDU",		&mos_cmdVDU,		HELP_VDU_ARGS,		HELP_VDU },
