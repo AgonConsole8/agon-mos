@@ -687,6 +687,7 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 	char *parseEnd = NULL;
 	char *start = source;
 	char lastChar = '\0';
+	int value = 0;
 
 	if (divider == NULL) {
 		divider = " ";
@@ -745,14 +746,14 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 	}
 
 	if (base > 1 && base <= 36) {
-		*number = strtol(start, &parseEnd, base);
+		value = strtol(start, &parseEnd, base);
 	} else {
 		return false;
 	}
 
 	*endptr = lastChar;
 
-	if ((parseEnd < endptr) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && *number < 0)) {
+	if ((parseEnd < endptr) || (flags & EXTRACT_FLAG_POSITIVE_ONLY && value < 0)) {
 		// we didn't consume whole string, or negative found for positive only
 		if (*end == source) {
 			// update our end pointer to point to where we reached
@@ -765,6 +766,7 @@ bool extractNumber(char * source, char ** end, char * divider, int * number, BYT
 		*end = parseEnd;
 	}
 
+	*number = value;
 	return true;
 }
 

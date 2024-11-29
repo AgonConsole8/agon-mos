@@ -2902,6 +2902,61 @@ int readDate(char * buffer, int * size) {
 	return FR_OK;
 }
 
+// Write the date
+int writeDate(char * buffer) {
+	vdp_time_t t;
+	char * end = buffer;
+	char * arg = NULL;
+	int	day = -1;
+	int mon = -1;
+	int weekday = -1;
+	char writeBuffer[6];
+
+	// Write date will iterate over input buffer to extract day and month, and optional weekday
+	// weekday will be discarded
+	// repeated elements will trigger an error
+	// string beyond the date will be ignored
+
+	while (day == -1 || mon == -1) {
+		if (extractString(end, &end, ", ", &arg, EXTRACT_FLAG_AUTO_TERMINATE) != FR_OK) {
+			return FR_INVALID_PARAMETER;
+		}
+		if (weekday == -1) {
+			weekday = rtc_dayFromName(arg);
+			if (weekday != -1) {
+				continue;
+			}
+		}
+		if (mon == -1) {
+			mon = rtc_monthFromName(arg);
+			if (mon != -1) {
+				continue;
+			}
+		}
+		if (day == -1) {
+			if (extractNumber(arg, &arg, " ,", &day, EXTRACT_FLAG_DECIMAL_ONLY | EXTRACT_FLAG_POSITIVE_ONLY)) {
+				continue;
+			}
+		}
+		// If we get here, our date string is invalid
+		return FR_INVALID_PARAMETER;
+	}
+
+	rtc_update();
+	rtc_unpack(&rtc, &t);
+
+	writeBuffer[0] = t.year - EPOCH_YEAR;
+	writeBuffer[1] = mon + 1;
+	writeBuffer[2] = day;
+	writeBuffer[3] = t.hour;
+	writeBuffer[4] = t.minute;
+	writeBuffer[5] = t.second;
+	mos_SETRTC((UINT24)writeBuffer);
+
+	rtc_update();
+	return FR_OK;
+}
+
 // Read the time
 int readTime(char * buffer, int * size) {
 	vdp_time_t t;
@@ -3002,7 +3057,7 @@ static t_mosCodeSystemVariable yearVar = {
 // Sys$Date variable definition - read-only (for now)
 static t_mosCodeSystemVariable dateVar = {
 	&readDate,
-	NULL		// TODO implement date write function
+	&writeDate
 };
 
 // Sys$Time variable definition

@@ -21,6 +21,7 @@
 #include "defines.h"
 #include "uart.h"
 #include "clock.h"
+#include "strings.h"
 
 extern volatile BYTE vpd_protocol_flags;		// In globals.asm
 extern volatile BYTE rtc_enable;				// In globals.asm
@@ -101,4 +102,28 @@ void rtc_formatDate(char * buffer, vdp_time_t * t) {
 //
 void rtc_formatTime(char * buffer, vdp_time_t * t) {
 	sprintf(buffer, "%02d:%02d:%02d", t->hour, t->minute, t->second);
+}
+
+// Work out month from string
+//
+int rtc_monthFromName(char * month) {
+	int i;
+	for (i = 0; i < 12; i++) {
+		if (strcasecmp(month, rtc_months[i][0]) == 0 || strcasecmp(month, rtc_months[i][1]) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+// Work out weekday from string
+//
+int rtc_dayFromName(char * day) {
+	int i;
+	for (i = 0; i < 7; i++) {
+		if (strcasecmp(day, rtc_days[i][0]) == 0 || strcasecmp(day, rtc_days[i][1]) == 0) {
+			return i;
+		}
+	}
+	return -1;
 }
