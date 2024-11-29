@@ -334,6 +334,10 @@ int resolveRelativePath(char * path, char * resolved, int length) {
 	char * leafname;
 	char leafChar;
 
+	if (!path || !resolved) {
+		return FR_INVALID_PARAMETER;
+	}
+
 	leafname = getFilepathLeafname(path);
 	leafChar = *leafname;
 	if (leafname == path) {

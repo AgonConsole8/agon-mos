@@ -192,7 +192,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_getdirectoryforpath	; 0x39
 			DW	mos_api_getfilepathleafname	; 0x3a 
 			DW	mos_api_isdirectory	; 0x3b
-			DW	mos_api_not_implemented	; 0x3c   mos_api_getabsolutepath (uses resolveRelativePath)
+			DW	mos_api_getabsolutepath	; 0x3c
 			DW	mos_api_not_implemented	; 0x3d
 			DW	mos_api_not_implemented	; 0x3e
 			DW	mos_api_not_implemented	; 0x3f
@@ -1551,10 +1551,29 @@ $$:			LD	A, 5		; Return 5 FR_NO_PATH
 			RET
 
 ; Get the absolute version of a (relative) path
+; HLU: Pointer to the path to get the absolute version of
+; DEU: Pointer to the buffer to store the absolute path in
+; BCU: Length of the buffer
+; Returns:
+; - A: Status code
 ;
 ; int resolveRelativePath(char * path, char * resolved, int length);
-; This needs adjusting to allow it to return length, and accept a null resolved buffer
-
+; For now, we will not support returning back length, or calculating length
+mos_api_getabsolutepath:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume pointers are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	BC		; int length
+			PUSH	DE		; char * resolved
+			PUSH	HL		; char * path
+			CALL	_resolveRelativePath	; Call the C function resolveRelativePath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			RET
 
 ; Open a file
 ; HLU: Pointer to a blank FIL struct
