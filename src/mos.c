@@ -1841,7 +1841,7 @@ UINT24 mos_TYPE(char * filename) {
 
 	umm_free(expandedFilename);
 	umm_free(buffer);
-	return FR_OK;
+	return fr;
 }
 
 // Change directory
