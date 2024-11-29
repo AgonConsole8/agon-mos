@@ -85,7 +85,7 @@ mos_pmatch:		EQU	28h
 mos_getargument:	EQU	29h
 mos_extractstring:	EQU	2Ah
 mos_extractnumber:	EQU	2Bh
-mos_escapestring:	EQU	2Ch	; not implemented, yet
+mos_escapestring:	EQU	2Ch
 
 ; System variables and related functions
 ;

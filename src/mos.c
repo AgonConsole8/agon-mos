@@ -2530,7 +2530,7 @@ UINT24 mos_FOPEN(char * filename, UINT8 mode) {
 	int		i;
 	FRESULT	fr = expandPath(filename, &expandedFilename);
 
-	if (fr == FR_OK) {
+	if (fr == FR_OK || fr == FR_NO_FILE) {
 		for (i = 0; i < MOS_maxOpenFiles; i++) {
 			if (mosFileObjects[i].free == 0) {
 				fr = f_open(&mosFileObjects[i].fileObject, expandedFilename, mode);
