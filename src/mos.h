@@ -61,6 +61,7 @@ t_mosCommand	*mos_getCommand(char * ptr, uint8_t flags);
 char *	mos_trim(char * s, bool removeLeadingAsterisks);
 int		mos_runBin(UINT24 addr, char * args);
 int		mos_runBinFile(char * filepath, char * args);
+int		mos_runOrLoadFile(char * args, bool run);
 int		mos_exec(char * buffer, BOOL in_mos, BYTE depth);
 UINT8 	mos_execMode(UINT8 * ptr);
 
@@ -84,6 +85,7 @@ int		mos_cmdIF(char *ptr);
 int		mos_cmdIFTHERE(char *ptr);
 int		mos_cmdJMP(char * ptr);
 int		mos_cmdLOAD(char * ptr);
+int		mos_cmdLOADFILE(char * ptr);
 int		mos_cmdMEM(char *ptr);
 int		mos_cmdMKDIR(char *ptr);
 int		mos_cmdMOUNT(char *ptr);
@@ -92,6 +94,7 @@ int		mos_cmdPRINTF(char *ptr);
 int		mos_cmdREN(char *ptr);
 int		mos_cmdRUN(char * ptr);
 int		mos_cmdRUNBIN(char * ptr);
+int		mos_cmdRUNFILE(char * ptr);
 int		mos_cmdSAVE(char *ptr);
 int		mos_cmdSET(char *ptr);
 int		mos_cmdSETEVAL(char *ptr);
@@ -209,6 +212,12 @@ UINT8	fat_EOF(FIL * fp);
 							"default to &40000\r\n"
 #define HELP_LOAD_ARGS		"<filename> [<addr>]"
 
+#define HELP_LOADFILE		"Load a file from disc, according to its LoadType\r\n" \
+							"MOS will look up the \"LoadType\" for the file based on its extension\r\n" \
+							"in variable named Alias$@LoadType_<extension>\r\n" \
+							"and execute the defined command to load the file\r\n"
+#define HELP_LOADFILE_ARGS	"<filename> [<args>]"
+
 #define HELP_MEM			"Output memory statistics\r\n"
 
 #define HELP_MKDIR			"Create a new folder on the SD card\r\n"
@@ -240,6 +249,12 @@ UINT8	fat_EOF(FIL * fp);
 							"detecting Moslets based on whether it is located in the Moslet$Path\r\n" \
 							"To run a binary at a specific address, use the Load and Run commands\r\n"
 #define HELP_RUNBIN_ARGS	"<filename> [<args>]"
+
+#define HELP_RUNFILE		"Run a file from disc, according to its RunType\r\n" \
+							"MOS will look up the \"RunType\" for the file based on its extension\r\n" \
+							"in variable named Alias$@RunType_<extension>\r\n" \
+							"and execute the defined command to run the file\r\n"
+#define HELP_RUNFILE_ARGS	"<filename> [<args>]"
 
 #define HELP_SAVE			"Save a block of memory to the SD card\r\n"
 #define HELP_SAVE_ARGS		"<filename> <addr> <size>"

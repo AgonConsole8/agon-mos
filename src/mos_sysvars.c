@@ -1202,13 +1202,15 @@ int substituteArgs(char * template, char * args, char * dest, int length, bool o
 		argument = getArgument(args, maxArg + 1, NULL);
 		if (argument != NULL) {
 			argLen = strlen(argument);
-			size += argLen;
-			if (copying) {
-				*dest++ = ' ';
-				destRemaining--;
-				strncpy(dest, argument, argLen < destRemaining ? argLen : destRemaining);
+			if (argLen > 0) {
+				size += argLen + 1;
+				if (copying) {
+					*dest++ = ' ';
+					destRemaining--;
+					strncpy(dest, argument, destRemaining);
+				}
+				copying = false;
 			}
-			copying = false;
 		}
 	}
 	if (copying) {

@@ -109,6 +109,7 @@ static t_mosCommand mosCommands[] = {
 	{ "IfThere",	&mos_cmdIFTHERE,	false,	HELP_IFTHERE_ARGS,	HELP_IFTHERE },
 	{ "JMP",		&mos_cmdJMP,		true,	HELP_JMP_ARGS,		HELP_JMP },
 	{ "Load",		&mos_cmdLOAD,		true,	HELP_LOAD_ARGS,		HELP_LOAD },
+	{ "LoadFile",	&mos_cmdLOADFILE,	true,	HELP_LOADFILE_ARGS,	HELP_LOADFILE },
 	{ "LS",			&mos_cmdDIR,		true,	HELP_CAT_ARGS,		HELP_CAT },
 	{ "Mem",		&mos_cmdMEM,		false,	NULL,				HELP_MEM },
 	{ "MkDir",		&mos_cmdMKDIR,		true,	HELP_MKDIR_ARGS,	HELP_MKDIR },
@@ -121,6 +122,7 @@ static t_mosCommand mosCommands[] = {
 	{ "RM",			&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Run",		&mos_cmdRUN,		true,	HELP_RUN_ARGS,		HELP_RUN },
 	{ "RunBin",		&mos_cmdRUNBIN,		true,	HELP_RUNBIN_ARGS,	HELP_RUNBIN },
+	{ "RunFile",	&mos_cmdRUNFILE,	true,	HELP_RUNFILE_ARGS,	HELP_RUNFILE },
 	{ "Save",		&mos_cmdSAVE,		true,	HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "Set",		&mos_cmdSET,		false,	HELP_SET_ARGS,		HELP_SET },
 	{ "SetEval",	&mos_cmdSETEVAL,	false,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
@@ -286,14 +288,14 @@ int mos_runBinFile(char * filepath, char * args) {
 	int result = getResolvedPath(filepath, &resolvedPath);
 
 	#if DEBUG > 0
-	createOrUpdateSystemVariable("LastApp$RunPath", MOS_VAR_STRING, filepath);
+	createOrUpdateSystemVariable("LastBin$RunPath", MOS_VAR_STRING, filepath);
 	#endif /* DEBUG */
 	if (result != FR_OK) {
 		return result;
 	}
 
 	#if DEBUG > 0
-	createOrUpdateSystemVariable("LastApp$UnresolvedRun", MOS_VAR_STRING, resolvedPath);
+	createOrUpdateSystemVariable("LastBin$UnresolvedRun", MOS_VAR_STRING, resolvedPath);
 	#endif /* DEBUG */
 
 	// Fully resolved path allocation - size is very conservative
@@ -311,13 +313,77 @@ int mos_runBinFile(char * filepath, char * args) {
 		}
 		result = mos_LOAD(fullyResolvedPath, addr, 0);
 		if (result == FR_OK) {
+			createOrUpdateSystemVariable("LastBin$Run", MOS_VAR_STRING, fullyResolvedPath);
 			result = mos_runBin(addr, args);
 		}
 	}
 
-	createOrUpdateSystemVariable("LastApp$Run", MOS_VAR_STRING, fullyResolvedPath);
-
 	umm_free(fullyResolvedPath);
+	umm_free(resolvedPath);
+	return result;
+}
+
+// runOrLoadFile needs to be called with args _including_ the filepath
+int mos_runOrLoadFile(char * ptr, bool run) {
+	char *	filepath = NULL;
+	char *	args = NULL;
+	char * 	leafname = NULL;
+	char *	resolvedPath = NULL;
+	char *	extension = NULL;
+	int		result = extractString(ptr, &args, NULL, &filepath, EXTRACT_FLAG_AUTO_TERMINATE);
+
+	if (result != FR_OK) {
+		return result;
+	}
+	result = getResolvedPath(filepath, &resolvedPath);
+
+	#if DEBUG > 0
+	createOrUpdateSystemVariable(run ? "LastFile$RunPath" : "LastFile$LoadPath", MOS_VAR_STRING, filepath);
+	#endif /* DEBUG */
+	if (result != FR_OK) {
+		return result;
+	}
+
+	leafname = getFilepathLeafname(resolvedPath);
+	if (leafname == NULL) {
+		umm_free(resolvedPath);
+		return MOS_INVALID_COMMAND;
+	}
+
+	extension = strrchr(leafname, '.');
+	if (extension == NULL) {
+		result = MOS_INVALID_COMMAND;
+	} else {
+		// Look up a runtype for the file extension
+		char * runtype = NULL;
+		char * token = umm_malloc(strlen(extension) + 17);
+		if (token == NULL) {
+			result = MOS_OUT_OF_MEMORY;
+		} else {
+			extension++;
+			sprintf(token, "Alias$@%sType_%s", run ? "Run" : "Load", extension);
+			if (args && *(args - 1) == '\0') {
+				*(args - 1) = ' ';	// Replace the terminator with a space
+			}
+			runtype = expandVariableToken(token);
+			umm_free(token);
+			if (runtype != NULL) {
+				// We have a run/load type, so use substituteArguments to build the command
+				char * command = substituteArguments(runtype, ptr, false);
+				if (command != NULL) {
+					createOrUpdateSystemVariable(run ? "LastFile$Run" : "LastFile$Load", MOS_VAR_STRING, command);
+					result = mos_exec(command, true, 0);
+					umm_free(command);
+				} else {
+					result = MOS_OUT_OF_MEMORY;
+				}
+				umm_free(runtype);
+			} else {
+				result = MOS_INVALID_COMMAND;
+			}
+		}
+	}
+
 	umm_free(resolvedPath);
 	return result;
 }
@@ -1119,6 +1185,16 @@ int mos_cmdJMP(char *ptr) {
 	return 0;
 }
 
+// LOADFILE <filename> [<arguments>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdLOADFILE(char *ptr) {
+	return mos_runOrLoadFile(ptr, false);
+}
+
 // RUN [<addr>] [<arguments>] command
 // Parameters:
 // - ptr: Pointer to the argument string in the line edit buffer
@@ -1152,6 +1228,16 @@ int mos_cmdRUNBIN(char *ptr) {
 	}
 	ptr = mos_trim(ptr, false);
 	return mos_runBinFile(filename, ptr);
+}
+
+// RUNFILE <filename> [<arguments>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdRUNFILE(char *ptr) {
+	return mos_runOrLoadFile(ptr, true);
 }
 
 // CD <path> command
@@ -3103,4 +3189,14 @@ void mos_setupSystemVariables() {
 	// Keyboard and console settings
 	createOrUpdateSystemVariable("Keyboard", MOS_VAR_CODE, &keyboardVar);
 	createOrUpdateSystemVariable("Console", MOS_VAR_CODE, &consoleVar);
+
+	// RunRypes
+	createOrUpdateSystemVariable("Alias$@RunType_obey", MOS_VAR_STRING, "Obey %*0");
+	createOrUpdateSystemVariable("Alias$@RunType_exec", MOS_VAR_STRING, "Exec %*0");
+	createOrUpdateSystemVariable("Alias$@RunType_bin", MOS_VAR_STRING, "RunBin %*0");
+	createOrUpdateSystemVariable("Alias$@RunType_bas", MOS_VAR_STRING, "BBCBasic %*0");
+	createOrUpdateSystemVariable("Alias$@RunType_bbc", MOS_VAR_STRING, "BBCBasic %*0");
+	// LoadTypes
+	createOrUpdateSystemVariable("Alias$@LoadType_obey", MOS_VAR_STRING, "Type %*0");
+	createOrUpdateSystemVariable("Alias$@LoadType_bin", MOS_VAR_STRING, "Load %*0");
 }
