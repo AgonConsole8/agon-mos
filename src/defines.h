@@ -40,6 +40,19 @@ extern void _low_bss[];
 extern void _low_romdata[];
 extern int _len_data;
 
+/**
+ * MOS-specific return codes
+ * These extend the FatFS return codes FRESULT
+ */
+typedef enum {
+	MOS_INVALID_COMMAND = 20,	/* (20) Command could not be understood */
+	MOS_INVALID_EXECUTABLE, 	/* (21) Executable file format not recognised */
+	MOS_OUT_OF_MEMORY,			/* (22) Generic out of memory error */
+	MOS_NOT_IMPLEMENTED,		/* (23) API call not implemented */
+	MOS_OVERLAPPING_SYSTEM,		/* (24) File load prevented to stop overlapping system memory */
+	MOS_BAD_STRING,				/* (25) Bad or incomplete string */
+	MOS_TOO_DEEP,				/* (26) Too many nested commands */
+} MOSRESULT;
 
 #define SPL_STACK_SIZE				2048
 #define HEAP_LEN ((int)_stack - (int)_heapbot - SPL_STACK_SIZE)

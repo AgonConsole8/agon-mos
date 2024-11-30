@@ -37,12 +37,14 @@
 			XREF	SET_AHL24
 			XREF	GET_AHL24
 			XREF	SET_ADE24
+			XREF	SET_ABC24
+			XREF	SET_AIX24
 
 			XREF	_mos_OSCLI		; In mos.c
 			XREF	_mos_EDITLINE
-			XREF	_mos_LOAD
-			XREF	_mos_SAVE
-			XREF	_mos_CD
+			XREF	_mos_LOAD_API
+			XREF	_mos_SAVE_API
+			XREF	_mos_CD_API
 			XREF	_mos_DIR_API
 			XREF	_mos_DEL
 			XREF	_mos_REN_API
@@ -52,9 +54,10 @@
 			XREF	_mos_FPUTC
 			XREF	_mos_FEOF
 			XREF	_mos_GETERROR
-			XREF	_mos_MKDIR
+			XREF	_mos_MKDIR_API
 			XREF	_mos_COPY_API
 			XREF	_mos_GETRTC 
+			XREF	_mos_UNPACKRTC 
 			XREF	_mos_SETRTC 
 			XREF	_mos_SETINTVECTOR
 			XREF	_mos_GETFIL
@@ -94,6 +97,26 @@
 			XREF	_f_closedir
 			XREF	_f_readdir
 			XREF	_f_getcwd
+
+			XREF	_pmatch			; In strings.c
+
+			XREF	_getArgument		; In mos_sysvars.c
+			XREF	_extractString
+			XREF	_extractNumber
+			XREF	_escapeString
+			XREF	_setVarVal
+			XREF	_readVarVal
+			XREF	_gsInit
+			XREF	_gsRead
+			XREF	_gsTrans
+			XREF	_substituteArgs
+			; XREF	_evaluateExpression
+
+			XREF	_resolvePath		; In mos_file.c
+			XREF	_getDirectoryForPath
+			XREF	_getFilepathLeafname
+			XREF	_isDirectory
+			XREF	_resolveRelativePath
 			
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
@@ -141,105 +164,106 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_i2c_close	; 0x20
 			DW	mos_api_i2c_write	; 0x21
 			DW	mos_api_i2c_read	; 0x22
+			DW	mos_api_unpackrtc	; 0x23
 
-			DW  mos_api_not_implemented ; 0x23
-			DW  mos_api_not_implemented ; 0x24
-			DW  mos_api_not_implemented ; 0x25
-			DW  mos_api_not_implemented ; 0x26
-			DW  mos_api_not_implemented ; 0x27
-			DW  mos_api_not_implemented ; 0x28
-			DW  mos_api_not_implemented ; 0x29
-			DW  mos_api_not_implemented ; 0x2a
-			DW  mos_api_not_implemented ; 0x2b
-			DW  mos_api_not_implemented ; 0x2c
-			DW  mos_api_not_implemented ; 0x2d
-			DW  mos_api_not_implemented ; 0x2e
-			DW  mos_api_not_implemented ; 0x2f
+			DW	mos_api_not_implemented	; 0x24
+			DW	mos_api_not_implemented	; 0x25
+			DW	mos_api_not_implemented	; 0x26
+			DW	mos_api_not_implemented	; 0x27
 
-			DW  mos_api_not_implemented ; 0x30
-			DW  mos_api_not_implemented ; 0x31
-			DW  mos_api_not_implemented ; 0x32
-			DW  mos_api_not_implemented ; 0x33
-			DW  mos_api_not_implemented ; 0x34
-			DW  mos_api_not_implemented ; 0x35
-			DW  mos_api_not_implemented ; 0x36
-			DW  mos_api_not_implemented ; 0x37
-			DW  mos_api_not_implemented ; 0x38
-			DW  mos_api_not_implemented ; 0x39
-			DW  mos_api_not_implemented ; 0x3a
-			DW  mos_api_not_implemented ; 0x3b
-			DW  mos_api_not_implemented ; 0x3c
-			DW  mos_api_not_implemented ; 0x3d
-			DW  mos_api_not_implemented ; 0x3e
-			DW  mos_api_not_implemented ; 0x3f
+			DW	mos_api_pmatch		; 0x28
+			DW	mos_api_getargument	; 0x29
+			DW	mos_api_extractstring	; 0x2a
+			DW	mos_api_extractnumber	; 0x2b   
+			DW	mos_api_escapestring	; 0x2c
+			DW	mos_api_not_implemented	; 0x2d
+			DW	mos_api_not_implemented	; 0x2e
+			DW	mos_api_not_implemented	; 0x2f
 
-			DW  mos_api_not_implemented ; 0x40
-			DW  mos_api_not_implemented ; 0x41
-			DW  mos_api_not_implemented ; 0x42
-			DW  mos_api_not_implemented ; 0x43
-			DW  mos_api_not_implemented ; 0x44
-			DW  mos_api_not_implemented ; 0x45
-			DW  mos_api_not_implemented ; 0x46
-			DW  mos_api_not_implemented ; 0x47
-			DW  mos_api_not_implemented ; 0x48
-			DW  mos_api_not_implemented ; 0x49
-			DW  mos_api_not_implemented ; 0x4a
-			DW  mos_api_not_implemented ; 0x4b
-			DW  mos_api_not_implemented ; 0x4c
-			DW  mos_api_not_implemented ; 0x4d
-			DW  mos_api_not_implemented ; 0x4e
-			DW  mos_api_not_implemented ; 0x4f
+			DW	mos_api_setvarval	; 0x30
+			DW	mos_api_readvarval	; 0x31
+			DW	mos_api_gsinit		; 0x32
+			DW	mos_api_gsread		; 0x33
+			DW	mos_api_gstrans		; 0x34
+			DW	mos_api_substituteargs	; 0x35
+			DW	mos_api_not_implemented	; 0x36   reserved for mos_api_evaluateexpression
+			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
+			DW	mos_api_resolvepath	; 0x38
+			DW	mos_api_getdirectoryforpath	; 0x39
+			DW	mos_api_getfilepathleafname	; 0x3a 
+			DW	mos_api_isdirectory	; 0x3b
+			DW	mos_api_getabsolutepath	; 0x3c
+			DW	mos_api_not_implemented	; 0x3d
+			DW	mos_api_not_implemented	; 0x3e
+			DW	mos_api_not_implemented	; 0x3f
 
-			DW  mos_api_not_implemented ; 0x50
-			DW  mos_api_not_implemented ; 0x51
-			DW  mos_api_not_implemented ; 0x52
-			DW  mos_api_not_implemented ; 0x53
-			DW  mos_api_not_implemented ; 0x54
-			DW  mos_api_not_implemented ; 0x55
-			DW  mos_api_not_implemented ; 0x56
-			DW  mos_api_not_implemented ; 0x57
-			DW  mos_api_not_implemented ; 0x58
-			DW  mos_api_not_implemented ; 0x59
-			DW  mos_api_not_implemented ; 0x5a
-			DW  mos_api_not_implemented ; 0x5b
-			DW  mos_api_not_implemented ; 0x5c
-			DW  mos_api_not_implemented ; 0x5d
-			DW  mos_api_not_implemented ; 0x5e
-			DW  mos_api_not_implemented ; 0x5f
+			DW	mos_api_not_implemented	; 0x40
+			DW	mos_api_not_implemented	; 0x41
+			DW	mos_api_not_implemented	; 0x42
+			DW	mos_api_not_implemented	; 0x43
+			DW	mos_api_not_implemented	; 0x44
+			DW	mos_api_not_implemented	; 0x45
+			DW	mos_api_not_implemented	; 0x46
+			DW	mos_api_not_implemented	; 0x47
+			DW	mos_api_not_implemented	; 0x48
+			DW	mos_api_not_implemented	; 0x49
+			DW	mos_api_not_implemented	; 0x4a
+			DW	mos_api_not_implemented	; 0x4b
+			DW	mos_api_not_implemented	; 0x4c
+			DW	mos_api_not_implemented	; 0x4d
+			DW	mos_api_not_implemented	; 0x4e
+			DW	mos_api_not_implemented	; 0x4f
 
-			DW  mos_api_not_implemented ; 0x60
-			DW  mos_api_not_implemented ; 0x61
-			DW  mos_api_not_implemented ; 0x62
-			DW  mos_api_not_implemented ; 0x63
-			DW  mos_api_not_implemented ; 0x64
-			DW  mos_api_not_implemented ; 0x65
-			DW  mos_api_not_implemented ; 0x66
-			DW  mos_api_not_implemented ; 0x67
-			DW  mos_api_not_implemented ; 0x68
-			DW  mos_api_not_implemented ; 0x69
-			DW  mos_api_not_implemented ; 0x6a
-			DW  mos_api_not_implemented ; 0x6b
-			DW  mos_api_not_implemented ; 0x6c
-			DW  mos_api_not_implemented ; 0x6d
-			DW  mos_api_not_implemented ; 0x6e
-			DW  mos_api_not_implemented ; 0x6f
+			DW	mos_api_not_implemented	; 0x50
+			DW	mos_api_not_implemented	; 0x51
+			DW	mos_api_not_implemented	; 0x52
+			DW	mos_api_not_implemented	; 0x53
+			DW	mos_api_not_implemented	; 0x54
+			DW	mos_api_not_implemented	; 0x55
+			DW	mos_api_not_implemented	; 0x56
+			DW	mos_api_not_implemented	; 0x57
+			DW	mos_api_not_implemented	; 0x58
+			DW	mos_api_not_implemented	; 0x59
+			DW	mos_api_not_implemented	; 0x5a
+			DW	mos_api_not_implemented	; 0x5b
+			DW	mos_api_not_implemented	; 0x5c
+			DW	mos_api_not_implemented	; 0x5d
+			DW	mos_api_not_implemented	; 0x5e
+			DW	mos_api_not_implemented	; 0x5f
 
-			DW  mos_api_not_implemented ; 0x70
-			DW  mos_api_not_implemented ; 0x71
-			DW  mos_api_not_implemented ; 0x72
-			DW  mos_api_not_implemented ; 0x73
-			DW  mos_api_not_implemented ; 0x74
-			DW  mos_api_not_implemented ; 0x75
-			DW  mos_api_not_implemented ; 0x76
-			DW  mos_api_not_implemented ; 0x77
-			DW  mos_api_not_implemented ; 0x78
-			DW  mos_api_not_implemented ; 0x79
-			DW  mos_api_not_implemented ; 0x7a
-			DW  mos_api_not_implemented ; 0x7b
-			DW  mos_api_not_implemented ; 0x7c
-			DW  mos_api_not_implemented ; 0x7d
-			DW  mos_api_not_implemented ; 0x7e
-			DW  mos_api_not_implemented ; 0x7f
+			DW	mos_api_not_implemented	; 0x60
+			DW	mos_api_not_implemented	; 0x61
+			DW	mos_api_not_implemented	; 0x62
+			DW	mos_api_not_implemented	; 0x63
+			DW	mos_api_not_implemented	; 0x64
+			DW	mos_api_not_implemented	; 0x65
+			DW	mos_api_not_implemented	; 0x66
+			DW	mos_api_not_implemented	; 0x67
+			DW	mos_api_not_implemented	; 0x68
+			DW	mos_api_not_implemented	; 0x69
+			DW	mos_api_not_implemented	; 0x6a
+			DW	mos_api_not_implemented	; 0x6b
+			DW	mos_api_not_implemented	; 0x6c
+			DW	mos_api_not_implemented	; 0x6d
+			DW	mos_api_not_implemented	; 0x6e
+			DW	mos_api_not_implemented	; 0x6f
+
+			DW	mos_api_not_implemented	; 0x70
+			DW	mos_api_not_implemented	; 0x71
+			DW	mos_api_not_implemented	; 0x72
+			DW	mos_api_not_implemented	; 0x73
+			DW	mos_api_not_implemented	; 0x74
+			DW	mos_api_not_implemented	; 0x75
+			DW	mos_api_not_implemented	; 0x76
+			DW	mos_api_not_implemented	; 0x77
+			DW	mos_api_not_implemented	; 0x78
+			DW	mos_api_not_implemented	; 0x79
+			DW	mos_api_not_implemented	; 0x7a
+			DW	mos_api_not_implemented	; 0x7b
+			DW	mos_api_not_implemented	; 0x7c
+			DW	mos_api_not_implemented	; 0x7d
+			DW	mos_api_not_implemented	; 0x7e
+			DW	mos_api_not_implemented	; 0x7f
 
 mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;			
@@ -332,7 +356,7 @@ mos_api_load:		LD	A, MB		; Check if MBASE is 0
 $$:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
-			CALL	_mos_LOAD	; Call the C function mos_LOAD
+			CALL	_mos_LOAD_API	; Call the C function mos_LOAD_API
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
@@ -362,8 +386,8 @@ mos_api_save:		LD	A, MB		; Check if MBASE is 0
 $$:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
-			CALL	_mos_SAVE	; Call the C function mos_LOAD
-			LD	A, L		; Return vaue in HLU, put in A
+			CALL	_mos_SAVE_API	; Call the C function mos_SAVE_API
+			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
 			POP	BC
@@ -385,7 +409,7 @@ mos_api_cd:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename	
-			CALL	_mos_CD
+			CALL	_mos_CD_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
@@ -495,7 +519,7 @@ mos_api_mkdir:		LD	A, MB		; Check if MBASE is 0
 ; Finally, we can do the load
 ;
 			PUSH	HL		; char   * filename
-			CALL	_mos_MKDIR	; Call the C function mos_MKDIR
+			CALL	_mos_MKDIR_API	; Call the C function mos_MKDIR_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
@@ -727,6 +751,17 @@ mos_api_getrtc:		LD	A, MB		; Check if MBASE is 0
 			CALL	_mos_GETRTC
 			POP	HL
 			RET 
+
+; Unpack RTC data
+; HLU: Pointer to a buffer to copy the RTC data to
+;
+mos_api_unpackrtc:	LD	A, MB		; Check if MBASE is 0
+			OR	A, A 
+			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
+			PUSH 	HL
+			CALL	_mos_UNPACKRTC
+			POP	HL
+			RET
 
 ; Set the RTC
 ; HLU: Pointer to a buffer with the time data in
@@ -988,6 +1023,556 @@ mos_api_flseek:		PUSH 	DE		; UINT32 offset (msb)
 			POP	BC
 			POP	HL
 			POP	DE
+			RET
+
+
+; MOS String functions
+;
+; Pattern matching
+; HLU: Address of pattern (zero terminated)
+; DEU: Address at string to compare against pattern (zero terminated)
+; C: Flags
+; Returns:
+; - A: File error, or 0 if OK
+; - F: Carry reset indicates no room for file.
+;
+mos_api_pmatch:		LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
+			PUSH	DE		; char * string
+			PUSH	HL		; char * pattern
+			CALL	_pmatch	; Call the C function pmatch
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			RET
+
+; Extract a (numbered) argument from a string
+; HLU: Pointer to source string
+; BCU: Argument number
+; Returns:
+; - HLU: Address of the argument or zero if not found
+;
+; char * getArgument(char * source, int argNo, char ** end)
+mos_api_getargument:	PUSH	AF		; UINT8 flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			CALL	NZ, SET_AHL24
+			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; char ** end
+			PUSH	BC		; UINT8 argNo
+			PUSH	HL		; char * source
+			CALL	_getArgument	; Call the C function getArgument
+			; HL now contains the argument address
+			POP	BC
+			POP	BC
+			EX	(SP), HL
+			POP	HL
+			POP	AF
+			RET
+
+; Extract a string, using a given divider
+; HLU: Pointer to source string to extract from
+; DEU: Pointer to string for divider matching, or 0 for default (space)
+; A: Flags
+; Depending on flags, the result string will be zero terminated or not
+; Returns:
+; - A: status code
+; - HLU: Address of the result string
+; - DEU: Address of next character after end of result string
+;
+; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags)
+mos_api_extractstring:	
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D		; Check if DE is zero
+			OR	A, E
+			JR	Z, $F		; DE is zero so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; char ** result
+			PUSH	DE		; char * divider
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; char ** end
+			PUSH	HL		; char * source
+			CALL	_extractString	; Call the C function extractString
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	HL
+			POP	HL
+			POP	HL
+			LD	L, A		; keep result so we can
+			POP 	AF		; unpop the AF
+			LD 	A, L		; return status code in A
+			LD	HL, (_scratchpad)	; return result in HLU
+			LD	DE, (_scratchpad + 3)	; return end in DEU
+			RET
+
+; Extract a number, using given divider
+; HLU: Pointer to source string to extract from
+; DEU: Pointer to string for divider matching, or 0 for default (space)
+; A: Flags
+; Returns:
+; - A: status code
+; - HLU: Number extracted
+; - DEU: Address of next character after end of number
+;
+; bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags)
+mos_api_extractnumber:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * number
+			PUSH	DE		; char * divider
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; char ** end
+			PUSH	HL		; char * source
+			CALL	_extractNumber	; Call the C function extractNumber
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	HL
+			POP	HL
+			POP	HL
+			LD	L, A		; keep result so we can
+			POP 	AF		; unpop the AF
+			LD 	A, L		; move return value back to A
+			LD	HL, (_scratchpad)	; return number in HLU
+			LD	DE, (_scratchpad + 3)	; return end in DEU
+			; Return value in A will be true/false
+			; so we need to change to 0 for success, and 19 (invalid parameter) for failure
+			OR	A, A		; Was status value false?
+			JR	Z, $F		; If it is, we need to replace with 19
+			LD	A, 0		; Otherwise, return 0 FR_OK
+			RET
+$$:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
+			RET
+
+; Escape a string, converting control characters to be pipe-prefixed
+; HLU: Pointer to source string
+; DEU: Pointer to destination buffer (optional)
+; BCU: Length of destination buffer
+; Returns:
+; - A: Status code
+; - BCU: Length of escaped string
+;
+; int escapeString(char * source, char * dest, int * length)
+mos_api_escapestring:
+			LD	(_scratchpad), BC 	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * length
+			PUSH	DE		; char * dest
+			PUSH	HL		; char * source
+			CALL	_escapeString	; Call the C function escapeString
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	DE
+			POP	BC
+			LD	BC, (HL)	; Return the length
+			RET
+
+; Set a variable value
+; HLU: Pointer to variable name (can include wildcards)
+; DEU: Variable value (number, or pointer to string)
+; IXU: Pointer to variable name (0 for first call)
+; A: Variable type, or -1 (255) to delete the variable
+; Returns:
+; - A: Status code
+; - D: Actual variable type
+; - IXU: Pointer to variable name (for next call)
+;
+; int setVarVal(char * name, void * value, char ** actualName, BYTE * type);
+mos_api_setvarval:
+			LD	(_scratchpad + 3), A	; Save the type
+			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	HL		; Temporary storage
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; BYTE * type
+			LD	IX, _scratchpad
+			PUSH	IX		; char ** actualName
+			PUSH	DE		; void * value
+			PUSH	HL		; char * name
+			CALL	_setVarVal	; Call the C function setVarVal
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	IX		; To be replaced
+			POP	IX
+			POP	IX
+			LD 	IX, _scratchpad
+			LD	D, (IX + 3)	; Return the actual type
+			LD	IX, (IX)	; Return the actual name
+			RET
+
+; Read a variable value
+; HLU: Pointer to variable name (can include wildcards)
+; DEU: Pointer to buffer to store the value (null/0 to read length only)
+; BCU: Length of buffer
+; IXU: Pointer to variable name (0 for first call)
+; A: Flags (3 = expand value into string)
+; Returns:
+; - A: Status code
+; - D: Actual variable type
+; - BCU: Length of variable value
+; - IXU: Pointer to variable name (for next call)
+;
+; int readVarVal(char * namePattern, void * value, char ** actualName, int * length, BYTE * typeFlag)
+mos_api_readvarval:
+			LD	(_scratchpad + 6), A	; Save the flags
+			LD	(_scratchpad + 3), BC	; Save the length
+			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D		; but DE is optional...
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH	HL		; Temporary storage
+			LD	HL, _scratchpad + 6
+			EX	(SP), HL	; BYTE * typeFlag
+			PUSH	HL
+			LD	HL, _scratchpad + 3
+			EX	(SP), HL	; int * length
+			LD	IX, _scratchpad
+			PUSH	IX		; char ** actualName
+			PUSH	DE		; void * value
+			PUSH	HL		; char * namePattern
+			CALL	_readVarVal	; Call the C function readVarVal
+			LD	A, L		; Save return value in HLU, in A
+			POP	HL
+			POP	DE
+			POP	IX		; To be replaced
+			POP	IX
+			POP	IX
+			LD 	IX, _scratchpad
+			LD	D, (IX + 6)	; Return the actual type
+			LD	BC, (IX + 3)	; Return the length
+			LD	IX, (IX)	; Return the actual name
+			RET
+
+; Initialise a GS Trans operation
+; HLU: Pointer to source buffer to translate
+; DEU: Address of pointer used to store trans info
+; A: Flags
+; Returns:
+; - A: Status code
+;
+mos_api_gsinit:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	DE		; t_mosTransInfo ** transInfoPtr
+			PUSH	HL		; char * source
+			CALL	_gsInit		; Call the C function gsInit
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	AF
+			LD	A, (_scratchpad)
+			RET
+
+; Perform a GS Trans "read" operation
+; HLU: Pointer to a char (byte) to store the result
+; DEU: Address of pointer used to store trans info (same pointer as used with gsInit)
+; Returns:
+; - A: Status code
+;
+mos_api_gsread:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	HL		; char * read
+			PUSH	DE		; t_mosTransInfo ** transInfoPtr
+			CALL	_gsRead		; Call the C function gsRead
+			LD	A, L		; Return value in HLU, put in A
+			POP	DE
+			POP	HL
+			RET
+
+; Perform a complete GSTrans operation from source into dest buffer
+; HLU: Pointer to source buffer
+; DEU: Pointer to destination buffer (can be null to just count size)
+; BCU: Length of destination buffer
+; A: Flags
+; Returns:
+; - A: Status code
+; - BCU: Calculated total length of destination string
+;
+; int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags)
+mos_api_gstrans:
+			PUSH	AF		; BYTE flags
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			LD	A, D		; Check if DE is zero
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24
+$$:			PUSH 	HL
+			LD	HL, _scratchpad
+			EX	(SP), HL	; int * read
+			PUSH	BC		; UINT24 destLength
+			PUSH	DE		; char * dest
+			PUSH	HL		; char * source
+			CALL	_gsTrans	; Call the C function gstrans
+			LD	A, L		; Return value in HLU, put in A
+			LD	(_scratchpad + 3), A	; Save the result
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	BC
+			POP	AF
+			LD	A, (_scratchpad + 3)
+			LD	BC, (_scratchpad)
+			RET
+
+; Substitute arguments into a string from template
+; HLU: Pointer to template string
+; DEU: Pointer to arguments string
+; BCU: Length of destination buffer
+; IXU: Pointer to destination buffer (can be null to just count size)
+; A: Flags
+; Returns:
+; - BCU: Calculated length of destination string
+;
+; int substituteArgs(char * template, char * args, char * dest, int length, bool omitRest)
+mos_api_substituteargs:
+			PUSH	AF		; BYTE flags (bool omitRest)
+			PUSH	BC		; UINT24 length
+			PUSH	IX		; char * dest
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, sub_args_contd	; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+			EX	(SP), HL	; Swap IX (on stack) with HL, as IX is optional
+			LD	A, L
+			OR	A, H
+			JR	Z, $F		; HL was zero, so jump ahead
+			LD	A, MB
+			CALL	SET_AHL24	; HL (IX) not zero, so set U to MB
+$$:			EX	(SP), HL
+sub_args_contd:		PUSH	DE		; char * args
+			PUSH	HL		; char * template
+			CALL	_substituteArgs	; Call the C function substituteArgs
+			LD	(_scratchpad), HL	; Save the result
+			POP	HL
+			POP	DE
+			POP	IX
+			POP	BC
+			POP	AF
+			LD	BC, (_scratchpad)
+			RET
+
+; All these optional address things need an MB load into A before calling SET_Axx24
+
+; Resolves a path, replacing prefixes and leafnames with actual values
+; HLU: Pointer to the path to resolve
+; DEU: Pointer to the resolved path (optional - omit for count only)
+; BCU: Length of the resolved path buffer
+; IXU: Pointer to the index (integer) of the resolved path
+; IYU: Pointer to a directory object to persist between calls (optional)
+; Returns:
+; - A: Status code
+; - BCU: Length of the resolved path
+; - Index pointed to at IXU, if set, will be updated to the next path index
+;
+; int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir)
+mos_api_resolvepath:
+			LD	(_scratchpad), BC	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, res_path_contd	; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+			PUSH	HL		; push HL so we can use register for working, if we need to
+			; DE is optional, so check if it's zero
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			; IX is optional, so check if it's zero
+			PUSH	IX
+			POP	HL
+			LD	A, H
+			OR	A, L
+			JR	Z, $F		; IX is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_AHL24	; IX not zero, so set U to MB
+$$:			PUSH	HL
+			POP	IX
+			; IY is optional, so check if it's zero
+			PUSH	IY
+			POP	HL
+			LD	A, H
+			OR	A, L
+			JR	Z, $F		; IY is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_AHL24	; IY not zero, so set U to MB
+$$:			PUSH	HL
+			POP	IY
+			POP	HL
+			; OK so we should now have all the addresses set up
+res_path_contd:		PUSH	IY		; DIR * dir
+			PUSH	IX		; BYTE * index
+			LD	IX, _scratchpad
+			PUSH	IX		; int * length
+			PUSH	DE		; char * resolvedPath
+			PUSH	HL		; char * filepath
+			CALL	_resolvePath	; Call the C function resolvePath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	IX
+			POP	IY
+			LD	BC, (_scratchpad)
+			RET
+
+; Get the directory for a given path
+; String only - resolves path prefixes for the given index
+; HLU: Pointer to the path to get the directory for
+; DEU: Pointer to the buffer to store the directory in (optional - omit for count only)
+; BCU: Length of the buffer
+; A: Search index
+; Returns:
+; - A: Status code
+; - BCU: Length of the directory
+;
+; int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchIndex)
+mos_api_getdirectoryforpath:
+			PUSH	AF		; BYTE searchIndex
+			LD	(_scratchpad), BC	; Save the length
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+			; DE is optional, so check if it's zero
+			LD	A, D
+			OR	A, E
+			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, MB
+			CALL	SET_ADE24	; DE not zero, so set U to MB
+$$:			LD	BC, _scratchpad
+			PUSH	BC		; int * length
+			PUSH	DE		; char * dir
+			PUSH	HL		; char * srcPath
+			CALL	_getDirectoryForPath	; Call the C function getDirectoryForPath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	BC		; (AF push - we will replace)
+			LD	BC, (_scratchpad)
+			RET
+
+; Get the leafname for a given path
+; HLU: Pointer to the path to get the leafname for
+; Returns:
+; - HLU: Pointer to the leafname
+;
+; char * getFilepathLeafname(char * filepath);
+mos_api_getfilepathleafname:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+$$:			PUSH	HL		; char * filepath
+			CALL	_getFilepathLeafname	; Call the C function getFilepathLeafname
+			EX	(SP), HL	; Return value in HLU
+			POP	HL
+			RET
+
+; Check if a given path points to a directory
+; NB this does not do path resolution
+; HLU: Pointer to the path to check
+; Returns:
+; - A: Status code
+mos_api_isdirectory:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			CALL	SET_AHL24	; HL is required, so set it
+$$:			PUSH	HL		; char * filepath
+			CALL	_isDirectory	; Call the C function isDirectory
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			; return value is true/false, so we need to change to 0 for success, and 19 (invalid parameter) for failure
+			OR	A, A		; Was status value false?
+			JR	Z, $F		; If it is, we need to replace with 5
+			LD	A, 0		; Otherwise, return 0 FR_OK
+			RET
+$$:			LD	A, 5		; Return 5 FR_NO_PATH
+			RET
+
+; Get the absolute version of a (relative) path
+; HLU: Pointer to the path to get the absolute version of
+; DEU: Pointer to the buffer to store the absolute path in
+; BCU: Length of the buffer
+; Returns:
+; - A: Status code
+;
+; int resolveRelativePath(char * path, char * resolved, int length);
+; For now, we will not support returning back length, or calculating length
+mos_api_getabsolutepath:
+			LD	A, MB		; Check if MBASE is 0
+			OR	A, A
+			JR	Z, $F		; If it is, we can assume pointers are 24 bit
+			CALL	SET_AHL24
+			CALL	SET_ADE24
+$$:			PUSH	BC		; int length
+			PUSH	DE		; char * resolved
+			PUSH	HL		; char * path
+			CALL	_resolveRelativePath	; Call the C function resolveRelativePath
+			LD	A, L		; Return value in HLU, put in A
+			POP	HL
+			POP	DE
+			POP	BC
 			RET
 
 ; Open a file

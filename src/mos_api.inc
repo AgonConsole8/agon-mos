@@ -77,7 +77,34 @@ mos_i2c_open:		EQU	1Fh
 mos_i2c_close:		EQU	20h
 mos_i2c_write:		EQU	21h
 mos_i2c_read:		EQU	22h
+mos_unpackrtc:		EQU	23h
 
+; MOS string functions
+;
+mos_pmatch:		EQU	28h
+mos_getargument:	EQU	29h
+mos_extractstring:	EQU	2Ah
+mos_extractnumber:	EQU	2Bh
+mos_escapestring:	EQU	2Ch
+
+; System variables and related functions
+;
+mod_setvarval:		EQU	30h
+mos_readvarval:		EQU	31h
+mos_gsinit:		EQU	32h
+mos_gsread:		EQU	33h
+mos_gstrans:		EQU	34h
+mos_substituteargs:	EQU	35h
+mos_evaluateexpression:	EQU	36h	; not implemented, yet
+; 37h not yet used
+
+; Path resolution functions
+;
+mos_resolvepath:	EQU	38h
+mos_getdirforpath:	EQU	39h
+mos_getleafname:	EQU	3Ah
+mos_isdirectory:	EQU	3Bh
+mos_getabsolutepath:	EQU	3Ch
 
 ; FatFS file access functions
 ;

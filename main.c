@@ -45,6 +45,7 @@
 #include "ff.h"
 #include "clock.h"
 #include "mos_editor.h"
+#include "mos_sysvars.h"
 #include "mos.h"
 #include "i2c.h"
 #include "umm_malloc.h"
@@ -147,9 +148,6 @@ void bootmsg(void) {
 	#endif
 
 	printf("\n\r\n\r");
-	#if	DEBUG > 0
-	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
-	#endif
 }
 
 
@@ -160,7 +158,6 @@ extern void _heapbot[];
 //
 int main(void) {
 	UART 	pUART0;
-	//void *  empty = NULL;
 
 	DI();											// Ensure interrupts are disabled before we do anything
 	init_interrupts();								// Initialise the interrupt vectors
@@ -198,8 +195,12 @@ int main(void) {
 	}
 
 	bootmsg();
+	#if	DEBUG > 0
+	printf("@Baud Rate: %d\n\r\n\r", pUART0.baudRate);
+	#endif
 
 	mos_mount();									// Mount the SD card
+	mos_setupSystemVariables();						// Setup the system variables
 
 	putch(7);										// Startup beep
 	editHistoryInit();								// Initialise the command history
@@ -208,7 +209,8 @@ int main(void) {
 	//
 	#if enable_config == 1
 	{
-		int err = mos_EXEC("autoexec.txt", &cmd, sizeof cmd);	// Then load and run the config file
+		int err = mos_EXEC("autoexec.txt");			// Then load and run the config file
+		createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)err);
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
 		}
@@ -217,14 +219,14 @@ int main(void) {
 
 	// The main loop
 	//
-	while(1) {
-		if(mos_input(&cmd, sizeof(cmd)) == 13) {
-			int err = mos_exec(&cmd, TRUE);
-			if(err > 0) {
+	while (1) {
+		if (mos_input(&cmd, sizeof(cmd)) == 13) {
+			int err = mos_exec(&cmd, TRUE, 0);
+			createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)err);
+			if (err > 0) {
 				mos_error(err);
 			}
-		}
-		else {
+		} else {
 			printf("Escape\n\r");
 		}
 	}

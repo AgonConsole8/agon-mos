@@ -27,10 +27,14 @@ typedef struct {
 	UINT8  second;
 } vdp_time_t;
 
-void init_rtc();           				// In rtc.asm
+void init_rtc();					// In rtc.asm
 
 void rtc_update();
 void rtc_unpack(UINT8 * buffer, vdp_time_t * t);
 void rtc_formatDateTime(char * buffer, vdp_time_t * t);
+void rtc_formatDate(char * buffer, vdp_time_t * t);
+void rtc_formatTime(char * buffer, vdp_time_t * t);
+int rtc_monthFromName(char * month);
+int rtc_dayFromName(char * day);
 
 #endif RTC_H
