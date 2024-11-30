@@ -234,6 +234,13 @@ UINT8	fat_EOF(FIL * fp);
 							"default to &40000.\r\n"
 #define HELP_RUN_ARGS		"[<addr>]"
 
+#define HELP_RUNBIN			"Run a binary file from disc\r\n" \
+							"Optionally, pass parameters to the binary\r\n" \
+							"MOS will automatically load and run the binary at an appropriate address\r\n" \
+							"detecting Moslets based on whether it is located in the Moslet$Path\r\n" \
+							"To run a binary at a specific address, use the Load and Run commands\r\n"
+#define HELP_RUNBIN_ARGS	"<filename> [<args>]"
+
 #define HELP_SAVE			"Save a block of memory to the SD card\r\n"
 #define HELP_SAVE_ARGS		"<filename> <addr> <size>"
 

@@ -120,7 +120,7 @@ static t_mosCommand mosCommands[] = {
 	{ "Rename",		&mos_cmdREN,		true,	HELP_RENAME_ARGS,	HELP_RENAME },
 	{ "RM",			&mos_cmdDEL,		true,	HELP_DELETE_ARGS,	HELP_DELETE },
 	{ "Run",		&mos_cmdRUN,		true,	HELP_RUN_ARGS,		HELP_RUN },
-	{ "RunBin",		&mos_cmdRUNBIN,		true,	HELP_RUN_ARGS,		HELP_RUN },
+	{ "RunBin",		&mos_cmdRUNBIN,		true,	HELP_RUNBIN_ARGS,	HELP_RUNBIN },
 	{ "Save",		&mos_cmdSAVE,		true,	HELP_SAVE_ARGS,		HELP_SAVE },
 	{ "Set",		&mos_cmdSET,		false,	HELP_SET_ARGS,		HELP_SET },
 	{ "SetEval",	&mos_cmdSETEVAL,	false,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
