@@ -71,10 +71,8 @@ extern BOOL	vdpSupportsTextPalette;
 // Parameters:
 // - pUART: Pointer to a UART structure
 // - baudRate: Baud rate to initialise UART with
-// Returns:
-// - 1 if the function succeeded, otherwise 0
 //
-int wait_ESP32(UART * pUART, UINT24 baudRate) {	
+void wait_ESP32(UART * pUART, UINT24 baudRate) {	
 	int	i, t;
 
 	pUART->baudRate = baudRate;			// Initialise the UART object
@@ -86,19 +84,19 @@ int wait_ESP32(UART * pUART, UINT24 baudRate) {
 
 	open_UART0(pUART);					// Open the UART 
 	init_timer0(10, 16, 0x00);  		// 10ms timer for delay
-	gp = 0;								// Reset the general poll byte	
-	for(t = 0; t < 200; t++) {			// A timeout loop (200 x 50ms = 10s)
+
+	gp = 0;
+	while (gp == 0) {					// Wait for the ESP32 to respond with a GP packet
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
-		putch(1);
-		for(i = 0; i < 5; i++) {		// Wait 50ms
+		putch(2);						// Poll VDP with a GP of 2 to request full-duplex
+		for (i = 0; i < 5; i++) {		// Wait 50ms
+			if (gp != 0) break;
 			wait_timer0();
 		}
-		if(gp == 1) break;				// If general poll returned, then exit for loop
 	}
 	enable_timer0(0);					// Disable the timer
-	return gp;
 }
 
 // Initialise the interrupts
@@ -167,12 +165,9 @@ int main(void) {
 	init_UART1();									// Initialise UART1
 	EI();											// Enable the interrupts now
 	
-	if(!wait_ESP32(&pUART0, 1152000)) {				// Try to lock onto the ESP32 at maximum rate
-		if(!wait_ESP32(&pUART0, 384000))	{		// If that fails, then fallback to the lower baud rate
-			gp = 2;									// Flag GP as 2, just in case we need to handle this error later
-		}
-	}	
-	if(coldBoot == 0) {								// If a warm boot detected then
+	wait_ESP32(&pUART0, 1152000);					// Connect to VDP at maximum rate
+
+	if (coldBoot == 0) {							// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
 
