@@ -61,6 +61,8 @@ extern void 	i2c_handler(void);
 extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
+extern volatile BYTE	keymods;		// Key modifiers
+extern volatile BYTE	keydown;		// Key down flag
 
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
@@ -106,6 +108,12 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 	putch(0x01);
 	putch(0x01);
 	putch(0x00);
+
+	// Request update for whether shift key (virtual key 117) is pressed
+	putch(23);
+	putch(0);
+	putch(VDP_checkkey);
+	putch(117);
 }
 
 // Initialise the interrupts
@@ -157,6 +165,9 @@ void bootmsg(void) {
 	printf("\n\r\n\r");
 }
 
+bool shiftPressed() {
+	return keydown && (keymods & 0x02);		// Shift indicator is keymods bit 1
+}
 
 //extern UINT24 bottom;
 extern void _heapbot[];
@@ -212,8 +223,15 @@ int main(void) {
 	// Load the autoexec.bat config file
 	//
 	#if enable_config == 1
-	{
-		int err = mos_EXEC("autoexec.txt");			// Then load and run the config file
+	if (!shiftPressed()) {
+		int err;
+		err = mos_cmdOBEY("!boot.obey");			// Try !boot obey file first
+		if (err == FR_NO_FILE) {
+			err = mos_cmdOBEY("autoexec.obey");		// If that's not found, try autoexec.obey
+		}
+		if (err == FR_NO_FILE) {
+			err = mos_EXEC("autoexec.txt");			// Fall back to using EXEC on autoexec.txt
+		}
 		createOrUpdateSystemVariable("Sys$ReturnCode", MOS_VAR_NUMBER, (void *)err);
 		if (err > 0 && err != FR_NO_FILE) {
 			mos_error(err);
