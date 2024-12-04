@@ -64,7 +64,7 @@
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
-;							
+;
 ; The UART protocol handler state machine
 ;
 vdp_protocol:		LD	A, (_vdp_protocol_state)
@@ -74,6 +74,8 @@ vdp_protocol:		LD	A, (_vdp_protocol_state)
 			JR	Z, vdp_protocol_state1
 			DEC	A
 			JR	Z, vdp_protocol_state2
+			DEC	A
+			JR	Z, vdp_protocol_state3
 			XOR	A
 			LD	(_vdp_protocol_state), A
 			RET
@@ -83,21 +85,19 @@ vdp_protocol:		LD	A, (_vdp_protocol_state)
 vdp_protocol_state0:	LD	A, C			; Wait for a header byte (bit 7 set)
 			SUB	80h
 			RET	C
-			CP	vdp_protocol_vesize	; Check whether the command is in bounds
-			RET	NC			; Out of bounds, so just ignore
 			LD	(_vdp_protocol_cmd), A	; Store the cmd (discard the top bit)
 			LD	(_vdp_protocol_ptr), HL	; Store the buffer pointer
 			LD	A, 1			; Switch to next state
 			LD	(_vdp_protocol_state), A
 			RET
-			
+
 ;
 ; Read the packet length in
 ;
 vdp_protocol_state1:	LD	A, C			; Fetch the length byte
 			CP	VDPP_BUFFERLEN + 1	; Check if it exceeds buffer length (16)
 			JR	C, $F			;
-			XOR	A			; If it does exceed buffer length, reset state machine
+			LD	A, 3			; If it does exceed buffer length, switch to state 3 (ignore packet)
 			LD	(_vdp_protocol_state), A
 			RET
 ;
@@ -107,7 +107,7 @@ $$:			LD	(_vdp_protocol_len), A	; Store the length
 			LD	A, 2			; Switch to next state
 			LD	(_vdp_protocol_state), A
 			RET
-			
+
 ; Read the packet body in
 ;
 vdp_protocol_state2:	LD	HL, (_vdp_protocol_ptr)	; Get the buffer pointer
@@ -123,10 +123,12 @@ vdp_protocol_state2:	LD	HL, (_vdp_protocol_ptr)	; Get the buffer pointer
 ;
 
 vdp_protocol_exec:	XOR	A			; Reset the state
-			LD	(_vdp_protocol_state), A	
+			LD	(_vdp_protocol_state), A
+			LD	A, (_vdp_protocol_cmd)	; Get the command byte...
+			CP	vdp_protocol_vesize	; Check whether the command is in bounds
+			RET	NC			; Out of bounds, so just ignore
 			LD	DE, vdp_protocol_vector
 			LD	HL, 0			; Index into the jump table
-			LD	A, (_vdp_protocol_cmd)	; Get the command byte...
 			LD	L, A			; ...in HLU
 			ADD	HL, HL			; Multiply by four, as each entry is 4 bytes
 			ADD	HL, HL			; And add the address of the vector table
@@ -147,7 +149,18 @@ vdp_protocol_vector:	JP	vdp_protocol_GP
 			JP	vdp_protocol_MOUSE
 ;
 vdp_protocol_vesize:	EQU	($-vdp_protocol_vector)/4
-	
+
+;
+; Discard data (packet too long)
+;
+vdp_protocol_state3:	LD	A, (_vdp_protocol_len)
+			DEC	A
+			LD	(_vdp_protocol_len), A
+			RET	NZ			; Stay in this state if there are still bytes to read
+			XOR	A			; Reset the state
+			LD	(_vdp_protocol_state), A
+			RET
+
 ; General Poll
 ;
 vdp_protocol_GP:	LD	A, (_vdp_protocol_data + 0)
