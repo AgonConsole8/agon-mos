@@ -50,7 +50,7 @@
 #include "i2c.h"
 #include "umm_malloc.h"
 
-extern BYTE scrcolours, scrpixelIndex;  // In globals.asm
+extern BYTE scrcolours, scrpixelIndex;	// In globals.asm
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -83,20 +83,29 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 	pUART->interrupts = UART_IER_RECEIVEINT;
 
 	open_UART0(pUART);					// Open the UART 
-	init_timer0(10, 16, 0x00);  		// 10ms timer for delay
+	init_timer0(10, 16, 0x00);			// 10ms timer for delay
 
 	gp = 0;
 	while (gp == 0) {					// Wait for the ESP32 to respond with a GP packet
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
-		putch(2);						// Poll VDP with a GP of 2 to request full-duplex
+		putch(1);
 		for (i = 0; i < 5; i++) {		// Wait 50ms
 			if (gp != 0) break;
 			wait_timer0();
 		}
 	}
 	enable_timer0(0);					// Disable the timer
+
+	// Set feature flag for full-duplex, flag 0x0101, non-zero 16-bit value
+	putch(23);
+	putch(0);
+	putch(VDP_feature);
+	putch(0x01);
+	putch(0x01);
+	putch(0x01);
+	putch(0x00);
 }
 
 // Initialise the interrupts
@@ -176,7 +185,7 @@ int main(void) {
 	scrcolours = 0;
 	scrpixelIndex = 255;
 	getModeInformation();
-    while (scrcolours == 0) { }
+	while (scrcolours == 0) { }
 	readPalette(128, TRUE);
 
 	if (scrpixelIndex < 128) {
