@@ -75,8 +75,9 @@ UART_LSR_RDY		EQU	%01		; Data ready
 
 ; Check whether we're clear to send (UART0 only)
 ;
-UART0_wait_CTS:		GET_GPIO	PD_DR, 8		; Check Port D, bit 3 (CTS)
-			JR		NZ, UART0_wait_CTS
+UART0_wait_CTS:		IN0		A, (UART0_REG_MSR)
+			BIT		4, A			; check inverted CTS bit, 1 = CTS, 0 = NOT CTS (clear to send)
+			JR		Z, UART0_wait_CTS
 			RET
 
 UART1_wait_CTS:		GET_GPIO	PC_DR, 8		; Check Port C, bit 3 (CTS)
@@ -186,7 +187,7 @@ $$:			CALL 		UART0_serial_RX
 ;
 UART1_serial_GETCH:	PUSH		AF 
 			LD		A, (_serialFlags)
-			TST		01h
+			TST		10h
 			JR		Z, UART_serial_NE
 			POP		AF
 $$:			CALL 		UART1_serial_RX
