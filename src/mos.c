@@ -445,7 +445,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		}
 		ptr = mos_trim(ptr, false);
 		// ptr will now point to the arguments
-		// printf("command is '%.*s', args '%s'\n\r", cmdLen, commandPtr, ptr ? ptr : "<not found>");
+		// printf("command is '%.*s', args '%s', cmdLen %d\n\r", cmdLen, commandPtr, ptr ? ptr : "<not found>", cmdLen);
 
 		if (*commandPtr == '%') {
 			// Skip alias expansion for commands that start with %
@@ -458,7 +458,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 				return MOS_OUT_OF_MEMORY;
 			}
 			sprintf(aliasToken, "Alias$%.*s", cmdLen, commandPtr);
-			if (aliasToken[strlen(aliasToken) - 1] == '.') {
+			if (cmdLen > 1 && aliasToken[strlen(aliasToken) - 1] == '.') {
 				aliasToken[strlen(aliasToken) - 1] = '*';
 			}
 			if (getSystemVariable(aliasToken, &alias) == 0) {
@@ -487,7 +487,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		}
 		strncpy(command, commandPtr, cmdLen);
 		command[cmdLen] = '\0';
-		// printf("searching for command '%s'\n\r", command);
+		// printf("searching for command '%s' (cmdLen is %d)\n\r", command, cmdLen);
 
 		cmd = mos_getCommand(command, MATCH_COMMANDS);
 		umm_free(command);
