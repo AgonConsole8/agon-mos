@@ -68,6 +68,7 @@ typedef enum {
 #define VDP_mode				0x86
 #define VDP_rtc					0x87
 #define VDP_keystate			0x88
+#define VDP_checkkey			0x99
 #define VDP_palette				0x94
 #define VDP_logicalcoords		0xC0
 #define VDP_feature				0xF8
