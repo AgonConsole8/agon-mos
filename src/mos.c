@@ -1635,7 +1635,7 @@ int mos_cmdTYPE(char * ptr) {
 // - MOS error code
 //
 int	mos_cmdCLS(char *ptr) {
-	putchar(12);
+	putch(12);
 	return 0;
 }
 
@@ -1916,9 +1916,21 @@ UINT24 mos_TYPE(char * filename) {
 			if (br == 0)
 				break;
 			for (i = 0; i < br; ++i) {
-				putchar(buffer[i]);
-				if (buffer[i] == '\n') {
-					putchar('\r');
+				char c = buffer[i];
+				if (c < 0x20 && c != '\n' && c != '\r') {
+					putch('|');
+					putch(c + 0x40);
+				} else if (c == 0x7F) {
+					putch('|');
+					putch('?');
+				} else if (c == '|') {
+					putch('|');
+					putch('|');
+				} else {
+					putch(c);
+					if (c == '\n') {
+						putch('\r');
+					}
 				}
 			}
 		}
