@@ -60,6 +60,7 @@
 			XDEF	_errno
 			XDEF 	_coldBoot
 			XDEF	_gp
+			XDEF	_redirectHandle
 			XDEF	_serialFlags
 			XDEF 	_callSM
 			XDEF	_scratchpad
@@ -123,6 +124,8 @@ _mouseYDelta:		DS	2		; + 31h: Mouse Y delta
 _errno:			DS 	3		; extern int _errno
 _coldBoot:		DS	1		; extern char _coldBoot
 _gp:			DS	1		; extern char _gp
+
+_redirectHandle:	DS	1		; Redirect handle for file I/O
 
 ; Serial Flags:
 ;

@@ -54,6 +54,7 @@
 			XREF 	_keyled
 			XREF	_mouseX
 			XREF	_gp
+			XREF	_redirectHandle
 			XREF	_vpd_protocol_flags
 			XREF	_vdp_protocol_state
 			XREF	_vdp_protocol_cmd
@@ -64,6 +65,10 @@
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
+
+			XREF	_mos_FCLOSE		; In mos.c
+			XREF	_mos_FPUTN
+
 ;
 ; The UART protocol handler state machine
 ;
@@ -147,6 +152,8 @@ vdp_protocol_vector:	JP	vdp_protocol_GP
 			JP	vdp_protocol_RTC
 			JP	vdp_protocol_KEYSTATE
 			JP	vdp_protocol_MOUSE
+			JP	vdp_protocol_ECHO
+			JP	vdp_protocol_ECHOEND
 ;
 vdp_protocol_vesize:	EQU	($-vdp_protocol_vector)/4
 
@@ -343,4 +350,50 @@ vdp_protocol_MOUSE:	LD	HL, _vdp_protocol_data
 			LD	A, (_vpd_protocol_flags)
 			OR	VDPP_FLAG_MOUSE
 			LD	(_vpd_protocol_flags), A
+			RET
+
+; Echo data
+; Received when echo is enabled (used for redirection/spool)
+; If we have an active redirection, write data to the file
+;
+vdp_protocol_ECHO:	LD	A, (_redirectHandle)
+			OR	A
+			RET Z		; If the handle is zero, then ignore
+			LD	HL, 0
+			LD	L, A
+
+			PUSH	HL	; Temp push handle
+			LD	HL, (_vdp_protocol_ptr)
+			LD	DE, _vdp_protocol_data
+			SBC	HL, DE
+			; HL should now be actual length
+			EX	(SP), HL
+			PUSH	DE	; UINT24 data
+			PUSH	HL	; UINT8 handle
+			; EI
+			CALL	_mos_FPUTN
+			; DI
+			POP	HL
+			POP	DE
+			POP	BC
+			RET
+
+; Echo end
+; Received when echo gets disabled
+;
+; Byte: Handle to the file
+;
+vdp_protocol_ECHOEND:
+			LD	A, (_vpd_protocol_flags)
+			OR	VDPP_FLAG_MISC
+			LD	(_vpd_protocol_flags), A
+			RET
+			LD	A, (_vdp_protocol_data)
+			RET Z		; If the handle is zero, then ignore
+			LD	HL, 0
+			LD	L, A
+			; LD	HL, A
+			PUSH	HL
+			; CALL	_mos_FCLOSE
+			POP	HL
 			RET

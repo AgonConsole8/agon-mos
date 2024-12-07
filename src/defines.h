@@ -72,7 +72,10 @@ typedef enum {
 #define VDP_palette				0x94
 #define VDP_logicalcoords		0xC0
 #define VDP_feature				0xF8
+#define VDP_featureclear		0xF9
 #define VDP_consolemode			0xFE
 #define VDP_terminalmode		0xFF
+
+#define VDPP_BUFFERLEN			16	// Length of the VDP buffer - also defined in equs.inc
 
 #endif MOS_DEFINES_H
