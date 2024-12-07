@@ -55,6 +55,7 @@
 #include "umm_malloc.h"
 #include "mos_sysvars.h"
 #include "mos_file.h"
+#include "timer.h"
 #if DEBUG > 0
 # include "tests.h"
 #endif /* DEBUG */
@@ -69,6 +70,7 @@ extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
 extern BYTE scrcols, scrcolours, scrpixelIndex; // In globals.asm
 extern volatile	BYTE keyascii;					// In globals.asm
 extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile BYTE redirectHandle;			// Redirect handle
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
@@ -128,6 +130,7 @@ static t_mosCommand mosCommands[] = {
 	{ "SetEval",	&mos_cmdSETEVAL,	false,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
 	{ "SetMacro",	&mos_cmdSETMACRO,	false,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
 	{ "Show",		&mos_cmdSHOW,		false,	HELP_SHOW_ARGS,		HELP_SHOW },
+	{ "Spool",		&mos_cmdSPOOL,		false,	HELP_SPOOL_ARGS,	HELP_SPOOL },
 	{ "Time",		&mos_cmdTIME,		true,	HELP_TIME_ARGS,		HELP_TIME },
 	{ "Try",		&mos_cmdTRY,		false,	HELP_TRY_ARGS,		HELP_TRY },
 	{ "Type",		&mos_cmdTYPE,		true,	HELP_TYPE_ARGS,		HELP_TYPE },
@@ -1480,6 +1483,64 @@ int mos_cmdUNSET(char * ptr) {
 	return FR_OK;
 }
 
+// Spool [<filename>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdSPOOL(char * ptr) {
+	char *	filename;
+	int		result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+
+	// Calling `*spool` always needs us to close currently open spool file
+	if (redirectHandle != 0) {
+		// Send message to VDP to signal end of redirection, which should trigger file close
+		// NB this will only work if the VDP supports it
+		// Clear protocol flag for "misc message"
+		vpd_protocol_flags &= 0x7F;	// Reset bit 7
+		putch(23);
+		putch(0);
+		putch(VDP_featureclear);
+		putch(0x10);		// Echo flag
+		putch(0x02);
+		
+		// wait for flag
+		wait_VDP(0x80);
+		// if (!wait_VDP(0x80)) {
+		// 	// timed out (maybe VDP doesn't support this feature)
+		// }
+		mos_FCLOSE(redirectHandle);
+		redirectHandle = 0;
+	}
+
+	if (result != FR_OK) {
+		if (result == FR_INVALID_PARAMETER) {
+			printf("Closed spool file\r\n");
+			// No filename provided, which is OK, just close the spool file
+			return FR_OK;
+		}
+		return result;
+	}
+
+	redirectHandle = mos_FOPEN(filename, FA_CREATE_ALWAYS | FA_WRITE);
+
+	if (redirectHandle == 0) {
+		return FR_NO_FILE;
+	}
+
+	// Send message to VDP to signal start of redirection
+	// NB this will only work if the VDP supports it, otherwise it will be ignored
+	putch(23);
+	putch(0);
+	putch(VDP_feature);
+	putch(0x10);		// Echo flag
+	putch(0x02);
+	putch(redirectHandle);
+	putch(0x00);
+
+	return FR_OK;
+}
 
 // VDU <char1> <char2> ... <charN>
 // Parameters:
@@ -2704,6 +2765,15 @@ void	mos_FPUTC(UINT8 fh, char c) {
 
 	if (fo > 0) {
 		f_putc(c, fo);
+	}
+}
+
+void mos_FPUTN(UINT8 fh, UINT24 address, UINT24 length) {
+	FIL * fo = (FIL *)mos_GETFIL(fh);
+	UINT bw;
+
+	if (fo > 0) {
+		f_write(fo, (const void *)address, length, &bw);
 	}
 }
 

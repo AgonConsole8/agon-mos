@@ -100,6 +100,7 @@ int		mos_cmdSET(char *ptr);
 int		mos_cmdSETEVAL(char *ptr);
 int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
+int		mos_cmdSPOOL(char *ptr);
 int		mos_cmdTIME(char *ptr);
 int		mos_cmdTRY(char *ptr);
 int		mos_cmdTYPE(char *ptr);
@@ -131,6 +132,7 @@ UINT24	mos_FOPEN(char * filename, UINT8 mode);
 UINT24	mos_FCLOSE(UINT8 fh);
 UINT24	mos_FGETC(UINT8 fh);
 void	mos_FPUTC(UINT8 fh, char c);
+void	mos_FPUTN(UINT8 fh, UINT24 address, UINT24 length);
 UINT24	mos_FREAD(UINT8 fh, UINT24 buffer, UINT24 btr);
 UINT24	mos_FWRITE(UINT8 fh, UINT24 buffer, UINT24 btw);
 UINT8  	mos_FLSEEK(UINT8 fh, UINT32 offset);
@@ -295,6 +297,10 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified\r\n"
 #define HELP_SHOW_ARGS		"[<variablespec>]"
+
+#define HELP_SPOOL			"Opens a new file and causes subsequent VDU output to be directed to it\r\n" \
+							"*Spool with no filename causes the spool file to be closed\r\n"
+#define HELP_SPOOL_ARGS		"[<filename>]"
 
 #define HELP_TIME			"Set and read the VDP's real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"
