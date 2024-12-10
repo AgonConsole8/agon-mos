@@ -411,6 +411,8 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		return FR_OK;
 	}
 
+	mos_saveSpool();
+
 	// TODO the code here to separate command from arguments needs reworking
 	// it has become messy, especially with the addition of quoted strings
 	// Will be revisited when we have runtypes, as they will require a different interpretation of `.`
@@ -554,6 +556,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			if (args) umm_free(args);
 		}
 	}
+	mos_saveSpool();
 	return result;
 }
 
@@ -1492,6 +1495,7 @@ int mos_cmdUNSET(char * ptr) {
 int mos_cmdSPOOL(char * ptr) {
 	char *	filename;
 	int		result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+	int		bufferLen = 2048;
 
 	// Calling `*spool` always needs us to close currently open spool file
 	if (redirectHandle != 0) {
@@ -1507,11 +1511,11 @@ int mos_cmdSPOOL(char * ptr) {
 		
 		// wait for flag
 		wait_VDP(0x80);
-		// if (!wait_VDP(0x80)) {
-		// 	// timed out (maybe VDP doesn't support this feature)
-		// }
+		mos_saveSpool();
 		mos_FCLOSE(redirectHandle);
 		redirectHandle = 0;
+		umm_free(spoolBuffer_start);
+		spoolBuffer_start = NULL;
 	}
 
 	if (result != FR_OK) {
@@ -1523,9 +1527,25 @@ int mos_cmdSPOOL(char * ptr) {
 		return result;
 	}
 
+	// Allocate a buffer for spooling
+	// TODO bufferLen is an arbitrary size... we could make this configurable
+	// we could also consider using a dynamic buffer size, starting largeish, and reducing if large alloc fails
+	// as this spooling approach can overflow the buffer
+	spoolBuffer_start = umm_malloc(bufferLen);
+	if (!spoolBuffer_start) {
+		return MOS_OUT_OF_MEMORY;
+	}
+	spoolBuffer_current = spoolBuffer_start;
+	spoolBuffer_lastSaved = spoolBuffer_start;
+	spoolBuffer_maxUsed = spoolBuffer_start;
+	// spoolBuffer_maxPtr = spoolBuffer_start + bufferLen - VDPP_BUFFERLEN;
+	spoolBuffer_maxPtr = spoolBuffer_start + bufferLen - 30;
+
 	redirectHandle = mos_FOPEN(filename, FA_CREATE_ALWAYS | FA_WRITE);
 
 	if (redirectHandle == 0) {
+		umm_free(spoolBuffer_start);
+		spoolBuffer_start = NULL;
 		return FR_NO_FILE;
 	}
 
@@ -1540,6 +1560,46 @@ int mos_cmdSPOOL(char * ptr) {
 	putch(0x00);
 
 	return FR_OK;
+}
+
+void mos_saveSpool() {
+	BYTE * current;
+	BYTE * lastSaved;
+	BYTE * maxUsed;
+
+	// Disable interrupts to check and copy the current buffer state
+	DI();
+		if (redirectHandle == 0 || spoolBuffer_pending == 0) {
+			// Nothing to save
+			EI();
+			return;
+		}
+
+		current = spoolBuffer_current;
+		lastSaved = spoolBuffer_lastSaved;
+		maxUsed = spoolBuffer_maxUsed;
+		// Clear saving flag
+		spoolBuffer_pending = 0;
+	EI();
+
+	if (current == lastSaved) {
+		// Nothing to save
+		return;
+	}
+
+	if (current > lastSaved) {
+		// Save from lastSaved to current
+		mos_FWRITE(redirectHandle, (UINT24)lastSaved, current - lastSaved);
+	} else {
+		// Save from lastSaved to maxUsed
+		mos_FWRITE(redirectHandle, (UINT24)lastSaved, maxUsed - lastSaved);
+		// Save from start to current
+		if (current != spoolBuffer_start) {
+			mos_FWRITE(redirectHandle, (UINT24)spoolBuffer_start, current - spoolBuffer_start);
+		}
+	}
+
+	spoolBuffer_lastSaved = current;
 }
 
 // VDU <char1> <char2> ... <charN>
@@ -2765,15 +2825,6 @@ void	mos_FPUTC(UINT8 fh, char c) {
 
 	if (fo > 0) {
 		f_putc(c, fo);
-	}
-}
-
-void mos_FPUTN(UINT8 fh, UINT24 address, UINT24 length) {
-	FIL * fo = (FIL *)mos_GETFIL(fh);
-	UINT bw;
-
-	if (fo > 0) {
-		f_write(fo, (const void *)address, length, &bw);
 	}
 }
 

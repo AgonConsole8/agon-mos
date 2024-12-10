@@ -62,12 +62,18 @@
 			XREF	_vdp_protocol_ptr
 			XREF	_vdp_protocol_data
 
+			XREF	_spoolBuffer_pending
+			XREF	_spoolBuffer_start
+			XREF	_spoolBuffer_current
+			XREF	_spoolBuffer_lastSaved
+			XREF	_spoolBuffer_maxUsed
+			XREF	_spoolBuffer_maxPtr
+
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
 
 			XREF	_mos_FCLOSE		; In mos.c
-			XREF	_mos_FPUTN
 
 ;
 ; The UART protocol handler state machine
@@ -354,28 +360,36 @@ vdp_protocol_MOUSE:	LD	HL, _vdp_protocol_data
 
 ; Echo data
 ; Received when echo is enabled (used for redirection/spool)
-; If we have an active redirection, write data to the file
+; Copy to circular spool buffer for later saving
 ;
 vdp_protocol_ECHO:	LD	A, (_redirectHandle)
 			OR	A
-			RET Z		; If the handle is zero, then ignore
-			LD	HL, 0
-			LD	L, A
+			RET	Z	; If the handle is zero, then ignore
 
-			PUSH	HL	; Temp push handle
+			; Work out our length
 			LD	HL, (_vdp_protocol_ptr)
 			LD	DE, _vdp_protocol_data
 			SBC	HL, DE
-			; HL should now be actual length
-			EX	(SP), HL
-			PUSH	DE	; UINT24 data
-			PUSH	HL	; UINT8 handle
-			; EI
-			CALL	_mos_FPUTN
-			; DI
-			POP	HL
-			POP	DE
-			POP	BC
+			; in principle, our length should always be more than 1
+			RET	C	; Belt & braces - if carry set, then ignore
+
+			LD	BC, HL	; BC = length
+			LD	HL, DE	; HL = protocol data
+			LD	DE, (_spoolBuffer_current)
+			LDIR		; Copy the data to the spool buffer
+			LD	(_spoolBuffer_current), DE	; Update the current pointer
+
+			LD	A, 1
+			LD	(_spoolBuffer_pending), A	; Indicate a save pending
+
+			; if our current pointer is now greater than maxPtr, we need to loop and record current as maxUsed
+			LD	HL, (_spoolBuffer_maxPtr)
+			SBC	HL, DE
+			RET	NC		; If carry not set, no need to loop
+			LD	(_spoolBuffer_maxUsed), DE
+			LD	DE, (_spoolBuffer_start)
+			LD	(_spoolBuffer_current), DE
+
 			RET
 
 ; Echo end
@@ -387,13 +401,4 @@ vdp_protocol_ECHOEND:
 			LD	A, (_vpd_protocol_flags)
 			OR	VDPP_FLAG_MISC
 			LD	(_vpd_protocol_flags), A
-			RET
-			LD	A, (_vdp_protocol_data)
-			RET Z		; If the handle is zero, then ignore
-			LD	HL, 0
-			LD	L, A
-			; LD	HL, A
-			PUSH	HL
-			; CALL	_mos_FCLOSE
-			POP	HL
 			RET

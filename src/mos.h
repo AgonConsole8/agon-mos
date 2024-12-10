@@ -39,6 +39,12 @@
 #include "mos_sysvars.h"
 
 extern char  	cmd[256];				// Array for the command line handler
+extern BYTE		spoolBuffer_pending;
+extern BYTE *	spoolBuffer_start;
+extern BYTE *	spoolBuffer_current;
+extern BYTE *	spoolBuffer_lastSaved;
+extern BYTE *	spoolBuffer_maxUsed;
+extern BYTE *	spoolBuffer_maxPtr;
 
 typedef struct {
 	char * name;
@@ -132,7 +138,6 @@ UINT24	mos_FOPEN(char * filename, UINT8 mode);
 UINT24	mos_FCLOSE(UINT8 fh);
 UINT24	mos_FGETC(UINT8 fh);
 void	mos_FPUTC(UINT8 fh, char c);
-void	mos_FPUTN(UINT8 fh, UINT24 address, UINT24 length);
 UINT24	mos_FREAD(UINT8 fh, UINT24 buffer, UINT24 btr);
 UINT24	mos_FWRITE(UINT8 fh, UINT24 buffer, UINT24 btw);
 UINT8  	mos_FLSEEK(UINT8 fh, UINT32 offset);
@@ -145,6 +150,8 @@ void	mos_UNPACKRTC(UINT24 address);
 void	mos_SETRTC(UINT24 address);
 UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
+
+void	mos_saveSpool();
 
 extern TCHAR	cwd[256];
 extern BOOL	sdcardDelay;

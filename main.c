@@ -65,6 +65,9 @@ extern volatile BYTE	redirectHandle;	// Redirect handle
 extern volatile BYTE	keymods;		// Key modifiers
 extern volatile BYTE	keydown;		// Key down flag
 
+extern volatile BYTE	spoolBuffer_pending;
+extern volatile BYTE * 	spoolBuffer_start;
+
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
 
@@ -196,6 +199,8 @@ int main(void) {
 	EI();											// Enable the interrupts now
 	
 	redirectHandle = 0;								// No redirection
+	spoolBuffer_pending = 0;						// No spooling
+	spoolBuffer_start = NULL;
 
 	wait_ESP32(&pUART0, 1152000);					// Connect to VDP at maximum rate
 

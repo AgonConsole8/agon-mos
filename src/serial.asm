@@ -36,7 +36,10 @@
 			XDEF	getch 
 
 			XREF	_serialFlags	; In globals.asm
-				
+
+			XREF	_save_spool
+			XREF	_spoolBuffer_pending
+
 UART0_PORT		EQU	%C0		; UART0
 UART1_PORT		EQU	%D0		; UART1
 				
