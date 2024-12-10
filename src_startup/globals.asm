@@ -60,6 +60,7 @@
 			XDEF	_errno
 			XDEF 	_coldBoot
 			XDEF	_gp
+			XDEF	_redirectHandle
 			XDEF	_serialFlags
 			XDEF 	_callSM
 			XDEF	_scratchpad
@@ -71,6 +72,13 @@
 			XDEF	_vdp_protocol_len
 			XDEF	_vdp_protocol_ptr
 			XDEF	_vdp_protocol_data
+
+			XDEF	_spoolBuffer_pending
+			XDEF	_spoolBuffer_start
+			XDEF	_spoolBuffer_current
+			XDEF	_spoolBuffer_lastSaved
+			XDEF	_spoolBuffer_maxUsed
+			XDEF	_spoolBuffer_maxPtr
 
 			XDEF	_user_kbvector
 
@@ -124,6 +132,8 @@ _errno:			DS 	3		; extern int _errno
 _coldBoot:		DS	1		; extern char _coldBoot
 _gp:			DS	1		; extern char _gp
 
+_redirectHandle:	DS	1		; Redirect handle for file I/O
+
 ; Serial Flags:
 ;
 ; - Bit 0: UART0 enabled
@@ -158,6 +168,15 @@ _vdp_protocol_cmd:	DS	1		; Command
 _vdp_protocol_len:	DS	1		; Size of packet data
 _vdp_protocol_ptr:	DS	3		; Pointer into data
 _vdp_protocol_data:	DS	VDPP_BUFFERLEN
+
+; Redirection/spool circular buffer pointers, etc
+;
+_spoolBuffer_pending:	DS	1		; Flag to indicate that the spool buffer save is pending
+_spoolBuffer_start:	DS	3		; Pointer to the start of the current spool buffer
+_spoolBuffer_current:	DS	3		; Pointer to the current position in spool buffer (next byte to write)
+_spoolBuffer_lastSaved:	DS	3		; Pointer to the last saved position in spool buffer
+_spoolBuffer_maxUsed:	DS	3		; Pointer to last byte used before looping back to start
+_spoolBuffer_maxPtr:	DS	3		; Pointer to the end of the current spool buffer, minus VDPP_BUFFERLEN, for when to loop
 
 ;
 ; Userspace hooks

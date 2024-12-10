@@ -55,6 +55,7 @@
 #include "umm_malloc.h"
 #include "mos_sysvars.h"
 #include "mos_file.h"
+#include "timer.h"
 #if DEBUG > 0
 # include "tests.h"
 #endif /* DEBUG */
@@ -69,6 +70,7 @@ extern int 		exec24(UINT24 addr, char * params);	// In misc.asm
 extern BYTE scrcols, scrcolours, scrpixelIndex; // In globals.asm
 extern volatile	BYTE keyascii;					// In globals.asm
 extern volatile	BYTE vpd_protocol_flags;		// In globals.asm
+extern volatile BYTE redirectHandle;			// Redirect handle
 extern BYTE 	rtc;							// In globals.asm
 
 static FATFS	fs;					// Handle for the file system
@@ -128,6 +130,7 @@ static t_mosCommand mosCommands[] = {
 	{ "SetEval",	&mos_cmdSETEVAL,	false,	HELP_SETEVAL_ARGS,	HELP_SETEVAL },
 	{ "SetMacro",	&mos_cmdSETMACRO,	false,	HELP_SETMACRO_ARGS,	HELP_SETMACRO },
 	{ "Show",		&mos_cmdSHOW,		false,	HELP_SHOW_ARGS,		HELP_SHOW },
+	{ "Spool",		&mos_cmdSPOOL,		false,	HELP_SPOOL_ARGS,	HELP_SPOOL },
 	{ "Time",		&mos_cmdTIME,		true,	HELP_TIME_ARGS,		HELP_TIME },
 	{ "Try",		&mos_cmdTRY,		false,	HELP_TRY_ARGS,		HELP_TRY },
 	{ "Type",		&mos_cmdTYPE,		true,	HELP_TYPE_ARGS,		HELP_TYPE },
@@ -408,6 +411,8 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 		return FR_OK;
 	}
 
+	mos_saveSpool();
+
 	// TODO the code here to separate command from arguments needs reworking
 	// it has become messy, especially with the addition of quoted strings
 	// Will be revisited when we have runtypes, as they will require a different interpretation of `.`
@@ -551,6 +556,7 @@ int mos_exec(char * buffer, BOOL in_mos, BYTE depth) {
 			if (args) umm_free(args);
 		}
 	}
+	mos_saveSpool();
 	return result;
 }
 
@@ -1480,6 +1486,121 @@ int mos_cmdUNSET(char * ptr) {
 	return FR_OK;
 }
 
+// Spool [<filename>] command
+// Parameters:
+// - ptr: Pointer to the argument string in the line edit buffer
+// Returns:
+// - MOS error code
+//
+int mos_cmdSPOOL(char * ptr) {
+	char *	filename;
+	int		result = extractString(ptr, &ptr, NULL, &filename, EXTRACT_FLAG_AUTO_TERMINATE);
+	int		bufferLen = 2048;
+
+	// Calling `*spool` always needs us to close currently open spool file
+	if (redirectHandle != 0) {
+		// Send message to VDP to signal end of redirection, which should trigger file close
+		// NB this will only work if the VDP supports it
+		// Clear protocol flag for "misc message"
+		vpd_protocol_flags &= 0x7F;	// Reset bit 7
+		putch(23);
+		putch(0);
+		putch(VDP_featureclear);
+		putch(0x10);		// Echo flag
+		putch(0x02);
+		
+		// wait for flag
+		wait_VDP(0x80);
+		mos_saveSpool();
+		mos_FCLOSE(redirectHandle);
+		redirectHandle = 0;
+		umm_free(spoolBuffer_start);
+		spoolBuffer_start = NULL;
+	}
+
+	if (result != FR_OK) {
+		if (result == FR_INVALID_PARAMETER) {
+			printf("Closed spool file\r\n");
+			// No filename provided, which is OK, just close the spool file
+			return FR_OK;
+		}
+		return result;
+	}
+
+	// Allocate a buffer for spooling
+	// TODO bufferLen is an arbitrary size... we could make this configurable
+	// we could also consider using a dynamic buffer size, starting largeish, and reducing if large alloc fails
+	// as this spooling approach can overflow the buffer
+	spoolBuffer_start = umm_malloc(bufferLen);
+	if (!spoolBuffer_start) {
+		return MOS_OUT_OF_MEMORY;
+	}
+	spoolBuffer_current = spoolBuffer_start;
+	spoolBuffer_lastSaved = spoolBuffer_start;
+	spoolBuffer_maxUsed = spoolBuffer_start;
+	// spoolBuffer_maxPtr = spoolBuffer_start + bufferLen - VDPP_BUFFERLEN;
+	spoolBuffer_maxPtr = spoolBuffer_start + bufferLen - 30;
+
+	redirectHandle = mos_FOPEN(filename, FA_CREATE_ALWAYS | FA_WRITE);
+
+	if (redirectHandle == 0) {
+		umm_free(spoolBuffer_start);
+		spoolBuffer_start = NULL;
+		return FR_NO_FILE;
+	}
+
+	// Send message to VDP to signal start of redirection
+	// NB this will only work if the VDP supports it, otherwise it will be ignored
+	putch(23);
+	putch(0);
+	putch(VDP_feature);
+	putch(0x10);		// Echo flag
+	putch(0x02);
+	putch(redirectHandle);
+	putch(0x00);
+
+	return FR_OK;
+}
+
+void mos_saveSpool() {
+	BYTE * current;
+	BYTE * lastSaved;
+	BYTE * maxUsed;
+
+	// Disable interrupts to check and copy the current buffer state
+	DI();
+		if (redirectHandle == 0 || spoolBuffer_pending == 0) {
+			// Nothing to save
+			EI();
+			return;
+		}
+
+		current = spoolBuffer_current;
+		lastSaved = spoolBuffer_lastSaved;
+		maxUsed = spoolBuffer_maxUsed;
+		// Clear saving flag
+		spoolBuffer_pending = 0;
+	EI();
+
+	if (current == lastSaved) {
+		// Nothing to save
+		return;
+	}
+
+	if (current > lastSaved) {
+		// Save from lastSaved to current
+		mos_FWRITE(redirectHandle, (UINT24)lastSaved, current - lastSaved);
+	} else {
+		// Save from lastSaved to maxUsed
+		mos_FWRITE(redirectHandle, (UINT24)lastSaved, maxUsed - lastSaved);
+		// Save from start to current
+		if (current != spoolBuffer_start) {
+			mos_FWRITE(redirectHandle, (UINT24)spoolBuffer_start, current - spoolBuffer_start);
+		}
+	}
+
+	spoolBuffer_lastSaved = current;
+}
 
 // VDU <char1> <char2> ... <charN>
 // Parameters:
