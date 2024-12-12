@@ -371,10 +371,11 @@ vdp_protocol_ECHO:	LD	A, (_redirectHandle)
 			LD	DE, _vdp_protocol_data
 			SBC	HL, DE
 			; in principle, our length should always be more than 1
-			RET	C	; Belt & braces - if carry set, then ignore
+			; RET	C	; Belt & braces - if carry set, then ignore
 
 			LD	BC, HL	; BC = length
-			LD	HL, DE	; HL = protocol data
+			; LD	HL, DE	; HL = protocol data
+			LD	HL, _vdp_protocol_data
 			LD	DE, (_spoolBuffer_current)
 			LDIR		; Copy the data to the spool buffer
 			LD	(_spoolBuffer_current), DE	; Update the current pointer
@@ -384,8 +385,11 @@ vdp_protocol_ECHO:	LD	A, (_redirectHandle)
 
 			; if our current pointer is now greater than maxPtr, we need to loop and record current as maxUsed
 			LD	HL, (_spoolBuffer_maxPtr)
+			SCF
+			CCF
 			SBC	HL, DE
 			RET	NC		; If carry not set, no need to loop
+			; RET	M		; If carry not set, no need to loop
 			LD	(_spoolBuffer_maxUsed), DE
 			LD	DE, (_spoolBuffer_start)
 			LD	(_spoolBuffer_current), DE
