@@ -33,11 +33,15 @@
 			XDEF	__2nd_jump_table
 			XDEF	__1st_jump_table
 			XDEF	__vector_table
+			XDEF	_save_spool
 			
 			XREF	_on_crash
 			XREF	mos_api
 			XREF	UART0_serial_PUTCH 
 			XREF	SET_AHL24
+
+			XREF	_mos_saveSpool	; in mos.c
+			XREF	_spoolBuffer_pending
 
 NVECTORS 		EQU 48			; Number of interrupt vectors
 
@@ -110,14 +114,22 @@ __nvectors:		DW NVECTORS            ; extern unsigned short _num_vectors;
 ; Parameters
 ; - A: The API command to run
 ;
-_rst_08_handler:	CALL	mos_api
+_rst_08_handler:	PUSH	AF
+			LD 	A, (_spoolBuffer_pending)
+			CALL	NZ, _save_spool
+			POP	AF
+			CALL	mos_api
 			RET.L
 
 ; Output a single character to the ESP32
 ; Parameters:
 ; - A: The character
 ;
-_rst_10_handler:	CALL	UART0_serial_PUTCH
+_rst_10_handler:	PUSH	AF
+			LD 	A, (_spoolBuffer_pending)
+			CALL	NZ, _save_spool
+			POP	AF
+			CALL	UART0_serial_PUTCH
 			RET.L
 
 ; Write a block of bytes out to the ESP32
@@ -126,7 +138,11 @@ _rst_10_handler:	CALL	UART0_serial_PUTCH
 ; -  BC: Size of buffer
 ; -   A: Delimiter (only if BCU = 0)
 ;
-_rst_18_handler:	LD	E, A 			; Preserve the delimiter
+_rst_18_handler:	PUSH	AF
+			LD 	A, (_spoolBuffer_pending)
+			CALL	NZ, _save_spool
+			POP	AF
+			LD	E, A 			; Preserve the delimiter
 			LD	A, MB			; Check if MBASE is 0
 			OR	A, A 
 			CALL	NZ, SET_AHL24		; No, so create a 24-bit pointer
@@ -165,7 +181,20 @@ __default_nmi_handler:	RETN.LIL
 ;
 __default_mi_handler:	EI
 			RETI.L
-					
+
+; Save spool buffer
+;
+_save_spool:		PUSH	AF
+			PUSH	BC
+			PUSH	DE
+			PUSH	HL
+			CALL	_mos_saveSpool
+			POP	HL
+			POP	DE
+			POP	BC
+			POP	AF
+			RET
+
 ; Initialize all potential interrupt vector locations with a known
 ; default handler.
 ;

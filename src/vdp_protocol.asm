@@ -54,6 +54,7 @@
 			XREF 	_keyled
 			XREF	_mouseX
 			XREF	_gp
+			XREF	_redirectHandle
 			XREF	_vpd_protocol_flags
 			XREF	_vdp_protocol_state
 			XREF	_vdp_protocol_cmd
@@ -61,9 +62,19 @@
 			XREF	_vdp_protocol_ptr
 			XREF	_vdp_protocol_data
 
+			XREF	_spoolBuffer_pending
+			XREF	_spoolBuffer_start
+			XREF	_spoolBuffer_current
+			XREF	_spoolBuffer_lastSaved
+			XREF	_spoolBuffer_maxUsed
+			XREF	_spoolBuffer_maxPtr
+
 			XREF	_user_kbvector
 
 			XREF	keyboard_handler	; In keyboard.asm
+
+			XREF	_mos_FCLOSE		; In mos.c
+
 ;
 ; The UART protocol handler state machine
 ;
@@ -147,6 +158,8 @@ vdp_protocol_vector:	JP	vdp_protocol_GP
 			JP	vdp_protocol_RTC
 			JP	vdp_protocol_KEYSTATE
 			JP	vdp_protocol_MOUSE
+			JP	vdp_protocol_ECHO
+			JP	vdp_protocol_ECHOEND
 ;
 vdp_protocol_vesize:	EQU	($-vdp_protocol_vector)/4
 
@@ -342,5 +355,54 @@ vdp_protocol_MOUSE:	LD	HL, _vdp_protocol_data
 			LDIR 
 			LD	A, (_vpd_protocol_flags)
 			OR	VDPP_FLAG_MOUSE
+			LD	(_vpd_protocol_flags), A
+			RET
+
+; Echo data
+; Received when echo is enabled (used for redirection/spool)
+; Copy to circular spool buffer for later saving
+;
+vdp_protocol_ECHO:	LD	A, (_redirectHandle)
+			OR	A
+			RET	Z	; If the handle is zero, then ignore
+
+			; Work out our length
+			LD	HL, (_vdp_protocol_ptr)
+			LD	DE, _vdp_protocol_data
+			SBC	HL, DE
+			; in principle, our length should always be more than 1
+			; RET	C	; Belt & braces - if carry set, then ignore
+
+			LD	BC, HL	; BC = length
+			; LD	HL, DE	; HL = protocol data
+			LD	HL, _vdp_protocol_data
+			LD	DE, (_spoolBuffer_current)
+			LDIR		; Copy the data to the spool buffer
+			LD	(_spoolBuffer_current), DE	; Update the current pointer
+
+			LD	A, 1
+			LD	(_spoolBuffer_pending), A	; Indicate a save pending
+
+			; if our current pointer is now greater than maxPtr, we need to loop and record current as maxUsed
+			LD	HL, (_spoolBuffer_maxPtr)
+			SCF
+			CCF
+			SBC	HL, DE
+			RET	NC		; If carry not set, no need to loop
+			; RET	M		; If carry not set, no need to loop
+			LD	(_spoolBuffer_maxUsed), DE
+			LD	DE, (_spoolBuffer_start)
+			LD	(_spoolBuffer_current), DE
+
+			RET
+
+; Echo end
+; Received when echo gets disabled
+;
+; Byte: Handle to the file
+;
+vdp_protocol_ECHOEND:
+			LD	A, (_vpd_protocol_flags)
+			OR	VDPP_FLAG_MISC
 			LD	(_vpd_protocol_flags), A
 			RET

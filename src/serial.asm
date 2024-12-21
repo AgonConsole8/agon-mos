@@ -36,7 +36,7 @@
 			XDEF	getch 
 
 			XREF	_serialFlags	; In globals.asm
-				
+
 UART0_PORT		EQU	%C0		; UART0
 UART1_PORT		EQU	%D0		; UART1
 				

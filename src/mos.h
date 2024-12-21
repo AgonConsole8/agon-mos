@@ -39,6 +39,12 @@
 #include "mos_sysvars.h"
 
 extern char  	cmd[256];				// Array for the command line handler
+extern BYTE		spoolBuffer_pending;
+extern BYTE *	spoolBuffer_start;
+extern BYTE *	spoolBuffer_current;
+extern BYTE *	spoolBuffer_lastSaved;
+extern BYTE *	spoolBuffer_maxUsed;
+extern BYTE *	spoolBuffer_maxPtr;
 
 typedef struct {
 	char * name;
@@ -100,6 +106,7 @@ int		mos_cmdSET(char *ptr);
 int		mos_cmdSETEVAL(char *ptr);
 int		mos_cmdSETMACRO(char *ptr);
 int		mos_cmdSHOW(char *ptr);
+int		mos_cmdSPOOL(char *ptr);
 int		mos_cmdTIME(char *ptr);
 int		mos_cmdTRY(char *ptr);
 int		mos_cmdTYPE(char *ptr);
@@ -143,6 +150,8 @@ void	mos_UNPACKRTC(UINT24 address);
 void	mos_SETRTC(UINT24 address);
 UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);
+
+void	mos_saveSpool();
 
 extern TCHAR	cwd[256];
 extern BOOL	sdcardDelay;
@@ -295,6 +304,10 @@ UINT8	fat_EOF(FIL * fp);
 
 #define HELP_SHOW			"Show lists system variables matching the name given, or all system variables if no name is specified\r\n"
 #define HELP_SHOW_ARGS		"[<variablespec>]"
+
+#define HELP_SPOOL			"Opens a new file and causes subsequent VDU output to be directed to it\r\n" \
+							"*Spool with no filename causes the spool file to be closed\r\n"
+#define HELP_SPOOL_ARGS		"[<filename>]"
 
 #define HELP_TIME			"Set and read the VDP's real-time clock\r\n"
 #define HELP_TIME_ARGS		"[ <yyyy> <mm> <dd> <hh> <mm> <ss> ]"

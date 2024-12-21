@@ -61,8 +61,12 @@ extern void 	i2c_handler(void);
 extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
+extern volatile BYTE	redirectHandle;	// Redirect handle
 extern volatile BYTE	keymods;		// Key modifiers
 extern volatile BYTE	keydown;		// Key down flag
+
+extern volatile BYTE	spoolBuffer_pending;
+extern volatile BYTE * 	spoolBuffer_start;
 
 extern volatile BYTE history_no;
 extern volatile BYTE history_size;
@@ -114,6 +118,15 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 	putch(0);
 	putch(VDP_checkkey);
 	putch(117);
+
+	// Tell VDP size of our VDP buffer (feature flag 0x0201)
+	putch(23);
+	putch(0);
+	putch(VDP_feature);
+	putch(0x01);
+	putch(0x02);
+	putch(VDPP_BUFFERLEN);
+	putch(0x00);
 }
 
 // Initialise the interrupts
@@ -185,6 +198,10 @@ int main(void) {
 	init_UART1();									// Initialise UART1
 	EI();											// Enable the interrupts now
 	
+	redirectHandle = 0;								// No redirection
+	spoolBuffer_pending = 0;						// No spooling
+	spoolBuffer_start = NULL;
+
 	wait_ESP32(&pUART0, 1152000);					// Connect to VDP at maximum rate
 
 	if (coldBoot == 0) {							// If a warm boot detected then
