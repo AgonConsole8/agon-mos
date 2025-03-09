@@ -754,13 +754,16 @@ mos_api_getrtc:		LD	A, MB		; Check if MBASE is 0
 
 ; Unpack RTC data
 ; HLU: Pointer to a buffer to copy the RTC data to
+; C: Flags (bit 0 = refresh RTC before unpacking, bit 1 = refresh RTC after unpacking)
 ;
 mos_api_unpackrtc:	LD	A, MB		; Check if MBASE is 0
 			OR	A, A 
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
+			PUSH 	C
 			PUSH 	HL
 			CALL	_mos_UNPACKRTC
 			POP	HL
+			POP	C
 			RET
 
 ; Set the RTC
