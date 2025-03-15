@@ -27,11 +27,11 @@
 
 
 			.ASSUME	ADL = 1
-			
+
 			DEFINE .STARTUP, SPACE = ROM
 			SEGMENT .STARTUP
-			
-			XDEF	mos_api	
+
+			XDEF	mos_api
 
 			XREF	SWITCH_A		; In misc.asm
 			XREF	SET_AHL24
@@ -56,9 +56,9 @@
 			XREF	_mos_GETERROR
 			XREF	_mos_MKDIR_API
 			XREF	_mos_COPY_API
-			XREF	_mos_GETRTC 
-			XREF	_mos_UNPACKRTC 
-			XREF	_mos_SETRTC 
+			XREF	_mos_GETRTC
+			XREF	_mos_UNPACKRTC
+			XREF	_mos_SETRTC
 			XREF	_mos_SETINTVECTOR
 			XREF	_mos_GETFIL
 			XREF	_mos_FREAD
@@ -68,15 +68,15 @@
 			XREF	_mos_I2C_CLOSE
 			XREF	_mos_I2C_WRITE
 			XREF	_mos_I2C_READ
-			
+
 			XREF	_fat_EOF		; In mos.c
 
 			XREF	_open_UART1		; In uart.c
 			XREF	_close_UART1
 
 			XREF	UART1_serial_GETCH	; In serial.asm
-			XREF	UART1_serial_PUTCH 
-			
+			XREF	UART1_serial_PUTCH
+
 			XREF	_keyascii		; In globals.asm
 			XREF	_keycount
 			XREF	_keydown
@@ -88,9 +88,9 @@
 
 			XREF	_f_open			; In ff.c
 			XREF	_f_close
-			XREF	_f_read 
+			XREF	_f_read
 			XREF	_f_write
-			XREF	_f_stat 
+			XREF	_f_stat
 			XREF	_f_lseek
 			XREF	_f_truncate
 			XREF	_f_opendir
@@ -117,7 +117,7 @@
 			XREF	_getFilepathLeafname
 			XREF	_isDirectory
 			XREF	_resolveRelativePath
-			
+
 ; Call a MOS API function
 ; 00h - 7Fh: Reserved for high level MOS calls
 ; 80h - FFh: Reserved for low level calls to FatFS
@@ -174,7 +174,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_pmatch		; 0x28
 			DW	mos_api_getargument	; 0x29
 			DW	mos_api_extractstring	; 0x2a
-			DW	mos_api_extractnumber	; 0x2b   
+			DW	mos_api_extractnumber	; 0x2b
 			DW	mos_api_escapestring	; 0x2c
 			DW	mos_api_not_implemented	; 0x2d
 			DW	mos_api_not_implemented	; 0x2e
@@ -190,7 +190,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_not_implemented	; 0x37   reserved for something else :)
 			DW	mos_api_resolvepath	; 0x38
 			DW	mos_api_getdirectoryforpath	; 0x39
-			DW	mos_api_getfilepathleafname	; 0x3a 
+			DW	mos_api_getfilepathleafname	; 0x3a
 			DW	mos_api_isdirectory	; 0x3b
 			DW	mos_api_getabsolutepath	; 0x3c
 			DW	mos_api_not_implemented	; 0x3d
@@ -266,7 +266,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 			DW	mos_api_not_implemented	; 0x7f
 
 mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
-;			
+;
 $$:			AND	7Fh			; Else remove the top bit
 			CP	mos_api_block2_size	; Check if out of bounds
 			JP	NC, mos_api_not_implemented
@@ -323,17 +323,17 @@ mos_api_not_implemented:
 ;  A: ASCII code of key pressed, or 0 if no key pressed
 ;
 mos_api_getkey:		PUSH	HL
-			LD	HL, _keycount	
+			LD	HL, _keycount
 mos_api_getkey_1:	LD	A, (HL)			; Wait for a key to be pressed
 $$:			CP	(HL)
 			JR	Z, $B
 			LD	A, (_keydown)		; Check if key is down
-			OR	A 
+			OR	A
 			JR	Z, mos_api_getkey_1	; No, so loop
-			POP	HL 
+			POP	HL
 			LD	A, (_keyascii)		; Get the key code
 			RET
-			
+
 ; Load an area of memory from a file.
 ; HLU: Address of filename (zero terminated)
 ; DEU: Address at which to load
@@ -393,12 +393,12 @@ $$:			PUSH	BC		; UINT24   size
 			POP	BC
 			SCF			; Flag as successful
 			RET
-			
+
 ; Change directory
 ; HLU: Address of path (zero terminated)
 ; Returns:
 ; - A: File error, or 0 if OK
-;			
+;
 mos_api_cd:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 ;
@@ -408,7 +408,7 @@ mos_api_cd:		LD	A, MB		; Check if MBASE is 0
 ;
 ; Finally, we can do the load
 ;
-			PUSH	HL		; char   * filename	
+			PUSH	HL		; char   * filename
 			CALL	_mos_CD_API
 			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
@@ -418,7 +418,7 @@ mos_api_cd:		LD	A, MB		; Check if MBASE is 0
 ; HLU: Address of path (zero terminated)
 ; Returns:
 ; - A: File error, or 0 if OK
-;	
+;
 mos_api_dir:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 ;
@@ -433,7 +433,7 @@ mos_api_dir:		LD	A, MB		; Check if MBASE is 0
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			RET
-			
+
 ; Delete a file from the SD card
 ; HLU: Address of filename (zero terminated)
 ; Returns:
@@ -465,12 +465,12 @@ mos_api_ren:		LD	A, MB		; Check if MBASE is 0
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEu to include the MBASE in the U byte
-; 
+;
 			CALL	SET_AHL24
 			CALL	SET_ADE24
 ;
 ; Finally we can do the rename
-; 
+;
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
 			CALL	_mos_REN_API	; Call the C function mos_REN_API
@@ -490,12 +490,12 @@ mos_api_copy:		LD	A, MB		; Check if MBASE is 0
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEu to include the MBASE in the U byte
-; 
+;
 			CALL	SET_AHL24
 			CALL	SET_ADE24
 ;
 ; Finally we can do the rename
-; 
+;
 $$:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
 			CALL	_mos_COPY_API	; Call the C function mos_COPY_API
@@ -530,7 +530,7 @@ mos_api_mkdir:		LD	A, MB		; Check if MBASE is 0
 ;
 mos_api_sysvars:	LD	IX, _sysvars
 			RET
-			
+
 ; Invoke the line editor
 ; HLU: Address of the buffer
 ; BCU: Buffer length
@@ -575,7 +575,7 @@ mos_api_fopen:		PUSH	BC
 ;
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
 ;
-			LD	A, C	
+			LD	A, C
 			LD	BC, 0
 			LD	C, A
 			PUSH	BC		; byte	  mode
@@ -617,7 +617,7 @@ mos_api_fclose:		PUSH	BC
 			POP	DE
 			POP	BC
 			RET
-			
+
 ; Get a character from a file
 ;   C: Filehandle
 ; Returns:
@@ -629,7 +629,7 @@ mos_api_fgetc:		PUSH	BC
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-;			
+;
 			LD	DE, 0
 			LD	E, C
 			PUSH	DE		; byte	  fh
@@ -644,7 +644,7 @@ mos_api_fgetc:		PUSH	BC
 			POP	DE
 			POP	BC
 			RET
-	
+
 ; Write a character to a file
 ;   C: Filehandle
 ;   B: Character to write
@@ -655,16 +655,16 @@ mos_api_fputc:		PUSH	AF
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-;		
+;
 			LD	DE, 0
-			LD	E, B		
+			LD	E, B
 			PUSH	DE		; byte	  char
 			LD	E, C
 			PUSH	DE		; byte	  fh
 			CALL	_mos_FPUTC
 			POP	DE
 			POP	DE
-;			
+;
 			POP	IY
 			POP	IX
 			POP	HL
@@ -672,31 +672,31 @@ mos_api_fputc:		PUSH	AF
 			POP	BC
 			POP	AF
 			RET
-			
+
 ; Check whether we're at the end of the file
 ;   C: Filehandle
 ; Returns:
 ;   A: 1 if at end of file, otherwise 0
-;     
+;
 mos_api_feof:		PUSH	BC
 			PUSH	DE
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-;			
+;
 			LD	DE, 0
 			LD	E, C
 			PUSH	DE		; byte	  fh
 			CALL	_mos_FEOF
 			POP	DE
-;			
+;
 			POP	IY
 			POP	IX
 			POP	HL
 			POP	DE
 			POP	BC
 			RET
-			
+
 ; Copy an error message
 ;   E: The error code
 ; HLU: Address of buffer to copy message into
@@ -714,7 +714,7 @@ mos_api_getError:	LD	A, MB		; Check if MBASE is 0
 			CALL	_mos_GETERROR
 			POP	DE
 			POP	HL
-			POP	BC			
+			POP	BC
 			RET
 
 ; Execute a MOS command
@@ -725,14 +725,14 @@ mos_api_getError:	LD	A, MB		; Check if MBASE is 0
 ;   A: MOS error code
 ;
 mos_api_oscli:		LD	A, MB		; Check if MBASE is 0
-			OR	A, A				
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
 ;
 ; Now execute the MOS command
 ;
 			PUSH	HL		; char * buffer
 			CALL	_mos_OSCLI
-			LD	A, L		; Return vaue in HLU, put in A			
+			LD	A, L		; Return vaue in HLU, put in A
 			POP	HL
 			RET
 
@@ -742,43 +742,43 @@ mos_api_oscli:		LD	A, MB		; Check if MBASE is 0
 ;   A: Length of time
 ;
 mos_api_getrtc:		LD	A, MB		; Check if MBASE is 0
-			OR	A, A 
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
 ;
 ; Now fetch the time
-;		
+;
 			PUSH	HL		; UINT24 address
 			CALL	_mos_GETRTC
 			POP	HL
-			RET 
+			RET
 
 ; Unpack RTC data
 ; HLU: Pointer to a buffer to copy the RTC data to
 ; C: Flags (bit 0 = refresh RTC before unpacking, bit 1 = refresh RTC after unpacking)
 ;
 mos_api_unpackrtc:	LD	A, MB		; Check if MBASE is 0
-			OR	A, A 
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
-			PUSH 	C
-			PUSH 	HL
+			PUSH	BC		; UINT8 flags
+			PUSH 	HL		; UINT24 address
 			CALL	_mos_UNPACKRTC
 			POP	HL
-			POP	C
+			POP	BC
 			RET
 
 ; Set the RTC
 ; HLU: Pointer to a buffer with the time data in
 ;
 mos_api_setrtc:		LD	A, MB		; Check if MBASE is 0
-			OR	A, A 
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
 ;
 ; Now fetch the time
-;		
+;
 			PUSH	HL		; UINT24 address
 			CALL	_mos_SETRTC
 			POP	HL
-			RET 
+			RET
 
 ; Set an interrupt vector
 ; HLU: Pointer to the interrupt vector (24-bit pointer)
@@ -786,16 +786,16 @@ mos_api_setrtc:		LD	A, MB		; Check if MBASE is 0
 ; Returns:
 ; HLU: Pointer to the previous vector
 ;
-mos_api_setintvector:	LD	A, E 
+mos_api_setintvector:	LD	A, E
 			LD	DE, 0 		; Clear DE
 			LD	E, A 		; Store the vector #
 			PUSH	HL		; void(*handler)(void)
 			PUSH	DE 		; byte vector
 			CALL	_mos_SETINTVECTOR
-			POP	DE 
 			POP	DE
-			RET 
-			
+			POP	DE
+			RET
+
 ; Set a VDP keyboard packet receiver callback
 ;   C: If non-zero then set the top byte of HLU(callback address)  to MB (for ADL=0 callers)
 ; HLU: Pointer to callback
@@ -809,16 +809,16 @@ mos_api_setkbvector:	PUSH	DE
 $$:			PUSH	HL
 			POP	DE
 			LD	HL, _user_kbvector
-			LD	(HL),DE		
+			LD	(HL),DE
 			POP	DE
 			RET
 
 ; Get the address of the keyboard map
 ; Returns:
 ; IXU: Base address of the keymap
-; 
+;
 mos_api_getkbmap:	LD	IX, _keymap
-			RET 
+			RET
 
 ; Open the I2C bus as master
 ;   C: Frequency ID
@@ -828,13 +828,13 @@ mos_api_i2c_open:	PUSH	BC
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-;			
+;
 			LD	HL,0
 			LD	L, C
 			PUSH	HL
 			CALL	_mos_I2C_OPEN
 			POP	HL
-;			
+;
 			POP	IY
 			POP	IX
 			POP	HL
@@ -849,9 +849,9 @@ mos_api_i2c_close:	PUSH	BC
 			PUSH	HL
 			PUSH	IX
 			PUSH	IY
-;			
+;
 			CALL	_mos_I2C_CLOSE
-;			
+;
 			POP	IY
 			POP	IX
 			POP	HL
@@ -863,15 +863,15 @@ mos_api_i2c_close:	PUSH	BC
 ;   C: I2C address
 ;   B: Number of bytes to write, maximum 32
 ; HLU: Address of buffer containing the bytes to send
-; 
+;
 mos_api_i2c_write:	PUSH	DE
 			PUSH	IX
 			PUSH	IY
 ;
 			LD	A, MB		; Check if MBASE is 0
-			OR	A, A 
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
-;			
+;
 			PUSH	HL		; Address of buffer
 			LD	HL,0
 			LD	L, B
@@ -882,7 +882,7 @@ mos_api_i2c_write:	PUSH	DE
 			POP	HL
 			POP	HL
 			POP	HL
-;			
+;
 			POP	IY
 			POP	IX
 			POP	DE
@@ -898,9 +898,9 @@ mos_api_i2c_read:	PUSH	DE
 			PUSH	IY
 ;
 			LD	A, MB		; Check if MBASE is 0
-			OR	A, A 
+			OR	A, A
 			CALL	NZ, SET_AHL24	; If it is running in classic Z80 mode, set U to MB
-;			
+;
 			PUSH	HL		; Address of buffer
 			LD	HL,0
 			LD	L, B
@@ -911,7 +911,7 @@ mos_api_i2c_read:	PUSH	DE
 			POP	HL
 			POP	HL
 			POP	HL
-;			
+;
 			POP	IY
 			POP	IX
 			POP	DE
@@ -936,7 +936,7 @@ mos_api_uopen:		LEA	HL, IX + 0	; HLU: Pointer to struct
 			CALL	_open_UART1	; Initialise the UART port
 			LD	A, L 		; The return value is in HLU
 			POP	HL 		; Tidy up the stack
-			RET 
+			RET
 
 ; Close UART1
 ;
@@ -956,7 +956,7 @@ mos_api_ugetc		JP	UART1_serial_GETCH
 ;   F: C if successful
 ;   F: NC if the UART is not open
 ;
-mos_api_uputc:		LD	A, C 
+mos_api_uputc:		LD	A, C
 			JP	UART1_serial_PUTCH
 
 ; Convert a file handle to a FIL structure pointer
@@ -966,7 +966,7 @@ mos_api_uputc:		LD	A, C
 ;
 mos_api_getfil:		PUSH	BC		; UINT8 fh
 			CALL	_mos_GETFIL
-			POP	BC 
+			POP	BC
 			RET
 
 ; Read a block of data from a file
@@ -983,7 +983,7 @@ mos_api_fread:		LD	A, MB		; Check if MBASE is 0
 			PUSH	HL		; UINT24 buffer
 			PUSH	BC		; UINT8 fh
 			CALL	_mos_FREAD
-			LD	(_scratchpad), HL 
+			LD	(_scratchpad), HL
 			POP	BC
 			POP	HL
 			POP	DE
@@ -1004,7 +1004,7 @@ mos_api_fwrite:		LD	A, MB		; Check if MBASE is 0
 			PUSH	HL		; UINT24 buffer
 			PUSH	BC		; UINT8 fh
 			CALL	_mos_FWRITE
-			LD	(_scratchpad), HL 
+			LD	(_scratchpad), HL
 			POP	BC
 			POP	HL
 			POP	DE
@@ -1038,18 +1038,23 @@ mos_api_flseek:		PUSH 	DE		; UINT32 offset (msb)
 ; Returns:
 ; - A: File error, or 0 if OK
 ;
-mos_api_pmatch:		LD	A, MB		; Check if MBASE is 0
+mos_api_pmatch:		PUSH	BC
+			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_AHL24
 			CALL	SET_ADE24
-$$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
+$$:			LD	A, C
+			LD	BC, 0
+			LD	C, A
+			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			PUSH	DE		; char * string
 			PUSH	HL		; char * pattern
-			CALL	_pmatch	; Call the C function pmatch
+			CALL	_pmatch		; Call the C function pmatch
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
+			POP	BC
 			POP	BC
 			RET
 
@@ -1090,7 +1095,7 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 ; - DEU: Address of next character after end of result string
 ;
 ; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags)
-mos_api_extractstring:	
+mos_api_extractstring:
 			PUSH	AF		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
@@ -1597,9 +1602,9 @@ ffs_api_fopen:		LD	A, MB		; A: MB
 $$:			PUSH	BC		; BYTE mode
 			PUSH	DE		; const TCHAR * path
 			PUSH	HL		; FIL * fp
-			CALL	_f_open 
+			CALL	_f_open
 			LD	A, L 		; FRESULT
-			POP	HL 		
+			POP	HL
 			POP	DE
 			POP	BC
 			RET
@@ -1610,17 +1615,17 @@ $$:			PUSH	BC		; BYTE mode
 ;   A: FRESULT
 ;
 ffs_api_fclose:		LD	A, MB
-			OR	A, A 
+			OR	A, A
 			JR	Z, $F
 			CALL	GET_AHL24
-			OR 	A, A 
+			OR 	A, A
 			LD	A, MB
 			CALL	Z, SET_AHL24
 ;
 $$:			PUSH	HL		; FIL * fp
-			CALL	_f_close 
+			CALL	_f_close
 			LD	A, L		; FRESULT
-			POP	HL 
+			POP	HL
 			RET
 
 ; Read data from a file
@@ -1646,14 +1651,14 @@ $$:			PUSH	HL
 			PUSH	BC		; UINT btr
 			PUSH	DE		; void * buff
 			PUSH	HL		; FILE * fp
-			CALL	_f_read 
+			CALL	_f_read
 			LD	A, L 		; FRESULT
 			POP	HL
-			POP	DE 
-			POP	BC 
+			POP	DE
+			POP	BC
 			POP	BC
 			LD	BC, (_scratchpad)
-			RET 
+			RET
 
 ; Write data to a file
 ; HLU: Pointer to a FIL struct
@@ -1678,14 +1683,14 @@ $$:			PUSH	HL
 			PUSH	BC		; UINT btw
 			PUSH	DE		; void * buff
 			PUSH	HL		; FILE * fp
-			CALL	_f_write 
+			CALL	_f_write
 			LD	A, L 		; FRESULT
 			POP	HL
-			POP	DE 
-			POP	BC 
+			POP	DE
+			POP	BC
 			POP	BC
 			LD	BC, (_scratchpad)
-			RET 	
+			RET
 
 ; Check file exists
 ; HLU: Pointer to a FILINFO struct
@@ -1704,9 +1709,9 @@ ffs_api_stat:		LD	A, MB		; A: MB
 ;
 $$:			PUSH	HL		; FILEINFO * fil
 			PUSH	DE		; const TCHAR * path
-			CALL	_f_stat 
+			CALL	_f_stat
 			LD	A, L 		; FRESULT
-			POP	DE 
+			POP	DE
 			POP	HL
 			RET
 
@@ -1716,18 +1721,18 @@ $$:			PUSH	HL		; FILEINFO * fil
 ;   A: 1 if end of file, otherwise 0
 ;
 ffs_api_feof:		LD	A, MB
-			OR	A, A 
+			OR	A, A
 			JR	Z, $F
 			CALL	GET_AHL24
-			OR 	A, A 
+			OR 	A, A
 			LD	A, MB
 			CALL	Z, SET_AHL24
 ;
 $$:			PUSH	HL		; FILEINFO * fil
-			CALL	_fat_EOF 
+			CALL	_fat_EOF
 			LD	A, L 		; EOF
 			POP	HL
-			RET 
+			RET
 
 ; Move the read/write pointer in a file
 ; HLU: Pointer to a FIL struct
@@ -1737,65 +1742,65 @@ $$:			PUSH	HL		; FILEINFO * fil
 ;   A: FRESULT
 ;
 ffs_api_flseek:		LD	A, MB
-			OR	A, A 
+			OR	A, A
 			JR	Z, $F
 			CALL	GET_AHL24
-			OR 	A, A 
+			OR 	A, A
 			LD	A, MB
 			CALL	Z, SET_AHL24
 ;
 $$:			PUSH	BC 		; FSIZE_t ofs (msb)
 			PUSH	DE		; FSIZE_t ofs (lsw)
 			PUSH	HL		; FIL * fp
-			CALL	_f_lseek 
+			CALL	_f_lseek
 			LD	A, L
-			POP	HL		
+			POP	HL
 			POP	DE
 			POP	BC
-			RET 
+			RET
 
 ; Truncate a file
 ; HLU: Pointer to a FIL struct
 ; Returns:
 ;   A: FRESULT
 ;
-ffs_api_ftruncate:	
+ffs_api_ftruncate:
 			LD	A, MB
-			OR	A, A 
+			OR	A, A
 			JR	Z, $F
 			CALL	GET_AHL24
-			OR 	A, A 
+			OR 	A, A
 			LD	A, MB
 			CALL	Z, SET_AHL24
 ;
 $$:			PUSH	HL		; FIL * fp
-			CALL	_f_truncate 
+			CALL	_f_truncate
 			LD	A, L
-			POP	HL		
-			RET 
+			POP	HL
+			RET
 
-;		
+;
 ; Commands that have not been implemented yet
 ;
-ffs_api_fsync:		
+ffs_api_fsync:
 			JP mos_api_not_implemented
-ffs_api_fforward:	
+ffs_api_fforward:
 			JP mos_api_not_implemented
-ffs_api_fexpand:	
+ffs_api_fexpand:
 			JP mos_api_not_implemented
-ffs_api_fgets:		
+ffs_api_fgets:
 			JP mos_api_not_implemented
-ffs_api_fputc:		
+ffs_api_fputc:
 			JP mos_api_not_implemented
-ffs_api_fputs:		
+ffs_api_fputs:
 			JP mos_api_not_implemented
-ffs_api_fprintf:	
+ffs_api_fprintf:
 			JP mos_api_not_implemented
-ffs_api_ftell:		
+ffs_api_ftell:
 			JP mos_api_not_implemented
-ffs_api_fsize:		
+ffs_api_fsize:
 			JP mos_api_not_implemented
-ffs_api_ferror:		
+ffs_api_ferror:
 			JP mos_api_not_implemented
 
 ; Open a directory
@@ -1851,23 +1856,23 @@ $$:
 			POP	DE
 			RET
 
-ffs_api_dfindfirst:	
+ffs_api_dfindfirst:
 			JP mos_api_not_implemented
-ffs_api_dfindnext:	
+ffs_api_dfindnext:
 			JP mos_api_not_implemented
-ffs_api_unlink:		
+ffs_api_unlink:
 			JP mos_api_not_implemented
-ffs_api_rename:		
+ffs_api_rename:
 			JP mos_api_not_implemented
-ffs_api_chmod:		
+ffs_api_chmod:
 			JP mos_api_not_implemented
-ffs_api_utime:		
+ffs_api_utime:
 			JP mos_api_not_implemented
-ffs_api_mkdir:		
+ffs_api_mkdir:
 			JP mos_api_not_implemented
-ffs_api_chdir:		
+ffs_api_chdir:
 			JP mos_api_not_implemented
-ffs_api_chdrive:	
+ffs_api_chdrive:
 			JP mos_api_not_implemented
 ; Copy the current directory (string) into buffer (hl)
 ; HLU: Pointer to a buffer
@@ -1887,17 +1892,17 @@ $$:
 			POP	BC
 			RET
 
-ffs_api_mount:		
+ffs_api_mount:
 			JP mos_api_not_implemented
-ffs_api_mkfs:		
+ffs_api_mkfs:
 			JP mos_api_not_implemented
-ffs_api_fdisk		
+ffs_api_fdisk
 			JP mos_api_not_implemented
-ffs_api_getfree:	
+ffs_api_getfree:
 			JP mos_api_not_implemented
-ffs_api_getlabel:	
+ffs_api_getlabel:
 			JP mos_api_not_implemented
-ffs_api_setlabel:	
+ffs_api_setlabel:
 			JP mos_api_not_implemented
-ffs_api_setcp:		
+ffs_api_setcp:
 			JP mos_api_not_implemented
