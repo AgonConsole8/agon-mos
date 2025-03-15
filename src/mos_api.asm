@@ -1037,7 +1037,6 @@ mos_api_flseek:		PUSH 	DE		; UINT32 offset (msb)
 ; C: Flags
 ; Returns:
 ; - A: File error, or 0 if OK
-; - F: Carry reset indicates no room for file.
 ;
 mos_api_pmatch:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
@@ -1061,8 +1060,10 @@ $$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 ; - HLU: Address of the argument or zero if not found
 ;
 ; char * getArgument(char * source, int argNo, char ** end)
-mos_api_getargument:	PUSH	AF		; UINT8 flags
-			LD	A, MB		; Check if MBASE is 0
+; TODO work out if this actually makes sense, cos right now i don't get it
+; Actual function will update the end pointer to point to the end of the argument
+; which we need to be returning here
+mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			CALL	NZ, SET_AHL24
 			PUSH	HL
@@ -1076,7 +1077,6 @@ mos_api_getargument:	PUSH	AF		; UINT8 flags
 			POP	BC
 			EX	(SP), HL
 			POP	HL
-			POP	AF
 			RET
 
 ; Extract a string, using a given divider
