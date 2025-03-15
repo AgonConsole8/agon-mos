@@ -169,7 +169,7 @@ keyboard_lookup:	KEY(099)	; VK_SPACE
 			KEY(098)	; VK_Z              
 			KEY(046)	; VK_GRAVEACCENT
 			KEY(000)	; VK_ACUTEACCENT
-			KEY(000)	; VK_QUOTE
+			KEY(072)	; VK_QUOTE
 			KEY(000)	; VK_QUOTEDBL
 			KEY(094)	; VK_EQUALS
 			KEY(024)	; VK_MINUS
