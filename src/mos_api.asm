@@ -1229,7 +1229,9 @@ mos_api_setvarval:
 			CALL	SET_AHL24
 			LD	A, C
 			CP	1		; Is the type a number?
-			CALL	NZ, SET_AIX24	; Only set U if type is not a number
+			JR	Z, $F		; If it is, we don't need to set U to MB
+			LD	A, MB
+			CALL	SET_AIX24	; Only set U if type is not a number
 $$:			PUSH	HL		; Temporary storage
 			LD	HL, _scratchpad + 3
 			EX	(SP), HL	; BYTE * type
