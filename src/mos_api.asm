@@ -1210,63 +1210,68 @@ $$:			PUSH	HL
 
 ; Set a variable value
 ; HLU: Pointer to variable name (can include wildcards)
-; DEU: Variable value (number, or pointer to string)
-; IXU: Pointer to variable name (0 for first call)
-; A: Variable type, or -1 (255) to delete the variable
+; IXU: Variable value (number, or pointer to zero-terminated string)
+; IYU: Pointer to variable name (0 for first call)
+; C: Variable type, or -1 (255) to delete the variable
 ; Returns:
 ; - A: Status code
-; - D: Actual variable type
-; - IXU: Pointer to variable name (for next call)
+; - C: Actual variable type
+; - IYU: Pointer to variable name (for next call)
 ;
 ; int setVarVal(char * name, void * value, char ** actualName, BYTE * type);
 mos_api_setvarval:
+			LD	A, C
 			LD	(_scratchpad + 3), A	; Save the type
-			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	(_scratchpad), IY	; Save the actualName pointer
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			CALL	SET_ADE24
+			LD	A, C
+			CP	1		; Is the type a number?
+			CALL	NZ, SET_AIX24	; Only set U if type is not a number
 $$:			PUSH	HL		; Temporary storage
 			LD	HL, _scratchpad + 3
 			EX	(SP), HL	; BYTE * type
-			LD	IX, _scratchpad
-			PUSH	IX		; char ** actualName
-			PUSH	DE		; void * value
+			LD	IY, _scratchpad
+			PUSH	IY		; char ** actualName
+			PUSH	IX		; void * value
 			PUSH	HL		; char * name
 			CALL	_setVarVal	; Call the C function setVarVal
 			LD	A, L		; Save return value in HLU, in A
 			POP	HL
-			POP	IX		; To be replaced
-			POP	IX
-			POP	IX
-			LD 	IX, _scratchpad
-			LD	D, (IX + 3)	; Return the actual type
-			LD	IX, (IX)	; Return the actual name
+			POP	IY		; To be replaced
+			POP	IY
+			POP	IY
+			LD 	IY, _scratchpad
+			LD	C, (IY + 3)	; Return the actual type
+			LD	IY, (IY)	; Return the actual name
 			RET
 
 ; Read a variable value
 ; HLU: Pointer to variable name (can include wildcards)
-; DEU: Pointer to buffer to store the value (null/0 to read length only)
-; BCU: Length of buffer
-; IXU: Pointer to variable name (0 for first call)
-; A: Flags (3 = expand value into string)
+; IXU: Pointer to buffer to store the value (null/0 to read length only)
+; DEU: Length of buffer
+; IYU: Pointer to variable name (0 for first call)
+; C: Flags (3 = expand value into string)
 ; Returns:
 ; - A: Status code
-; - D: Actual variable type
-; - BCU: Length of variable value
-; - IXU: Pointer to variable name (for next call)
+; - C: Actual variable type
+; - DEU: Length of variable value
+; - IYU: Pointer to variable name (for next call)
 ;
 ; int readVarVal(char * namePattern, void * value, char ** actualName, int * length, BYTE * typeFlag)
 mos_api_readvarval:
+			LD	A, C
 			LD	(_scratchpad + 6), A	; Save the flags
-			LD	(_scratchpad + 3), BC	; Save the length
-			LD	(_scratchpad), IX	; Save the actualName pointer
+			LD	(_scratchpad + 3), DE	; Save the length
+			LD	(_scratchpad), IY	; Save the actualName pointer
+			LD	DE, IX		; move optional target buffer into DE
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			LD	A, D		; but DE is optional...
+			LD	A, D		; check it target buffer is zero
 			OR	A, E
 			JR	Z, $F		; DE is zero, so no need to set U to MB
 			LD	A, MB
@@ -1277,21 +1282,21 @@ $$:			PUSH	HL		; Temporary storage
 			PUSH	HL
 			LD	HL, _scratchpad + 3
 			EX	(SP), HL	; int * length
-			LD	IX, _scratchpad
-			PUSH	IX		; char ** actualName
+			LD	IY, _scratchpad
+			PUSH	IY		; char ** actualName
 			PUSH	DE		; void * value
 			PUSH	HL		; char * namePattern
 			CALL	_readVarVal	; Call the C function readVarVal
 			LD	A, L		; Save return value in HLU, in A
-			POP	HL
-			POP	DE
-			POP	IX		; To be replaced
-			POP	IX
-			POP	IX
-			LD 	IX, _scratchpad
-			LD	D, (IX + 6)	; Return the actual type
-			LD	BC, (IX + 3)	; Return the length
-			LD	IX, (IX)	; Return the actual name
+			POP	HL		; (variable name pattern)
+			POP	IX		; (value pointer)
+			POP	IY		; To be replaced
+			POP	IY
+			POP	IY
+			LD 	IY, _scratchpad
+			LD	C, (IY + 6)	; Return the actual type
+			LD	DE, (IY + 3)	; Return the length
+			LD	IY, (IY)	; Return the actual name
 			RET
 
 ; Initialise a GS Trans operation
