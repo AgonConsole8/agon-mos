@@ -1086,7 +1086,7 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 ; Extract a string, using a given divider
 ; HLU: Pointer to source string to extract from
 ; DEU: Pointer to string for divider matching, or 0 for default (space)
-; A: Flags
+; C: Flags
 ; Depending on flags, the result string will be zero terminated or not
 ; Returns:
 ; - A: status code
@@ -1095,7 +1095,7 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 ;
 ; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags)
 mos_api_extractstring:
-			PUSH	AF		; BYTE flags
+			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
@@ -1120,7 +1120,7 @@ $$:			PUSH	HL
 			POP	HL
 			POP	HL
 			LD	L, A		; keep result so we can
-			POP 	AF		; unpop the AF
+			POP 	BC		; unpop the BC
 			LD 	A, L		; return status code in A
 			LD	HL, (_scratchpad)	; return result in HLU
 			LD	DE, (_scratchpad + 3)	; return end in DEU
@@ -1129,7 +1129,7 @@ $$:			PUSH	HL
 ; Extract a number, using given divider
 ; HLU: Pointer to source string to extract from
 ; DEU: Pointer to string for divider matching, or 0 for default (space)
-; A: Flags
+; C: Flags
 ; Returns:
 ; - A: status code
 ; - HLU: Number extracted
@@ -1137,7 +1137,7 @@ $$:			PUSH	HL
 ;
 ; bool	extractNumber(char * source, char ** end, char * divider, int * number, BYTE flags)
 mos_api_extractnumber:
-			PUSH	AF		; BYTE flags
+			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
@@ -1162,7 +1162,7 @@ $$:			PUSH	HL
 			POP	HL
 			POP	HL
 			LD	L, A		; keep result so we can
-			POP 	AF		; unpop the AF
+			POP 	BC		; unpop the BC
 			LD 	A, L		; move return value back to A
 			LD	HL, (_scratchpad)	; return number in HLU
 			LD	DE, (_scratchpad + 3)	; return end in DEU
