@@ -1483,25 +1483,25 @@ res_path_contd:		PUSH	IY		; DIR * dir
 ; Get the directory for a given path
 ; String only - resolves path prefixes for the given index
 ; HLU: Pointer to the path to get the directory for
-; DEU: Pointer to the buffer to store the directory in (optional - omit for count only)
-; BCU: Length of the buffer
-; A: Search index
+; IXU: Pointer to buffer to store the directory in (optional, omit for count only)
+; DEU: Length of the buffer
+; C: Search index
 ; Returns:
 ; - A: Status code
-; - BCU: Length of the directory
+; - DEU: Length of the directory
 ;
 ; int getDirectoryForPath(char * srcPath, char * dir, int * length, BYTE searchIndex)
 mos_api_getdirectoryforpath:
-			PUSH	AF		; BYTE searchIndex
-			LD	(_scratchpad), BC	; Save the length
+			PUSH 	BC		; BYTE searchIndex
+			LD	(_scratchpad), DE	; Save the length
+			LD	DE, IX		; use DE for checking optional buffer
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24	; HL is required, so set it
-			; DE is optional, so check if it's zero
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			JR	Z, $F		; optional buffer is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; DE not zero, so set U to MB
 $$:			LD	BC, _scratchpad
@@ -1511,10 +1511,10 @@ $$:			LD	BC, _scratchpad
 			CALL	_getDirectoryForPath	; Call the C function getDirectoryForPath
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
-			POP	DE
+			POP	IX
+			POP	DE		; Length (will be replaced)
 			POP	BC
-			POP	BC		; (AF push - we will replace)
-			LD	BC, (_scratchpad)
+			LD	DE, (_scratchpad)
 			RET
 
 ; Get the leafname for a given path
