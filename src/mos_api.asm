@@ -1063,11 +1063,9 @@ $$:			LD	A, C
 ; BCU: Argument number
 ; Returns:
 ; - HLU: Address of the argument or zero if not found
+; - DEU: Address of the next character after the argument
 ;
 ; char * getArgument(char * source, int argNo, char ** end)
-; TODO work out if this actually makes sense, cos right now i don't get it
-; Actual function will update the end pointer to point to the end of the argument
-; which we need to be returning here
 mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			CALL	NZ, SET_AHL24
@@ -1081,7 +1079,8 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 			POP	BC
 			POP	BC
 			EX	(SP), HL
-			POP	HL
+			POP	HL		; Return start of argument in HLU
+			LD	DE, (_scratchpad)	; Return end of argument in DEU
 			RET
 
 ; Extract a string, using a given divider
