@@ -580,7 +580,7 @@ int gsRead(t_mosTransInfo ** transInfo, char * read) {
 // - source: The source string
 // - dest: The destination string buffer (or NULL to just calculate the length)
 // - destLen: The length of the destination buffer
-// - read: Pointer to an integer to store the number of characters read from source
+// - read: Pointer to an integer to store the number of translated characters read from source
 // Returns:
 // - FR_OK if successful
 // - FR_INVALID_PARAMETER if source is NULL

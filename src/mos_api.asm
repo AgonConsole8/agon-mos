@@ -1302,12 +1302,13 @@ $$:			PUSH	HL		; Temporary storage
 ; Initialise a GS Trans operation
 ; HLU: Pointer to source buffer to translate
 ; DEU: Address of pointer used to store trans info
-; A: Flags
+; C: Flags
 ; Returns:
 ; - A: Status code
 ;
+; int gsInit(void * source, t_mosTransInfo ** transInfoPtr, BYTE flags)
 mos_api_gsinit:
-			PUSH	AF		; BYTE flags
+			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
@@ -1317,69 +1318,70 @@ $$:			PUSH	DE		; t_mosTransInfo ** transInfoPtr
 			PUSH	HL		; char * source
 			CALL	_gsInit		; Call the C function gsInit
 			LD	A, L		; Return value in HLU, put in A
-			LD	(_scratchpad), A	; Save the result
 			POP	HL
 			POP	DE
-			POP	AF
-			LD	A, (_scratchpad)
+			POP	BC
 			RET
 
 ; Perform a GS Trans "read" operation
-; HLU: Pointer to a char (byte) to store the result
 ; DEU: Address of pointer used to store trans info (same pointer as used with gsInit)
 ; Returns:
 ; - A: Status code
+; - C: Character read
 ;
+; int gsRead(t_mosTransInfo ** transInfo, char * read)
 mos_api_gsread:
+			PUSH	HL		; preserve HL
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
-			CALL	SET_AHL24
 			CALL	SET_ADE24
-$$:			PUSH	HL		; char * read
+$$:			LD	HL, _scratchpad	; use scratchpad as temporary read character storage
+			PUSH	HL		; char * read
 			PUSH	DE		; t_mosTransInfo ** transInfoPtr
 			CALL	_gsRead		; Call the C function gsRead
 			LD	A, L		; Return value in HLU, put in A
 			POP	DE
 			POP	HL
+			LD	C, (HL)		; Get the character read
+			POP	HL		; Restore HL
 			RET
 
 ; Perform a complete GSTrans operation from source into dest buffer
 ; HLU: Pointer to source buffer
-; DEU: Pointer to destination buffer (can be null to just count size)
-; BCU: Length of destination buffer
-; A: Flags
+; IXU: Pointer to destination buffer
+; DEU: Length of destination buffer
+; C: Flags
 ; Returns:
 ; - A: Status code
 ; - BCU: Calculated total length of destination string
 ;
 ; int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags)
 mos_api_gstrans:
-			PUSH	AF		; BYTE flags
+			PUSH	BC		; BYTE flags
+			LD	BC, IX		; move optional target buffer into BC
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			LD	A, D		; Check if DE is zero
-			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			LD	A, B		; Check if target buffer is zero
+			OR	A, C
+			JR	Z, $F		; BC is zero, so no need to set U to MB
 			LD	A, MB
-			CALL	SET_ADE24
+			CALL	SET_ABC24
 $$:			PUSH 	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * read
-			PUSH	BC		; UINT24 destLength
-			PUSH	DE		; char * dest
+			PUSH	DE		; UINT24 destLength
+			PUSH	BC		; char * dest
 			PUSH	HL		; char * source
 			CALL	_gsTrans	; Call the C function gstrans
 			LD	A, L		; Return value in HLU, put in A
-			LD	(_scratchpad + 3), A	; Save the result
 			POP	HL
+			POP	IX
 			POP	DE
 			POP	BC
 			POP	BC
-			POP	AF
-			LD	A, (_scratchpad + 3)
 			LD	BC, (_scratchpad)
 			RET
 
