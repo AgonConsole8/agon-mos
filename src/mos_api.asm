@@ -1558,8 +1558,8 @@ $$:			LD	A, 5		; Return 5 FR_NO_PATH
 
 ; Get the absolute version of a (relative) path
 ; HLU: Pointer to the path to get the absolute version of
-; DEU: Pointer to the buffer to store the absolute path in
-; BCU: Length of the buffer
+; IXU: Pointer to the buffer to store the absolute path in
+; DEU: Length of the buffer
 ; Returns:
 ; - A: Status code
 ;
@@ -1570,15 +1570,15 @@ mos_api_getabsolutepath:
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume pointers are 24 bit
 			CALL	SET_AHL24
-			CALL	SET_ADE24
-$$:			PUSH	BC		; int length
-			PUSH	DE		; char * resolved
+			CALL	SET_AIX24
+$$:			PUSH	DE		; int length
+			PUSH	IX		; char * resolved
 			PUSH	HL		; char * path
 			CALL	_resolveRelativePath	; Call the C function resolveRelativePath
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
+			POP	IX
 			POP	DE
-			POP	BC
 			RET
 
 ; Open a file
