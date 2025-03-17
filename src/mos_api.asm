@@ -1427,65 +1427,57 @@ sub_args_contd:		PUSH	IX		; char * args
 
 ; Resolves a path, replacing prefixes and leafnames with actual values
 ; HLU: Pointer to the path to resolve
-; DEU: Pointer to the resolved path (optional - omit for count only)
-; BCU: Length of the resolved path buffer
-; IXU: Pointer to the index (integer) of the resolved path
+; IXU: Pointer to buffer to store the resolved path (optional - set to zero for length count only)
+; DEU: Length of the resolved path buffer
 ; IYU: Pointer to a directory object to persist between calls (optional)
+; C: Index of the resolved path (zero for first call)
 ; Returns:
 ; - A: Status code
-; - BCU: Length of the resolved path
-; - Index pointed to at IXU, if set, will be updated to the next path index
+; - BCU: Updated index
+; - DEU: Length of the resolved path
 ;
 ; int resolvePath(char * filepath, char * resolvedPath, int * length, BYTE * index, DIR * dir)
 mos_api_resolvepath:
-			LD	(_scratchpad), BC	; Save the length
+			LD	(_scratchpad), BC	; Save the index
+			LD	(_scratchpad + 3), DE	; Save the length
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, res_path_contd	; If it is, we can assume addresses are 24 bit
-			CALL	SET_AHL24	; HL is required, so set it
-			PUSH	HL		; push HL so we can use register for working, if we need to
-			; DE is optional, so check if it's zero
+			CALL	SET_AHL24	; HL (source path) is required, so set it
+			; IX(U) (destination buffer) is optional, so check if it's zero
+			LD	DE, IX
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			JR	Z, $F		; BC is zero, so no need to set U to MB
 			LD	A, MB
-			CALL	SET_ADE24	; DE not zero, so set U to MB
-$$:			; IX is optional, so check if it's zero
-			PUSH	IX
-			POP	HL
-			LD	A, H
-			OR	A, L
-			JR	Z, $F		; IX is zero, so no need to set U to MB
-			LD	A, MB
-			CALL	SET_AHL24	; IX not zero, so set U to MB
-$$:			PUSH	HL
-			POP	IX
-			; IY is optional, so check if it's zero
-			PUSH	IY
-			POP	HL
-			LD	A, H
-			OR	A, L
+			CALL	SET_ADE24	; BC not zero, so set U to MB
+$$:			LD	IX, DE
+			; IY (directory object pointer) is optional, so check if it's zero
+			LD	DE, IY
+			LD	A, D
+			OR	A, E
 			JR	Z, $F		; IY is zero, so no need to set U to MB
 			LD	A, MB
-			CALL	SET_AHL24	; IY not zero, so set U to MB
-$$:			PUSH	HL
-			POP	IY
-			POP	HL
+			CALL	SET_ADE24	; IY not zero, so set U to MB
+$$:			LD	IY, DE
 			; OK so we should now have all the addresses set up
 res_path_contd:		PUSH	IY		; DIR * dir
-			PUSH	IX		; BYTE * index
-			LD	IX, _scratchpad
-			PUSH	IX		; int * length
-			PUSH	DE		; char * resolvedPath
+			LD	IY, _scratchpad
+			PUSH	IY		; BYTE * index (scratchpad, from C on entry)
+			LD	DE, 3
+			ADD	IY, DE
+			PUSH	IY		; int * length (scratchpad + 3, from DE on entry)
+			PUSH	IX		; char * resolvedPath
 			PUSH	HL		; char * filepath
 			CALL	_resolvePath	; Call the C function resolvePath
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
-			POP	DE
-			POP	BC
 			POP	IX
+			POP	DE		; Length (will be replaced)
+			POP	BC		; Index (will be replaced)
 			POP	IY
-			LD	BC, (_scratchpad)
+			LD	BC, (_scratchpad)	; Overwrite C with new Index
+			LD	DE, (_scratchpad + 3)	; Returned length
 			RET
 
 ; Get the directory for a given path
