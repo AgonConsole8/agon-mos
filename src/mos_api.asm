@@ -1387,43 +1387,41 @@ $$:			PUSH 	HL
 
 ; Substitute arguments into a string from template
 ; HLU: Pointer to template string
-; DEU: Pointer to arguments string
-; BCU: Length of destination buffer
-; IXU: Pointer to destination buffer (can be null to just count size)
-; A: Flags
+; IXU: Pointer to arguments string
+; DEU: Length of destination buffer
+; IYU: Pointer to destination buffer (can be null to just count size)
+; C: Flags
 ; Returns:
 ; - BCU: Calculated length of destination string
 ;
 ; int substituteArgs(char * template, char * args, char * dest, int length, bool omitRest)
 mos_api_substituteargs:
-			PUSH	AF		; BYTE flags (bool omitRest)
-			PUSH	BC		; UINT24 length
-			PUSH	IX		; char * dest
+			PUSH	BC		; BYTE flags (bool omitRest)
+			PUSH	DE		; UINT24 length
+			PUSH	IY		; char * dest
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, sub_args_contd	; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
-			CALL	SET_ADE24
-			EX	(SP), HL	; Swap IX (on stack) with HL, as IX is optional
+			CALL	SET_AIX24
+			EX	(SP), HL	; Swap dest address (on stack) into HL, as it is optional
 			LD	A, L
 			OR	A, H
 			JR	Z, $F		; HL was zero, so jump ahead
 			LD	A, MB
 			CALL	SET_AHL24	; HL (IX) not zero, so set U to MB
-$$:			EX	(SP), HL
-sub_args_contd:		PUSH	DE		; char * args
+$$:			EX	(SP), HL	; Swap dest address back into stack
+sub_args_contd:		PUSH	IX		; char * args
 			PUSH	HL		; char * template
 			CALL	_substituteArgs	; Call the C function substituteArgs
 			LD	(_scratchpad), HL	; Save the result
 			POP	HL
-			POP	DE
 			POP	IX
+			POP	IY
+			POP	DE
 			POP	BC
-			POP	AF
 			LD	BC, (_scratchpad)
 			RET
-
-; All these optional address things need an MB load into A before calling SET_Axx24
 
 ; Resolves a path, replacing prefixes and leafnames with actual values
 ; HLU: Pointer to the path to resolve
