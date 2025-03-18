@@ -1091,7 +1091,6 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 ;
 ; int extractString(char * source, char ** end, char * divider, char ** result, BYTE flags)
 mos_api_extractstring:
-			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume addresses are 24 bit
@@ -1101,7 +1100,8 @@ mos_api_extractstring:
 			JR	Z, $F		; DE is zero so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; DE not zero, so set U to MB
-$$:			PUSH	HL
+$$:			PUSH	BC		; BYTE flags
+			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; char ** result
 			PUSH	DE		; char * divider
@@ -1115,9 +1115,7 @@ $$:			PUSH	HL
 			POP	HL
 			POP	HL
 			POP	HL
-			LD	L, A		; keep result so we can
 			POP 	BC		; unpop the BC
-			LD 	A, L		; return status code in A
 			LD	HL, (_scratchpad)	; return result in HLU
 			LD	DE, (_scratchpad + 3)	; return end in DEU
 			RET
@@ -1157,9 +1155,7 @@ $$:			PUSH	HL
 			POP	HL
 			POP	HL
 			POP	HL
-			LD	L, A		; keep result so we can
 			POP 	BC		; unpop the BC
-			LD 	A, L		; move return value back to A
 			LD	HL, (_scratchpad)	; return number in HLU
 			LD	DE, (_scratchpad + 3)	; return end in DEU
 			; Return value in A will be true/false
