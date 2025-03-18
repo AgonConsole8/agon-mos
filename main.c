@@ -146,7 +146,7 @@ void rainbow_msg(char* msg) {
 }
 
 void bootmsg(void) {
-	printf("Agon ");
+	printf("\rAgon ");
 	rainbow_msg(VERSION_VARIANT);
 	printf(" MOS Version %d.%d.%d", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 	#if VERSION_CANDIDATE > 0

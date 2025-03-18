@@ -139,7 +139,7 @@ UINT8	mos_FEOF(UINT8 fh);
 void 	mos_GETERROR(UINT8 errno, UINT24 address, UINT24 size);
 UINT24 	mos_OSCLI(char * cmd);
 UINT8 	mos_GETRTC(UINT24 address);
-void	mos_UNPACKRTC(UINT24 address);
+void	mos_UNPACKRTC(UINT24 address, UINT8 flags);
 void	mos_SETRTC(UINT24 address);
 UINT24	mos_SETINTVECTOR(UINT8 vector, UINT24 address);
 UINT24	mos_GETFIL(UINT8 fh);

@@ -2818,15 +2818,22 @@ UINT24 mos_OSCLI(char * cmd) {
 UINT8 mos_GETRTC(UINT24 address) {
 	vdp_time_t t;
 
-	mos_UNPACKRTC((UINT24)&t);
+	mos_UNPACKRTC((UINT24)&t, 1);
 	rtc_formatDateTime((char *)address, &t);
 
 	return strlen((char *)address);
 }
 
-void mos_UNPACKRTC(UINT24 address) {
-	rtc_update();
-	rtc_unpack(&rtc, (vdp_time_t *)address);
+void mos_UNPACKRTC(UINT24 address, UINT8 flags) {
+	if (flags & 1) {
+		rtc_update();
+	}
+	if (address != 0) {
+		rtc_unpack(&rtc, (vdp_time_t *)address);
+	}
+	if (flags & 2) {
+		rtc_update();
+	}
 }
 
 // Set the RTC

@@ -89,7 +89,7 @@ mos_escapestring:	EQU	2Ch
 
 ; System variables and related functions
 ;
-mod_setvarval:		EQU	30h
+mos_setvarval:		EQU	30h
 mos_readvarval:		EQU	31h
 mos_gsinit:		EQU	32h
 mos_gsread:		EQU	33h
