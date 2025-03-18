@@ -1360,7 +1360,7 @@ mos_api_gstrans:
 			CALL	SET_AHL24
 			LD	A, B		; Check if target buffer is zero
 			OR	A, C
-			JR	Z, $F		; BC is zero, so no need to set U to MB
+			JR	Z, $F		; target is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ABC24
 $$:			PUSH 	HL
@@ -1403,7 +1403,7 @@ mos_api_substituteargs:
 			OR	A, H
 			JR	Z, $F		; HL was zero, so jump ahead
 			LD	A, MB
-			CALL	SET_AHL24	; HL (IX) not zero, so set U to MB
+			CALL	SET_AHL24	; HL (dest address) not zero, so set U to MB
 $$:			EX	(SP), HL	; Swap dest address back into stack
 sub_args_contd:		PUSH	IX		; char * args
 			PUSH	HL		; char * template
@@ -1440,17 +1440,17 @@ mos_api_resolvepath:
 			LD	DE, IX
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; BC is zero, so no need to set U to MB
+			JR	Z, $F		; dest buffer is zero, so no need to set U to MB
 			LD	A, MB
-			CALL	SET_ADE24	; BC not zero, so set U to MB
+			CALL	SET_ADE24	; dest buffer not zero, so set U to MB
 $$:			LD	IX, DE
 			; IY (directory object pointer) is optional, so check if it's zero
 			LD	DE, IY
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; IY is zero, so no need to set U to MB
+			JR	Z, $F		; dir object is zero, so no need to set U to MB
 			LD	A, MB
-			CALL	SET_ADE24	; IY not zero, so set U to MB
+			CALL	SET_ADE24	; dir object not zero, so set U to MB
 $$:			LD	IY, DE
 			; OK so we should now have all the addresses set up
 res_path_contd:		PUSH	IY		; DIR * dir
