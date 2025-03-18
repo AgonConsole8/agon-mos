@@ -1038,23 +1038,19 @@ mos_api_flseek:		PUSH 	DE		; UINT32 offset (msb)
 ; Returns:
 ; - A: File error, or 0 if OK
 ;
-mos_api_pmatch:		PUSH	BC
+mos_api_pmatch:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
 			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_AHL24
 			CALL	SET_ADE24
-$$:			LD	A, C
-			LD	BC, 0
-			LD	C, A
-			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
+$$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			PUSH	DE		; char * string
 			PUSH	HL		; char * pattern
 			CALL	_pmatch		; Call the C function pmatch
 			LD	A, L		; Return value in HLU, put in A
 			POP	HL
 			POP	DE
-			POP	BC
 			POP	BC
 			RET
 
