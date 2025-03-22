@@ -207,11 +207,18 @@ void removeEditLine(char * buffer, int insertPos, int len) {
 
 // Handle hotkey, if defined
 // Returns:
-// - 1 if the hotkey was handled, otherwise 0
+// - 0 if the hotkey doesn't exist
+// - 1 if the hotkey was handled
+// - 2 if the hotkey was handled and we should auto-return
 //
-BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, int len) {
+BYTE handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, int len) {
 	char label[10];
 	t_mosSystemVariable *hotkeyVar = NULL;
+	BOOL autoReturn = false;
+	char * srcPtr;
+	char * srcEnd;
+	char * destPtr;
+	char * destEnd;
 
 	sprintf(label, "Hotkey$%d", fkey + 1);
 	if (getSystemVariable(label, &hotkeyVar) == 0) {
@@ -222,7 +229,7 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 			return 0;
 		}
 
-		substitutedString = substituteArguments(hotkeyString, buffer, false);
+		substitutedString = substituteArguments(hotkeyString, buffer, true);
 		umm_free(hotkeyString);
 		if (!substitutedString) {
 			return 0;
@@ -235,10 +242,27 @@ BOOL handleHotkey(UINT8 fkey, char * buffer, int bufferLength, int insertPos, in
 		}
 
 		removeEditLine(buffer, insertPos, len);
-		strcpy(buffer, substitutedString);
+		// Copy in the new string, ignoring any control characters, up to buffer length or first CR
+		srcPtr = substitutedString;
+		srcEnd = srcPtr + strlen(substitutedString);
+		destPtr = buffer;
+		destEnd = buffer + bufferLength - 1;
+		while (srcPtr < srcEnd && destPtr < destEnd) {
+			if (*srcPtr == 0x0D) {
+				autoReturn = true;
+				break;
+			}
+			if (*srcPtr >= 0x20 && *srcPtr != 0x7F) {
+				*destPtr++ = *srcPtr;
+			}
+			srcPtr++;
+		}
+		*destPtr = 0;
+
+		// strcpy(buffer, substitutedString);
 		printf("%s", buffer);
 		umm_free(substitutedString);
-		return 1;
+		return autoReturn ? 2 : 1;
 	}
 	return 0;
 }
@@ -307,25 +331,33 @@ UINT24 mos_EDITLINE(char * buffer, int bufferLength, UINT8 flags) {
 				historyAction = 3;
 			} break;
 
-			case 0x9F: //F1
-			case 0xA0: //F2
-			case 0xA1: //F3
-			case 0xA2: //F4
-			case 0xA3: //F5
-			case 0xA4: //F6
-			case 0xA5: //F7
-			case 0xA6: //F8
-			case 0xA7: //F9
-			case 0xA8: //F10
-			case 0xA9: //F11
-			case 0xAA: //F12
+			case 0x9F: // F1
+			case 0xA0: // F2
+			case 0xA1: // F3
+			case 0xA2: // F4
+			case 0xA3: // F5
+			case 0xA4: // F6
+			case 0xA5: // F7
+			case 0xA6: // F8
+			case 0xA7: // F9
+			case 0xA8: // F10
+			case 0xA9: // F11
+			case 0xAA: // F12
 			{
-				if (enableHotkeys && handleHotkey(keyc - 0x9F, buffer, bufferLength, insertPos, len)) {
-					len = strlen(buffer);
-					insertPos = len;
-					keya = 0x0D;	// auto-return for inserted hotkey
-					// Key was present, so drop through to ASCII key handling
-				} else break; // key wasn't present, so do nothing
+				if (enableHotkeys) {
+					BYTE handled = handleHotkey(keyc - 0x9F, buffer, bufferLength, insertPos, len);
+					if (handled != 0) {
+						len = strlen(buffer);
+						insertPos = len;
+						if (handled == 2) {
+							keya = 0x0D;	// auto-return for inserted hotkey
+						} else {
+							// no auto-return so we can skip the rest of the loop
+							break;
+						}
+						// Key was present, so drop through to ASCII key handling
+					} else break; // key not defined/handled, so do nothing
+				} else break; // function keys disabled, so do nothing
 			}
 
 			//

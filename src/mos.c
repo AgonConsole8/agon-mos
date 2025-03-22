@@ -771,11 +771,13 @@ int mos_cmdHOTKEY(char *ptr) {
 		for (key = 1; key <= 12; key++) {
 			hotkeyVar = NULL;
 			sprintf(label, "Hotkey$%d", key);
+			printf("F%d: %s", key, key < 10 ? " " : "");
 			if (getSystemVariable(label, &hotkeyVar) == 0) {
-				printf("F%d: %s%s\r\n", key, key < 10 ? " " : "", hotkeyVar->value);
+				printEscapedString(hotkeyVar->value);
 			} else {
-				printf("F%d: %sN/A\r\n", key, key < 10 ? " " : "");
+				printf("N/A");
 			}
+			printf("\r\n");
 		}
 		printf("\r\n");
 		return FR_OK;
@@ -800,11 +802,20 @@ int mos_cmdHOTKEY(char *ptr) {
 	}
 
 	// Remove surrounding quotes
-	// TODO consider whether this should be part of expandMacro?
+	// TODO consider whether this should be an optional part of expandMacro?
 	if (ptr[0] == '\"' && ptr[strlen(ptr) - 1] == '\"') {
 		ptr[strlen(ptr) - 1] = '\0';
 		ptr++;
 	}
+	// We need to add a `|M` to the end of the string...
+	// For now we'll use a crude length check on our ptr (args)
+	// ptr is at an unknown offset into our command buffer, but `*hotkey 12 ` is 10 characters
+	// This is imperfect and may fail in some edge-cases
+	// TODO This can more safely be done as part of expandMacro
+	if (strlen(ptr) > 242) {
+		return MOS_BAD_STRING;
+	}
+	strcat(ptr, "|M");
 
 	hotkeyString = expandMacro(ptr);
 	if (!hotkeyString) return FR_INT_ERR;
