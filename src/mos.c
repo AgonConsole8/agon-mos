@@ -2847,13 +2847,13 @@ UINT24	mos_FGETC(UINT8 fh) {
 	FRESULT fr;
 	FIL	*	fo;
 	UINT	br;
-	char	c;
+	UINT8	c;
 
 	fo = (FIL *)mos_GETFIL(fh);
 	if (fo > 0) {
 		fr = f_read(fo, &c, 1, &br); 
 		if (fr == FR_OK) {
-			return	c | (fat_EOF(fo) << 8);
+			return	((UINT24)c) | ((UINT24)fat_EOF(fo) << 8);
 		}		
 	}
 	return 0;
