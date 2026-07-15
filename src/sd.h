@@ -21,6 +21,11 @@
 
 extern int quickrand(void);
 
+typedef struct {
+	DWORD	address;
+	int		key;
+} SD_safe_access;
+
 int	unlockCode = 0;
 
 BYTE	SD_readBlocks(DWORD addr, BYTE *buf, WORD count);
@@ -50,27 +55,27 @@ BYTE	SD_init_API(int * code) {
 	return SD_init();
 }
 
-BYTE	SD_readBlocks_API(void * addr, BYTE *buf, WORD count) {
+BYTE	SD_readBlocks_API(SD_safe_access * addr_w_key, BYTE *buf, WORD count) {
 	// Check that value at addr+sizeof(DWORD) matches unlockCode
-	if (addr == NULL) {
+	if (addr_w_key == NULL) {
 		return SD_ERROR;
 	}
-	if ((unlockCode == 0) || (*(int *)(addr + sizeof(DWORD)) != unlockCode)) {
+	if ((unlockCode == 0) || (addr_w_key->key != unlockCode)) {
 		return SD_LOCKED;
 	}
 	// Read the blocks from the SD card
-	return SD_readBlocks(*(DWORD *)addr, buf, count);
+	return SD_readBlocks(addr_w_key->address, buf, count);
 }
 
-BYTE	SD_writeBlocks_API(void * addr, BYTE *buf, WORD count) {
+BYTE	SD_writeBlocks_API(SD_safe_access * addr_w_key, BYTE *buf, WORD count) {
 	// Check that value at addr+sizeof(DWORD) matches unlockCode
-	if (addr == NULL) {
+	if (addr_w_key == NULL) {
 		return SD_ERROR;
 	}
-	if ((unlockCode == 0) || (*(int *)(addr + sizeof(DWORD)) != unlockCode)) {
+	if ((unlockCode == 0) || (addr_w_key->key != unlockCode)) {
 		return SD_LOCKED;
 	}
-	return SD_writeBlocks(*(DWORD *)addr, buf, count);
+	return SD_writeBlocks(addr_w_key->address, buf, count);
 }
 
 #endif SD_H
