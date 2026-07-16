@@ -21,14 +21,22 @@
 
 extern int quickrand(void);
 
-int	unlockCode = 0;
+typedef struct {
+	DWORD		address;
+	UINT24	code;
+} SD_safe_access;
+
+//safety to throw an error if the length of code defined above is anything other than 3 bytes
+typedef char assert_sd_safe_access_size[(sizeof(SD_safe_access) == 7) ? 1 : -1];
+
+UINT24	unlockCode = 0;
 
 BYTE	SD_readBlocks(DWORD addr, BYTE *buf, WORD count);
 BYTE	SD_writeBlocks(DWORD addr, BYTE *buf, WORD count);
 
 BYTE	SD_init();
 
-void	SD_getUnlockCode(int * code) {
+void	SD_getUnlockCode(UINT24 * code) {
 	if (code == NULL) {
 		return;
 	}
@@ -43,34 +51,34 @@ void	SD_getUnlockCode(int * code) {
 	*code = unlockCode;
 }
 
-BYTE	SD_init_API(int * code) {
+BYTE	SD_init_API(UINT24 * code) {
 	if ((code == NULL) || (*code != unlockCode)) {
 		return SD_LOCKED;
 	}
 	return SD_init();
 }
 
-BYTE	SD_readBlocks_API(void * addr, BYTE *buf, WORD count) {
-	// Check that value at addr+sizeof(DWORD) matches unlockCode
-	if (addr == NULL) {
+BYTE	SD_readBlocks_API(SD_safe_access * addr_w_code, BYTE *buf, WORD count) {
+	// Check that the code provided matches unlockCode
+	if (addr_w_code == NULL) {
 		return SD_ERROR;
 	}
-	if ((unlockCode == 0) || (*(int *)(addr + sizeof(DWORD)) != unlockCode)) {
+	if ((unlockCode == 0) || (addr_w_code->code != unlockCode)) {
 		return SD_LOCKED;
 	}
 	// Read the blocks from the SD card
-	return SD_readBlocks(*(DWORD *)addr, buf, count);
+	return SD_readBlocks(addr_w_code->address, buf, count);
 }
 
-BYTE	SD_writeBlocks_API(void * addr, BYTE *buf, WORD count) {
-	// Check that value at addr+sizeof(DWORD) matches unlockCode
-	if (addr == NULL) {
+BYTE	SD_writeBlocks_API(SD_safe_access * addr_w_code, BYTE *buf, WORD count) {
+	// Check that the code provided matches unlockCode to prevent accidental SDcard writes
+	if (addr_w_code == NULL) {
 		return SD_ERROR;
 	}
-	if ((unlockCode == 0) || (*(int *)(addr + sizeof(DWORD)) != unlockCode)) {
+	if ((unlockCode == 0) || (addr_w_code->code != unlockCode)) {
 		return SD_LOCKED;
 	}
-	return SD_writeBlocks(*(DWORD *)addr, buf, count);
+	return SD_writeBlocks(addr_w_code->address, buf, count);
 }
 
 #endif SD_H
