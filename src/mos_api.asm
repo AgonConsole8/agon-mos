@@ -2222,7 +2222,7 @@ $$:			PUSH	DE		; DWORD * offset
 ; Returns:
 ; nothing
 sd_api_getunlockcode:	CALL	FIX_HLU24
-			PUSH	HL		; int * unlockCode
+			PUSH	HL		; UINT24 * unlockCode
 			CALL	_SD_getUnlockCode	; Call the C function SD_getUnlockCode
 			POP	HL
 			RET
