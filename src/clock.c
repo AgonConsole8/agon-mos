@@ -11,7 +11,6 @@
  * 26/09/2023:		Timestamps now packed into 6 bytes
  */
 
-#include <ez80.h>
 #include <defines.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -55,7 +54,7 @@ const char * rtc_months[12][2] = {
 // Request an update of the RTC from the ESP32
 //
 void rtc_update() {
-	if (!rtc_enable) {
+	if(!rtc_enable) {
 		return;
 	}
 	vpd_protocol_flags &= 0xDF;	// Reset bit 5
@@ -65,7 +64,7 @@ void rtc_update() {
 	putch(VDP_rtc);
 	putch(0);					// 0: Get time
 
-	wait_VDP(0x20);				// Wait for bit to be set, or timeout
+	while((vpd_protocol_flags & 0x20) == 0);	
 }
 
 // Unpack a 6-byte RTC packet into time struct

@@ -12,7 +12,7 @@
 ;    and sending the next request.
 ; 2) Getting as much done whilst the byte is being shifted out/in
 
-		INCLUDE "ez80F92.inc"
+		INCLUDE "equs.inc"
 		INCLUDE "macros.inc"
 
 SPI_ENA_DELAY	.equ	50
@@ -33,8 +33,6 @@ SPI_CLK		.equ	3	; PB3
 
 
 ; void spi_init(void);
-
-		SCOPE
 
 _init_spi:	;
 		; SS must remain high for SPI to work properly
@@ -76,12 +74,12 @@ _init_spi:	;
 
 		; PB_ALT2 &= ~BIT(SD_CS);
 		IN0		A,(PB_ALT2)
-		RES		%4,A
+		RES		0x4,A
 		OUT0		(PB_ALT2),A
 
 		; PB_DDR  &= ~BIT(SD_CS);
 		IN0		A,(PB_DDR)
-		RES		%4,A
+		RES		0x4,A
 		OUT0		(PB_DDR),A
 
 		;
@@ -95,7 +93,7 @@ _init_spi:	;
 
 		; PB_ALT2 |=  (BIT(SPI_MOSI) | BIT(SP_MISO) | BIT(SPI_CLK))
 		IN0		A,(PB_ALT2)
-		OR		A,((1<<SPI_MOSI)|(1<<SPI_MISO)|(1<<SPI_CLK))
+		OR		A,~~((1<<SPI_MOSI)|(1<<SPI_MISO)|(1<<SPI_CLK))
 		OUT0		(PB_ALT2),A
 
 		;
@@ -117,7 +115,7 @@ _init_spi:	;
 		; Enable SPI as master
 		;
 
-		LD		A,%30
+		LD		A,0x30
 		OUT0		(SPI_CTL),A
 	
 		; Delay for `SPI_ENA_DELAY' milliseconds
@@ -131,9 +129,8 @@ _init_spi:	;
 
 ; unsigned char spi_read_one(void);
 ;
-		SCOPE
 _spi_read_one:
-		LD		C,%FF		; Kick SPI into action before
+		LD		C,0xFF		; Kick SPI into action before
 		OUT0		(SPI_TSR),C	; anything else...
 		POP		HL		; Pop return address for later
 		JR		spi_wait
@@ -150,21 +147,20 @@ _spi_transfer:
 ; Both _spi_read_one and _spi_transfer use spi_wait to complete the operation
 
 spi_wait:	LD		B,0
-$loop:		IN0		A,(SPI_SR)
+1:		IN0		A,(SPI_SR)
 		RLA
-		JR		C,$done
-		DJNZ		$loop
-$done:		IN0		A,(SPI_RBR)
+		JR		C,2f
+		DJNZ		1b
+2:		IN0		A,(SPI_RBR)
 		JP		(HL)		; Faster than RET if we have HL
 
 
 ; void spi_read(char *buf, unsigned int len);
 ;
 
-		SCOPE
 _spi_read:
 		; Request the first byte - do first to minimise delay
-		LD		C,%FF
+		LD		C,0xFF
 		OUT0		(SPI_TSR),C
 
 		; Function prologue
@@ -179,49 +175,48 @@ _spi_read:
 		LD		HL,(IX+9)
 
 		; Decrement the count of bytes
-$mainloop:	LD		BC,1
+L_mainloop1:	LD		BC,1
 		OR		A,A
 		SBC		HL,BC
 
 		; If this is the last, break out of loop
-		JR		Z,$waitlast
+		JR		Z,L_waitlast
 
 		; Wait for byte to arrive then store it
-$waitnext:	LD		B,0		; (256 iterations)
-		LD		C,%FF		; pre-load C with dummy byte
-$loopnext:	IN0		A,(SPI_SR)
+L_waitnext:	LD		B,0		; (256 iterations)
+		LD		C,0xFF		; pre-load C with dummy byte
+L_loopnext:	IN0		A,(SPI_SR)
 		RLA
-		JR		C,$gotnext
-		DJNZ		$loopnext
+		JR		C,L_gotnext
+		DJNZ		L_loopnext
 		; TODO: detect errors
 
 		; Minimise delay from receiving to requesting the next byte
-$gotnext:	IN0		A,(SPI_RBR)
+L_gotnext:	IN0		A,(SPI_RBR)
 		OUT0		(SPI_TSR),C
 		LD		(DE),A
 		INC		DE
-		JR		$mainloop
+		JR		L_mainloop1
 
-$waitlast:	; Do function epilogue now, we have time
+L_waitlast:	; Do function epilogue now, we have time
 		LD		SP,IX
 		POP		IX
 
 		; Now wait for last byte
 		LD		B,0		; (256 iterations)
-$looplast:	IN0		A,(SPI_SR)
+L_looplast:	IN0		A,(SPI_SR)
 		RLA
-		JR		C,$gotlast
-		DJNZ		$looplast
+		JR		C,L_gotlast
+		DJNZ		L_looplast
 		; TODO: detect errors
 
-$gotlast:	IN0		A,(SPI_RBR)
+L_gotlast:	IN0		A,(SPI_RBR)
 		LD		(DE),A
 		RET
 
 
 ; void spi_write(char *buf, unsigned int len);
 
-		SCOPE
 _spi_write:
 		PUSH		IX
 		LD		IX,0
@@ -239,41 +234,41 @@ _spi_write:
 		LD		HL,(IX+9)
 
 		; Decrement the count of bytes
-$mainloop:	LD		BC,1
+L_mainloop2:	LD		BC,1
 		OR		A,A
 		SBC		HL,BC
 
 		; If this is the last, break out of loop
-		JR		Z,$waitlast
+		JR		Z,L_waitlast2
 
 		; Wait for the write to complete
-$waitnext:	LD		B,0		; (256 iterations)
+L_waitnext2:	LD		B,0		; (256 iterations)
 		LD		A,(DE)		; pre-load C with byte to write
 		LD		C,A
 		INC		DE
 
-$loopnext:	IN0		A,(SPI_SR)
+L_loopnext2:	IN0		A,(SPI_SR)
 		RLA
-		JR		C,$sentnext
-		DJNZ		$loopnext
+		JR		C,L_sentnext
+		DJNZ		L_loopnext2
 		; TODO: detect errors
 
 		; Minimise delay from send complete to sending the next octet
-$sentnext:	; Don't bother reading the dummy byte (IN0 A,(SPI_RBR))
+L_sentnext:	; Don't bother reading the dummy byte (IN0 A,(SPI_RBR))
 		OUT0		(SPI_TSR),C
-		JR		$mainloop
+		JR		L_mainloop2
 
-$waitlast:	; Do function epilogue now, whilst the last byte is transferring
+L_waitlast2:	; Do function epilogue now, whilst the last byte is transferring
 		LD		SP,IX
 		POP		IX
 
 		LD		B,0		; (256 iterations)
-$looplast:	IN0		A,(SPI_SR)
+L_looplast2:	IN0		A,(SPI_SR)
 		RLA
-		JR		C,$sentlast
-		DJNZ		$looplast
+		JR		C,L_sentlast
+		DJNZ		L_looplast2
 		; TODO: detect errors
 
-$sentlast:	; Don't bother reading the dummy byte (IN0 A,(SPI_RBR))
+L_sentlast:	; Don't bother reading the dummy byte (IN0 A,(SPI_RBR))
 		RET
 

@@ -112,4 +112,4 @@ int substituteArgs(char * template, char * args, char * dest, int length, BYTE f
 
 char *	substituteArguments(char * source, char * args, BYTE flags);
 
-#endif MOS_SYSVARS_H
+#endif /* MOS_SYSVARS_H */

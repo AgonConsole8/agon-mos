@@ -28,9 +28,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
-
+			.text
 			XDEF	mos_api
 
 			XREF	SWITCH_A		; In misc.asm
@@ -154,7 +152,7 @@
 ;  A: function to call
 ;
 mos_api:		CP	80h			; Check if it is a FatFS command
-			JR	NC, $F			; Yes, so jump to next block
+			JP	NC, 1f			; Yes, so jump to next block
 			CP	mos_api_block1_size	; Check if out of bounds
 			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; Switch on this table
@@ -297,7 +295,7 @@ mos_api_block1_start:	DW	mos_api_getkey		; 0x00
 
 mos_api_block1_size:	EQU 	($ - mos_api_block1_start) / 2
 ;
-$$:			AND	7Fh			; Else remove the top bit
+1:			AND	7Fh			; Else remove the top bit
 			CP	mos_api_block2_size	; Check if out of bounds
 			JP	NC, mos_api_not_implemented
 			CALL	SWITCH_A		; And switch on this table
@@ -356,8 +354,8 @@ mos_api_not_implemented:
 mos_api_getkey:		PUSH	HL
 			LD	HL, _keycount
 mos_api_getkey_1:	LD	A, (HL)			; Wait for a key to be pressed
-$$:			CP	(HL)
-			JR	Z, $B
+1:			CP	(HL)
+			JR	Z, 1b
 			LD	A, (_keydown)		; Check if key is down
 			OR	A
 			JR	Z, mos_api_getkey_1	; No, so loop
@@ -375,7 +373,7 @@ $$:			CP	(HL)
 ;
 mos_api_load:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEU to include the MBASE in the U byte
 ;
@@ -384,7 +382,7 @@ mos_api_load:		LD	A, MB		; Check if MBASE is 0
 ;
 ; Finally, we can do the load
 ;
-$$:			PUSH	BC		; UINT24   size
+1:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
 			CALL	_mos_LOAD_API	; Call the C function mos_LOAD_API
@@ -405,7 +403,7 @@ $$:			PUSH	BC		; UINT24   size
 ;
 mos_api_save:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEU to include the MBASE in the U byte
 ;
@@ -414,7 +412,7 @@ mos_api_save:		LD	A, MB		; Check if MBASE is 0
 ;
 ; Finally, we can do the save
 ;
-$$:			PUSH	BC		; UINT24   size
+1:			PUSH	BC		; UINT24   size
 			PUSH	DE		; UNIT24   address
 			PUSH	HL		; char   * filename
 			CALL	_mos_SAVE_API	; Call the C function mos_SAVE_API
@@ -493,7 +491,7 @@ mos_api_del:		LD	A, MB		; Check if MBASE is 0
 ;
 mos_api_ren:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEu to include the MBASE in the U byte
 ;
@@ -502,7 +500,7 @@ mos_api_ren:		LD	A, MB		; Check if MBASE is 0
 ;
 ; Finally we can do the rename
 ;
-$$:			PUSH	DE		; char * filename2
+1:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
 			CALL	_mos_REN_API	; Call the C function mos_REN_API
 			LD	A, L		; Return vaue in HLU, put in A
@@ -518,7 +516,7 @@ $$:			PUSH	DE		; char * filename2
 ;
 mos_api_copy:		LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 ;
 ; Now we need to mod HLU and DEu to include the MBASE in the U byte
 ;
@@ -527,7 +525,7 @@ mos_api_copy:		LD	A, MB		; Check if MBASE is 0
 ;
 ; Finally we can do the rename
 ;
-$$:			PUSH	DE		; char * filename2
+1:			PUSH	DE		; char * filename2
 			PUSH	HL		; char * filename1
 			CALL	_mos_COPY_API	; Call the C function mos_COPY_API
 			LD	A, L		; Return vaue in HLU, put in A
@@ -834,10 +832,10 @@ mos_api_setintvector:	LD	A, E
 mos_api_setkbvector:	PUSH	DE
 			XOR	A
 			OR	C		; If C!=0 set top byte (bits 16:23) to MB
-			JR	Z, $F
+			JR	Z, 1f
 			LD	A, MB
 			CALL	SET_AHL24
-$$:			PUSH	HL
+1:			PUSH	HL
 			POP	DE
 			LD	HL, _user_kbvector
 			LD	(HL),DE
@@ -978,7 +976,7 @@ mos_api_uclose:		JP	_close_UART1
 ;   F: C if successful
 ;   F: NC if the UART is not open
 ;
-mos_api_ugetc		JP	UART1_serial_GETCH
+mos_api_ugetc:		JP	UART1_serial_GETCH
 
 ; Write a character to UART1
 ;   C: Character to write
@@ -1084,10 +1082,10 @@ mos_api_flseek_p:	CALL	FIX_HLU24	; Fix the HLU to ensure it's a 24-bit pointer
 mos_api_pmatch:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_AHL24
 			CALL	SET_ADE24
-$$:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
+1:			PUSH	BC		; BYTE flags  (altho we'll push all 3 bytes)
 			PUSH	DE		; char * string
 			PUSH	HL		; char * pattern
 			CALL	_pmatch		; Call the C function pmatch
@@ -1136,14 +1134,14 @@ mos_api_getargument:	LD	A, MB		; Check if MBASE is 0
 mos_api_extractstring:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D		; Check if DE is zero
 			OR	A, E
-			JR	Z, $F		; DE is zero so no need to set U to MB
+			JR	Z, 1f		; DE is zero so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; DE not zero, so set U to MB
-$$:			PUSH	BC		; BYTE flags
+1:			PUSH	BC		; BYTE flags
 			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; char ** result
@@ -1177,14 +1175,14 @@ mos_api_extractnumber:
 			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			JR	Z, 1f		; DE is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24
-$$:			PUSH	HL
+1:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * number
 			PUSH	DE		; char * divider
@@ -1203,10 +1201,10 @@ $$:			PUSH	HL
 			; Return value in A will be true/false
 			; so we need to change to 0 for success, and 19 (invalid parameter) for failure
 			OR	A, A		; Was status value false?
-			JR	Z, $F		; If it is, we need to replace with 19
+			JR	Z, 1f		; If it is, we need to replace with 19
 			LD	A, 0		; Otherwise, return 0 FR_OK
 			RET
-$$:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
+1:			LD	A, 19		; Return 19 FR_INVALID_PARAMETER
 			RET
 
 ; Escape a string, converting control characters to be pipe-prefixed
@@ -1222,14 +1220,14 @@ mos_api_escapestring:
 			LD	(_scratchpad), BC 	; Save the length
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			JR	Z, 1f		; DE is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24
-$$:			PUSH	HL
+1:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * length
 			PUSH	DE		; char * dest
@@ -1259,14 +1257,14 @@ mos_api_setvarval:
 			LD	(_scratchpad), IY	; Save the actualName pointer
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, C
 			CP	1		; Is the type a number?
-			JR	Z, $F		; If it is, we don't need to set U to MB
+			JR	Z, 1f		; If it is, we don't need to set U to MB
 			LD	A, MB
 			CALL	SET_AIX24	; Only set U if type is not a number
-$$:			PUSH	HL		; Temporary storage
+1:			PUSH	HL		; Temporary storage
 			LD	HL, _scratchpad + 3
 			EX	(SP), HL	; BYTE * type
 			LD	IY, _scratchpad
@@ -1302,17 +1300,19 @@ mos_api_readvarval:
 			LD	(_scratchpad + 6), A	; Save the flags
 			LD	(_scratchpad + 3), DE	; Save the length
 			LD	(_scratchpad), IY	; Save the actualName pointer
-			LD	DE, IX		; move optional target buffer into DE
+			PUSH 	IX		; move optional target buffer into DE
+		        POP	DE
+	
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, D		; check it target buffer is zero
 			OR	A, E
-			JR	Z, $F		; DE is zero, so no need to set U to MB
+			JR	Z, 1f		; DE is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24
-$$:			PUSH	HL		; Temporary storage
+1:			PUSH	HL		; Temporary storage
 			LD	HL, _scratchpad + 6
 			EX	(SP), HL	; BYTE * typeFlag
 			PUSH	HL
@@ -1347,10 +1347,10 @@ mos_api_gsinit:
 			PUSH	BC		; BYTE flags
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_AHL24
 			CALL	SET_ADE24
-$$:			PUSH	DE		; t_mosTransInfo ** transInfoPtr
+1:			PUSH	DE		; t_mosTransInfo ** transInfoPtr
 			PUSH	HL		; char * source
 			CALL	_gsInit		; Call the C function gsInit
 			LD	A, L		; Return value in HLU, put in A
@@ -1370,9 +1370,9 @@ mos_api_gsread:
 			PUSH	HL		; preserve HL
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL and DE are 24 bit
+			JR	Z, 1f		; If it is, we can assume HL and DE are 24 bit
 			CALL	SET_ADE24
-$$:			LD	HL, _scratchpad	; use scratchpad as temporary read character storage
+1:			LD	HL, _scratchpad	; use scratchpad as temporary read character storage
 			PUSH	HL		; char * read
 			PUSH	DE		; t_mosTransInfo ** transInfoPtr
 			CALL	_gsRead		; Call the C function gsRead
@@ -1395,17 +1395,18 @@ $$:			LD	HL, _scratchpad	; use scratchpad as temporary read character storage
 ; int gsTrans(char * source, char * dest, int destLen, int * read, BYTE flags)
 mos_api_gstrans:
 			PUSH	BC		; BYTE flags
-			LD	BC, IX		; move optional target buffer into BC
+			PUSH  	IX		; move optional target buffer into BC
+			POP     BC
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24
 			LD	A, B		; Check if target buffer is zero
 			OR	A, C
-			JR	Z, $F		; target is zero, so no need to set U to MB
+			JR	Z, 1f		; target is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ABC24
-$$:			PUSH 	HL
+1:			PUSH 	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; int * read
 			PUSH	DE		; UINT24 destLength
@@ -1443,10 +1444,10 @@ mos_api_substituteargs:
 			EX	(SP), HL	; Swap dest address (on stack) into HL, as it is optional
 			LD	A, L
 			OR	A, H
-			JR	Z, $F		; HL was zero, so jump ahead
+			JR	Z, 1f		; HL was zero, so jump ahead
 			LD	A, MB
 			CALL	SET_AHL24	; HL (dest address) not zero, so set U to MB
-$$:			EX	(SP), HL	; Swap dest address back into stack
+1:			EX	(SP), HL	; Swap dest address back into stack
 sub_args_contd:		PUSH	IX		; char * args
 			PUSH	HL		; char * template
 			CALL	_substituteArgs	; Call the C function substituteArgs
@@ -1480,21 +1481,25 @@ mos_api_resolvepath:
 			JR	Z, res_path_contd	; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24	; HL (source path) is required, so set it
 			; IX(U) (destination buffer) is optional, so check if it's zero
-			LD	DE, IX
+			PUSH 	IX
+			POP	DE
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; dest buffer is zero, so no need to set U to MB
+			JR	Z, 1f		; dest buffer is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; dest buffer not zero, so set U to MB
-$$:			LD	IX, DE
+1:			PUSH	DE
+			POP     IX
 			; IY (directory object pointer) is optional, so check if it's zero
-			LD	DE, IY
+			PUSH	IY
+			POP  	DE
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; dir object is zero, so no need to set U to MB
+			JR	Z, 1f		; dir object is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; dir object not zero, so set U to MB
-$$:			LD	IY, DE
+1:			PUSH 	DE
+			POP	IY
 			; OK so we should now have all the addresses set up
 res_path_contd:		LD	BC, 0		; Clear BC for flags
 			LD	A, (_scratchpad + 1)	; Get the flags byte
@@ -1534,17 +1539,18 @@ res_path_contd:		LD	BC, 0		; Clear BC for flags
 mos_api_getdirectoryforpath:
 			PUSH 	BC		; BYTE searchIndex
 			LD	(_scratchpad), DE	; Save the length
-			LD	DE, IX		; use DE for checking optional buffer
+			PUSH 	IX		; use DE for checking optional buffer
+			POP	DE
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume addresses are 24 bit
+			JR	Z, 1f		; If it is, we can assume addresses are 24 bit
 			CALL	SET_AHL24	; HL is required, so set it
 			LD	A, D
 			OR	A, E
-			JR	Z, $F		; optional buffer is zero, so no need to set U to MB
+			JR	Z, 1f		; optional buffer is zero, so no need to set U to MB
 			LD	A, MB
 			CALL	SET_ADE24	; DE not zero, so set U to MB
-$$:			LD	BC, _scratchpad
+1:			LD	BC, _scratchpad
 			PUSH	BC		; int * length
 			PUSH	DE		; char * dir
 			PUSH	HL		; char * srcPath
@@ -1566,9 +1572,9 @@ $$:			LD	BC, _scratchpad
 mos_api_getfilepathleafname:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			JR	Z, 1f		; If it is, we can assume HL is 24 bit
 			CALL	SET_AHL24	; HL is required, so set it
-$$:			PUSH	HL		; char * filepath
+1:			PUSH	HL		; char * filepath
 			CALL	_getFilepathLeafname	; Call the C function getFilepathLeafname
 			EX	(SP), HL	; Return value in HLU
 			POP	HL
@@ -1582,17 +1588,17 @@ $$:			PUSH	HL		; char * filepath
 mos_api_isdirectory:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume HL is 24 bit
+			JR	Z, 1f		; If it is, we can assume HL is 24 bit
 			CALL	SET_AHL24	; HL is required, so set it
-$$:			PUSH	HL		; char * filepath
+1:			PUSH	HL		; char * filepath
 			CALL	_isDirectory	; Call the C function isDirectory
 			POP	HL
 			; return value is true/false, so we need to change to 0 for success, and 19 (invalid parameter) for failure
 			OR	A, A		; Was status value false?
-			JR	Z, $F		; If it is, we need to replace with 5
+			JR	Z, 1f		; If it is, we need to replace with 5
 			LD	A, 0		; Otherwise, return 0 FR_OK
 			RET
-$$:			LD	A, 5		; Return 5 FR_NO_PATH
+1:			LD	A, 5		; Return 5 FR_NO_PATH
 			RET
 
 ; Get the absolute version of a (relative) path
@@ -1607,10 +1613,10 @@ $$:			LD	A, 5		; Return 5 FR_NO_PATH
 mos_api_getabsolutepath:
 			LD	A, MB		; Check if MBASE is 0
 			OR	A, A
-			JR	Z, $F		; If it is, we can assume pointers are 24 bit
+			JR	Z, 1f		; If it is, we can assume pointers are 24 bit
 			CALL	SET_AHL24
 			CALL	SET_AIX24
-$$:			LD	(_scratchpad), DE
+1:			LD	(_scratchpad), DE
 			LD	DE, _scratchpad
 			PUSH	DE		; int * length
 			PUSH	IX		; char * resolved
@@ -1656,10 +1662,10 @@ mos_api_wait_vdp_flags:
 ;
 ffs_api_fopen:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	BC		; BYTE mode
+1:			PUSH	BC		; BYTE mode
 			PUSH	DE		; const TCHAR * path
 			PUSH	HL		; FIL * fp
 			CALL	_f_open
@@ -1691,10 +1697,10 @@ ffs_api_fclose:		CALL	FIX_HLU24
 ;
 ffs_api_fread:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	HL
+1:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; UINT * br
 			PUSH	BC		; UINT btr
@@ -1719,10 +1725,10 @@ $$:			PUSH	HL
 ;
 ffs_api_fwrite:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	HL
+1:			PUSH	HL
 			LD	HL, _scratchpad
 			EX	(SP), HL	; UINT * bw
 			PUSH	BC		; UINT btw
@@ -1794,14 +1800,15 @@ ffs_api_fexpand:	; Not supported in our FatFS configuration
 ;
 ffs_api_fgets:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	HL		; FILE * fp
+1:			PUSH	HL		; FILE * fp
 			PUSH	BC		; UINT len
 			PUSH	DE		; void * buff
 			CALL	_f_gets
-			LD	DE, HL		; Return value in DE
+			PUSH	HL		; Return value in DE
+			POP	DE
 			POP	HL
 			POP	BC
 			POP	BC
@@ -1817,7 +1824,8 @@ ffs_api_fputc:		CALL	FIX_HLU24
 			PUSH	HL		; FIL * fp
 			PUSH	BC		; TCHAR c
 			CALL	_f_putc
-			LD	BC, HL		; Return value in BCU
+			PUSH	HL		; Return value in BCU
+			POP	BC
 			POP	HL
 			POP	HL
 			RET
@@ -1830,13 +1838,14 @@ ffs_api_fputc:		CALL	FIX_HLU24
 ;
 ffs_api_fputs:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	HL		; FIL * fp
+1:			PUSH	HL		; FIL * fp
 			PUSH	DE		; const TCHAR * str
 			CALL	_f_puts
-			LD	BC, HL		; Return value in BCU
+			PUSH	HL		; Return value in BCU
+			POP	BC
 			POP	HL
 			POP	HL
 			RET
@@ -1853,10 +1862,10 @@ ffs_api_fprintf:	; Available, but hard to expose as an API
 ;
 ffs_api_ftell:		LD	A, MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	DE		; DWORD * offset
+1:			PUSH	DE		; DWORD * offset
 			PUSH	HL		; FIL * fp
 			CALL	_fat_tell	; FRESULT returned in A
 			POP	HL
@@ -1883,10 +1892,10 @@ ffs_api_feof:		CALL	FIX_HLU24
 ;
 ffs_api_fsize:		LD	A, MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	DE		; DWORD * size
+1:			PUSH	DE		; DWORD * size
 			PUSH	HL		; FIL * fp
 			CALL	_fat_size	; FRESULT returned in A
 			POP	HL
@@ -1911,10 +1920,10 @@ ffs_api_ferror:		CALL	FIX_HLU24
 ; A: FRESULT
 ffs_api_dopen:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:
+1:
 			PUSH	DE 		; const TCHAR *path
 			PUSH    HL		; DIR *dp
 			CALL	_f_opendir
@@ -1929,9 +1938,9 @@ $$:
 ; A: FRESULT
 ffs_api_dclose:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:
+1:
 			PUSH    HL		; DIR *dp
 			CALL	_f_closedir
 			LD	A, L		; FRESULT
@@ -1945,10 +1954,10 @@ $$:
 ; A: FRESULT
 ffs_api_dread:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:
+1:
 			PUSH	DE 		; FILINFO *fno
 			PUSH    HL		; DIR *dp
 			CALL	_f_readdir
@@ -1967,12 +1976,12 @@ $$:
 ;
 ffs_api_dfindfirst:	LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_AHL24
 			CALL	SET_ADE24
 			CALL	SET_ABC24
 			CALL	SET_AIX24
-$$:			PUSH	IX		; const TCHAR * pattern
+1:			PUSH	IX		; const TCHAR * pattern
 			PUSH	BC		; const TCHAR * path
 			PUSH	DE		; FILINFO * fno
 			PUSH    HL		; DIR * dp
@@ -1992,7 +2001,8 @@ $$:			PUSH	IX		; const TCHAR * pattern
 ;
 ffs_api_dfindnext:	CALL	FIX_HLU24
 			PUSH	HL
-			LD	HL, DE
+			PUSH	DE
+			POP	HL
 			CALL	FIX_HLU24
 			EX	(SP), HL	; First stack entry is now DEU
 			PUSH	HL		; Second arg DIR
@@ -2010,10 +2020,10 @@ ffs_api_dfindnext:	CALL	FIX_HLU24
 ;
 ffs_api_stat:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	HL		; FILEINFO * fil
+1:			PUSH	HL		; FILEINFO * fil
 			PUSH	DE		; const TCHAR * path
 			CALL	_f_stat
 			LD	A, L 		; FRESULT
@@ -2043,10 +2053,10 @@ ffs_api_unlink:		LD	A, MB		; A: MB
 ;
 ffs_api_rename:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
-$$:			PUSH	DE		; const TCHAR * newname
+1:			PUSH	DE		; const TCHAR * newname
 			PUSH	HL		; const TCHAR * oldname
 			CALL	_f_rename
 			LD	A, L		; FRESULT
@@ -2098,9 +2108,9 @@ ffs_api_chdrive:	; Available but as we only support one drive, this is not usefu
 ; A: FRESULT
 ffs_api_getcwd:		LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:
+1:
 			PUSH	BC 		; sizeof(buffer)
 			PUSH    HL		; buffer
 			CALL	_f_getcwd
@@ -2136,16 +2146,16 @@ ffs_api_fdisk:		; Not supported in our FatFS configuration
 ;
 ffs_api_getfree:	LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_ABC24
 			CALL	SET_ADE24
 			; path is optional, so check if it's zero - arguably we could/should zero it
 			LD	A, H
 			OR	A, L
-			JR	Z, $F
+			JR	Z, 1f
 			LD	A, MB
 			CALL	SET_AHL24
-$$:			PUSH	BC		; UINT32 * clusterSize
+1:			PUSH	BC		; UINT32 * clusterSize
 			PUSH	DE		; UINT32 * clusters
 			PUSH	HL		; const TCHAR * path
 			CALL	_fat_getfree
@@ -2163,16 +2173,16 @@ $$:			PUSH	BC		; UINT32 * clusterSize
 ;
 ffs_api_getlabel:	LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_ABC24
 			CALL	SET_ADE24
 			; path is optional, so check if it's zero - arguably we could/should zero it
 			LD	A, H
 			OR	A, L
-			JR	Z, $F
+			JR	Z, 1f
 			LD	A, MB
 			CALL	SET_AHL24
-$$:			PUSH	BC		; UINT32 * vsn
+1:			PUSH	BC		; UINT32 * vsn
 			PUSH	DE		; TCHAR * label
 			PUSH	HL		; const TCHAR * path
 			CALL	_f_getlabel
@@ -2204,10 +2214,10 @@ ffs_api_setcp:		; Not supported in our FatFS configuration
 ;
 ffs_api_flseek_p:	LD	A, MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL 	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	FIX_HLU24_no_mb_check
-$$:			PUSH	DE		; DWORD * offset
+1:			PUSH	DE		; DWORD * offset
 			PUSH	HL		; FIL * fp
 			CALL	_fat_lseek	; FRESULT returned in A
 			POP	HL
@@ -2246,10 +2256,10 @@ sd_api_init:		CALL	FIX_HLU24	; HLU: Pointer to unlock code
 ; BYTE SD_readBlocks_API(DWORD * addr, BYTE *buf, WORD count)
 sd_api_readblocks:	LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:			PUSH	BC		; WORD count
+1:			PUSH	BC		; WORD count
 			PUSH	DE		; BYTE * buf
 			PUSH	HL		; DWORD * addr
 			CALL	_SD_readBlocks_API
@@ -2267,10 +2277,10 @@ $$:			PUSH	BC		; WORD count
 ; BYTE SD_writeBlocks_API(DWORD * addr, BYTE *buf, WORD count)
 sd_api_writeblocks:	LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			CALL	SET_ADE24	; Convert DE to an address in segment A (MB)
 			CALL	SET_AHL24	; Convert HL to an address in segment A (MB)
-$$:			PUSH	BC		; WORD count
+1:			PUSH	BC		; WORD count
 			PUSH	DE		; BYTE * buf
 			PUSH	HL		; DWORD * addr
 			CALL	_SD_readBlocks_API
@@ -2306,27 +2316,28 @@ func_getkbmap:		LD	HL, _keymap
 mos_api_getfunction:	LD	HL, 0		; Set HL to 0 (no function) as default
 			LD	A, MB		; A: MB
 			OR	A, A 		; Check whether MB is 0, i.e. in 24-bit mode
-			JR	Z, $F		; It is, so skip as all addresses can be assumed to be 24-bit
+			JR	Z, 1f		; It is, so skip as all addresses can be assumed to be 24-bit
 			LD	A, 20		; Invalid command (called from Z80 mode)
 			RET			; Return with error code 20 (Invalid command)
-$$:			LD	A, C		; Get flags
+1:			LD	A, C		; Get flags
 			OR	A, A		; Check if flags are set
-			JR	Z, $F		; Only support no flags for now
+			JR	Z, 1f		; Only support no flags for now
 			LD	A, 19		; Invalid parameter (flags set)
 			RET			; Return with error code 19 (Invalid parameter)
-$$:			LD	A, B		; Get function number
+1:			LD	A, B		; Get function number
 			CP	mos_function_block_size	; Check if out of bounds
-			JR	C, $F
+			JR	C, 1f
 			LD	A, 19		; Invalid parameter (function number out of bounds)
 			RET			; Return with error code 19 (Invalid parameter)
-$$:			; Get function address
+1:			; Get function address
 			; first we need to triple A to get the correct offset in the function table
 			PUSH	BC		; Save BC
 			PUSH	IX		; Save IX
 			LD	A, B		; Get function number
 			LD	BC, 0		; Set BC to 0
 			LD	C, A		; Set BC to function number
-			LD	IX, BC		; Copy to IX
+			PUSH	BC		; Copy to IX
+			POP 	IX
 			ADD	IX, IX		; IX = 2 * function number
 			ADD	IX, BC		; IX = 3 * function number
 			LD	BC, mos_function_block_start	; BC = start of function table
@@ -2338,23 +2349,23 @@ $$:			; Get function address
 			RET			; Return with OK code
 
 mos_function_block_start:
-			DW24	_SD_init	; 0x00
-			DW24	_SD_readBlocks	; 0x01
-			DW24	_SD_writeBlocks	; 0x02
-			DW24	0		; 0x03 (reserved for potential future _SD_status function)
-			DW24	0		; 0x04 (reserved for potential future _SD_ioctl function)
-			DW24	_f_printf	; 0x05
-			DW24	_f_findfirst	; 0x06
-			DW24	_f_findnext	; 0x07
-			DW24	_open_UART1	; 0x08
-			DW24	_setVarVal	; 0x09
-			DW24	_readVarVal	; 0x0A
-			DW24	_gsTrans	; 0x0B
-			DW24	_substituteArgs	; 0x0C
-			DW24	_resolvePath	; 0x0D
-			DW24	_getDirectoryForPath	; 0x0E
-			DW24	_resolveRelativePath	; 0x0F
-			DW24	func_getsysvars	; 0x10
-			DW24	func_getkbmap	; 0x11
+			D24	_SD_init	; 0x00
+			D24	_SD_readBlocks	; 0x01
+			D24	_SD_writeBlocks	; 0x02
+			D24	0		; 0x03 (reserved for potential future _SD_status function)
+			D24	0		; 0x04 (reserved for potential future _SD_ioctl function)
+			D24	_f_printf	; 0x05
+			D24	_f_findfirst	; 0x06
+			D24	_f_findnext	; 0x07
+			D24	_open_UART1	; 0x08
+			D24	_setVarVal	; 0x09
+			D24	_readVarVal	; 0x0A
+			D24	_gsTrans	; 0x0B
+			D24	_substituteArgs	; 0x0C
+			D24	_resolvePath	; 0x0D
+			D24	_getDirectoryForPath	; 0x0E
+			D24	_resolveRelativePath	; 0x0F
+			D24	func_getsysvars	; 0x10
+			D24	func_getkbmap	; 0x11
 
 mos_function_block_size:	EQU 	($ - mos_function_block_start) / 3

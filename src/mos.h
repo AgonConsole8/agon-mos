@@ -329,4 +329,4 @@ UINT8	wait_VDP(UINT8 mask);
 							"Character values are converted to bytes before sending\r\n"
 #define HELP_VDU_ARGS		"<char1> <char2> ... <charN>"
 
-#endif MOS_H
+#endif /* MOS_H */

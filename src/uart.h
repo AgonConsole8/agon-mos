@@ -14,7 +14,8 @@
 #ifndef UART_H
 #define UART_H
 
-#include <gpio.h>
+#include "defines.h"
+#include "ez80f92.h"
 
 #define MASTERCLOCK				18432000	        	//!< The default system clock speed for eZ80F92.
 #define CLOCK_DIVISOR_16		16			        	//!< The default clock divisor 
@@ -179,6 +180,6 @@ void close_UART1();
 extern volatile BYTE serialFlags;		// In globals.asm
 
 extern INT putch(INT ich);				// Now in serial.asm
-extern INT getch(VOID);					// Now in serial.asm
+extern INT getch(void);					// Now in serial.asm
 
-#endif UART_H
+#endif /* UART_H */

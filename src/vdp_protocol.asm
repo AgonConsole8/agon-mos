@@ -25,8 +25,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
+			.text
 			
 			XDEF	vdp_protocol
 
@@ -75,7 +74,7 @@ vdp_protocol:		LD	A, (_vdp_protocol_state)
 			DEC	A
 			JR	Z, vdp_protocol_state2
 			DEC	A
-			JR	Z, vdp_protocol_state3
+			JP	Z, vdp_protocol_state3
 			XOR	A
 			LD	(_vdp_protocol_state), A
 			RET
@@ -96,12 +95,12 @@ vdp_protocol_state0:	LD	A, C			; Wait for a header byte (bit 7 set)
 ;
 vdp_protocol_state1:	LD	A, C			; Fetch the length byte
 			CP	VDPP_BUFFERLEN + 1	; Check if it exceeds buffer length (16)
-			JR	C, $F			;
+			JR	C, 1f			;
 			LD	A, 3			; If it does exceed buffer length, switch to state 3 (ignore packet)
 			LD	(_vdp_protocol_state), A
 			RET
 ;
-$$:			LD	(_vdp_protocol_len), A	; Store the length
+1:			LD	(_vdp_protocol_len), A	; Store the length
 			OR	A			; If it is zero
 			JR	Z, vdp_protocol_exec	; Then we can skip fetching bytes, otherwise
 			LD	A, 2			; Switch to next state
@@ -174,14 +173,14 @@ vdp_protocol_KEY:	LD	HL, (_user_kbvector)		; If a user kbvector is set, call it
 			LD	DE, 0
 			OR	A
 			SBC	HL, DE
-			JR	Z, $F
-			LD	HL, $F
+			JR	Z, 1f
+			LD	HL, 1f
 			PUSH	HL				; Push return address from user routine
 			LD	HL, (_user_kbvector)
 			LD	DE, _vdp_protocol_data		; Pass keyboard packet address to user routine in DE (24-bit)
 			JP	(HL)
 ;
-$$:			LD	A, (_vdp_protocol_data + 0)	; ASCII key code
+1:			LD	A, (_vdp_protocol_data + 0)	; ASCII key code
 			LD	(_keyascii), A
 			LD	A, (_vdp_protocol_data + 1)	; Key modifiers (SHIFT, ALT, etc)
 			LD	(_keymods), A

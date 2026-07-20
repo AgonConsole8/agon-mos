@@ -12,11 +12,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
-				
-			XDEF	GPIOB_SETMODE				
-			XREF	SWITCH_A
+			.global GPIOB_SETMODE
 			
 ;  A: Mode
 ;  B: Pins

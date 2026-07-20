@@ -29,12 +29,11 @@
  * 11/11/2023:				RC3	+ See Github for full list of changes
  */
 
-#include <eZ80.h>
-#include <defines.h>
+#include "ez80f92.h"
+#include "defines.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <CTYPE.h>
-#include <String.h>
+#include <string.h>
 
 #include "defines.h"
 #include "version.h"
@@ -50,7 +49,7 @@
 #include "i2c.h"
 #include "umm_malloc.h"
 
-extern BYTE scrcolours, scrpixelIndex;	// In globals.asm
+extern volatile BYTE scrcolours, scrpixelIndex;  // In globals.asm
 
 extern void *	set_vector(unsigned int vector, void(*handler)(void));
 
@@ -58,7 +57,7 @@ extern void 	vblank_handler(void);
 extern void 	uart0_handler(void);
 extern void 	i2c_handler(void);
 
-extern char 			coldBoot;		// 1 = cold boot, 0 = warm boot
+extern char hardReset;		// 1 = hard cpu reset, 0 = soft reset
 extern volatile	char 	keycode;		// Keycode 
 extern volatile char	gp;				// General poll variable
 extern volatile BYTE	keymods;		// Key modifiers
@@ -73,6 +72,8 @@ extern BOOL	vdpSupportsTextPalette;
 // Parameters:
 // - pUART: Pointer to a UART structure
 // - baudRate: Baud rate to initialise UART with
+// Returns:
+// - 1 if the function succeeded, otherwise 0
 //
 void wait_ESP32(UART * pUART, UINT24 baudRate) {	
 	int	i, t;
@@ -97,6 +98,7 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 			if (gp != 0) break;
 			wait_timer0();
 		}
+		if(gp == 1) break;				// If general poll returned, then exit for loop
 	}
 	enable_timer0(0);					// Disable the timer
 
@@ -118,7 +120,7 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 
 // Initialise the interrupts
 //
-void init_interrupts(void) {
+static void init_interrupts(void) {
 	set_vector(PORTB1_IVECT, vblank_handler); 	// 0x32
 	set_vector(UART0_IVECT, uart0_handler);		// 0x18
 	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
@@ -139,10 +141,13 @@ void rainbow_msg(char* msg) {
 	if (i == 0)
 		i++;
 	for (; *msg; msg++) {
-		printf("%c%c%c", 17, i, *msg);
+		putch(17);
+		putch(i);
+		putch(*msg);
 		i = (i + 1 < scrcolours) ? i + 1 : 1;
 	}
-	printf("%c%c", 17, 15);
+	putch(17);
+	putch(15);
 }
 
 void bootmsg(void) {
@@ -170,28 +175,28 @@ bool shiftPressed() {
 }
 
 //extern UINT24 bottom;
-extern void _heapbot[];
+//extern uint8_t __heapbot[];
 
 // The main loop
 //
 int main(void) {
-	UART 	pUART0;
+        UART	pUART0;
 
-	DI();											// Ensure interrupts are disabled before we do anything
+	asm volatile("di");
 	init_interrupts();								// Initialise the interrupt vectors
 	init_rtc();										// Initialise the real time clock
 	init_spi();										// Initialise SPI comms for the SD card interface
 	init_UART0();									// Initialise UART0 for the ESP32 interface
 	init_UART1();									// Initialise UART1
-	EI();											// Enable the interrupts now
+	asm volatile("ei");
 	
 	wait_ESP32(&pUART0, 1152000);					// Connect to VDP at maximum rate
 
-	if (coldBoot == 0) {							// If a warm boot detected then
+	if (hardReset == 0) {							// If a warm boot detected then
 		putch(12);									// Clear the screen
 	}
 
-	umm_init_heap((void*)_heapbot, HEAP_LEN);
+	umm_init_heap((void*)__heapbot, HEAP_LEN);
 
 	scrcolours = 0;
 	scrpixelIndex = 255;

@@ -3323,6 +3323,33 @@ static UINT find_volume (	/* Returns BS status found in the hosting drive */
 }
 
 
+/* Pulled this routine out of mount_volume() purely because the clang ez80 backend
+ * throws `error: ran out of registers during register allocation` when trying to 
+ * compile this at -Oz optimisation level...
+ */
+#pragma clang optimize off
+static void _mount_volume_fsinfo_fragment(UINT fmt, LBA_t bsect, FATFS *fs) {
+
+		if (fmt == FS_FAT32				/* Allow to update FSInfo only if BPB_FSInfo32 == 1 */
+			&& ld_word(fs->win + BPB_FSInfo32) == 1
+			&& move_window(fs, bsect + 1) == FR_OK)
+		{
+			fs->fsi_flag = 0;
+			if (ld_word(fs->win + BS_55AA) == 0xAA55	/* Load FSInfo data if available */
+				&& ld_dword(fs->win + FSI_LeadSig) == 0x41615252
+				&& ld_dword(fs->win + FSI_StrucSig) == 0x61417272)
+			{
+#if (FF_FS_NOFSINFO & 1) == 0
+				fs->free_clst = ld_dword(fs->win + FSI_Free_Count);
+#endif
+#if (FF_FS_NOFSINFO & 2) == 0
+				fs->last_clst = ld_dword(fs->win + FSI_Nxt_Free);
+#endif
+			}
+		}
+}
+#pragma clang optimize on
+
 
 
 /*-----------------------------------------------------------------------*/
@@ -3513,23 +3540,7 @@ static FRESULT mount_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 		fs->last_clst = fs->free_clst = 0xFFFFFFFF;		/* Initialize cluster allocation information */
 		fs->fsi_flag = 0x80;
 #if (FF_FS_NOFSINFO & 3) != 3
-		if (fmt == FS_FAT32				/* Allow to update FSInfo only if BPB_FSInfo32 == 1 */
-			&& ld_word(fs->win + BPB_FSInfo32) == 1
-			&& move_window(fs, bsect + 1) == FR_OK)
-		{
-			fs->fsi_flag = 0;
-			if (ld_word(fs->win + BS_55AA) == 0xAA55	/* Load FSInfo data if available */
-				&& ld_dword(fs->win + FSI_LeadSig) == 0x41615252
-				&& ld_dword(fs->win + FSI_StrucSig) == 0x61417272)
-			{
-#if (FF_FS_NOFSINFO & 1) == 0
-				fs->free_clst = ld_dword(fs->win + FSI_Free_Count);
-#endif
-#if (FF_FS_NOFSINFO & 2) == 0
-				fs->last_clst = ld_dword(fs->win + FSI_Nxt_Free);
-#endif
-			}
-		}
+		_mount_volume_fsinfo_fragment(fmt, bsect, fs);
 #endif	/* (FF_FS_NOFSINFO & 3) != 3 */
 #endif	/* !FF_FS_READONLY */
 	}

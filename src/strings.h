@@ -39,4 +39,4 @@ size_t mos_strspn(const char *s, const char *accept);
 
 int pmatch(const char *pattern, const char *string, uint8_t flags);
 
-#endif // STRINGS_H
+#endif /* STRINGS_H */

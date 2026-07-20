@@ -73,4 +73,4 @@ BYTE	SD_writeBlocks_API(void * addr, BYTE *buf, WORD count) {
 	return SD_writeBlocks(*(DWORD *)addr, buf, count);
 }
 
-#endif SD_H
+#endif /* SD_H */

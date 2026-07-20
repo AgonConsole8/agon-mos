@@ -12,6 +12,8 @@
 #ifndef RTC_H
 #define RTC_H
 
+#include "defines.h"
+
 #define EPOCH_YEAR	1980
 
 // RTC time structure
@@ -37,4 +39,4 @@ void rtc_formatTime(char * buffer, vdp_time_t * t);
 int rtc_monthFromName(char * month);
 int rtc_dayFromName(char * day);
 
-#endif RTC_H
+#endif /* RTC_H */

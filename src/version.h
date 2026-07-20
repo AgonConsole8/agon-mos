@@ -10,4 +10,4 @@
 #define		VERSION_VARIANT		"Platform"
 #define     VERSION_SUBTITLE    "Arthur"
 
-#endif // VERSION_H
+#endif /* VERSION_H */

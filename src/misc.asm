@@ -18,9 +18,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
-
+			.text
 			XDEF	SWITCH_A
 			XDEF	SET_AHL24
 			XDEF	FIX_HLU24
@@ -75,11 +73,11 @@ FIX_HLU24_no_mb_check:	PUSH	HL
 			LD	A, (HL)
 			OR 	A, A
 ; top byte of HLU (on stack) already set so return
-			JR	NZ, $F
+			JR	NZ, 1f
 ; set top byte of HLU (on stack) to MB
 			LD	A, MB
 			LD	(HL), A
-$$:			POP	HL
+1:			POP	HL
 			RET
 
 ; Set the MSB of DE (U) to A
@@ -142,7 +140,7 @@ _exec24:		PUSH 	IY
 ; Write out a short subroutine "JP (DE)" to RAM
 ;			
 			LD	IX, _callSM	; Storage for the self modified routine
-			LD	(IX + 0), C3h	; JP llhhuu
+			LD	(IX + 0), 0xC3	; JP llhhuu
 			LD	(IX + 1), E
 			LD	(IX + 2), D
 			LD	(IX + 3), A	
@@ -176,11 +174,11 @@ _exec16:		PUSH 	IY
 ;
 
 			LD	IX, _callSM	; Storage for the self modified routine
-			LD	(IX + 0), 49h	; CALL.IS llhh
-			LD	(IX + 1), CDh
+			LD	(IX + 0), 0x49	; CALL.IS llhh
+			LD	(IX + 1), 0xCD
 			LD	(IX + 2), E
 			LD	(IX + 3), D
-			LD	(IX + 4), C9h	; RET		
+			LD	(IX + 4), 0xcd	; RET		
 ;
 _execSM:		CALL	_callSM		; Call the subroutine
 ;
@@ -201,10 +199,10 @@ _wait_timer0:		PUSH	AF
 			IN0	A, (TMR0_CTL)	; Enable the timer
 			OR	3
 			OUT0	(TMR0_CTL), A
-$$:			IN0	B, (TMR0_DR_L)	; Fetch the counter L
+1:			IN0	B, (TMR0_DR_L)	; Fetch the counter L
 			IN0 	A, (TMR0_DR_H)	; And the counter H
 			OR	B 
-			JR	NZ, $B
+			JR	NZ, 1b
 			POP	BC 
 			POP	AF 
 			RET
@@ -218,4 +216,3 @@ _timer0_delay:
 			TIMER_WAIT	0
 			JP		(HL)
 
-END

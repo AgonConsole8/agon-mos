@@ -48,4 +48,4 @@ void	mos_I2C_CLOSE(void);
 UINT8	mos_I2C_WRITE(UINT8 i2c_address, UINT8 size, char * buffer);
 UINT8	mos_I2C_READ(UINT8 i2c_address, UINT8 size, char * buffer);
 
-#endif _I2C_H_
+#endif /* _I2C_H_*/

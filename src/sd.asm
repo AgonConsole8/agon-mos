@@ -7,7 +7,6 @@
 ; Modinfo
 ;
 
-		INCLUDE "ez80F92.inc"
 		INCLUDE	"equs.inc"
 		INCLUDE "sd.inc"
 		INCLUDE	"macros.inc"
@@ -20,12 +19,12 @@ SD_READY	.equ		0
 
 SD_INIT_CYCLES		.equ	10
 
-SD_START_TOKEN	.equ	%FE
-SD_ERROR_TOKEN	.equ	%00
+SD_START_TOKEN	.equ	0xFE
+SD_ERROR_TOKEN	.equ	0x00
 
-SD_DATA_ACCEPTED	.equ	%05
-SD_DATA_REJECTED_CRC	.equ	%0B
-SD_DATA_REJECTED_WRITE	.equ	%0D
+SD_DATA_ACCEPTED	.equ	0x05
+SD_DATA_REJECTED_CRC	.equ	0x0B
+SD_DATA_REJECTED_WRITE	.equ	0x0D
 
 SD_BLOCK_LEN	.equ	512
 
@@ -50,7 +49,7 @@ SD_CMD_LEN	.equ	6
 ;	IX-6..IX-2	BYTE res[5]
 ;
 
-		SCOPE
+		
 
 _SD_init:
 		; Function prologue
@@ -68,65 +67,65 @@ _SD_init:
 
 		; Command card to idle
 		LD		B,10
-$loop1:		PUSH		BC
+1:		PUSH		BC
 		CALL		_SD_goIdleState
 		POP		BC
 		LD		(IX-6),A
-		CP		A,%01
-		JR		Z,$success1
-		DJNZ		$loop1
+		CP		A,0x01
+		JR		Z,L_success1
+		DJNZ		1b
 
 		; Failed after 10 attempts
-		JR		$out_error
+		JR		L_out_error
 		
 		; Send interface conditions
-$success1:	PEA		IX-6
+L_success1:	PEA		IX-6
 		CALL		_SD_sendIfCond
 		POP		BC
 
 		; Check first byte of response is 0x01
 		LD		A,(IX-6)
 		CP		A,1
-		JR		NZ,$out_error
+		JR		NZ,L_out_error
 
 		; Check fifth byte of response is 0xAA
 		LD		A,(IX-2)
-		CP		A,%AA
-		JR		NZ,$out_error
+		CP		A,0xAA
+		JR		NZ,L_out_error
 
 		; Attempt to initialize card
 
 		; Repeat up to 100 times
 		LD		B,100
-$loop2:		PUSH		BC
+L_loop2:		PUSH		BC
 		CALL		_SD_sendApp
 		CP		A,2		; is res[0] < 2 ?
-		JR		NC,$wait2
+		JR		NC,L_wait2
 		CALL		_SD_sendOpCond
 		CP		A,SD_READY
-		JR		Z,$success2
+		JR		Z,L_success2
 
 		; Wait 10ms before we try again
-$wait2:		DELAY_MS	10
+L_wait2:		DELAY_MS	10
 		POP		BC
-		DJNZ		$loop2
+		DJNZ		L_loop2
 
 		; Timeout: error
-		JR		$out_error
+		JR		L_out_error
 
-$success2:	PEA		IX-6
+L_success2:	PEA		IX-6
 		CALL		_SD_readOCR
 		POP		BC
 		LD		A,(IX-5)
 		RLA
-		JR		C,$out_success
-		; Fall through to $out_error
+		JR		C,L_out_success
+		; Fall through to L_out_error
 
-$out_error:	LD		A,SD_ERROR
-		JR		$exit
+L_out_error:	LD		A,SD_ERROR
+		JR		L_exit
 
-$out_success:	XOR		A,A	; LD A,LD_SUCCESS
-$exit:		LD		SP,IX
+L_out_success:	XOR		A,A	; LD A,LD_SUCCESS
+L_exit:		LD		SP,IX
 		POP		IX
 		RET
 
@@ -138,7 +137,6 @@ $exit:		LD		SP,IX
 ;	IX-3/IX-2	Reserved for SD_readSingleBlock
 ;	IX-1		token
 
-		SCOPE
 
 _SD_readBlocks:
 		; Function prologue
@@ -152,36 +150,36 @@ _SD_readBlocks:
 
 		; HL := count, then jump to the check for zero
 		LD		HL,(IX+15)
-		JR		$start
+		JR		L_start
 		
 		; Read current block
-$loop:		CALL		SD_readSingleBlock
+L_loop3:		CALL		SD_readSingleBlock
 
 		; Exit with SD_ERROR if res1 >= 2
 		CP		A,2
-		JR		NC,$err_exit
+		JR		NC,L_err_exit
 
 		; or if token != SD_DATA_ACCEPTED
 		LD		A,(IX-1)
-		CP		A,%FE
-		JR		NZ,$err_exit
+		CP		A,0xFE
+		JR		NZ,L_err_exit
 		
 		; Update sector, buf and count
 		; HL is set to the updated value of count
 		CALL		SD_updateIOVars
-$start:		LD		A,H
+L_start:		LD		A,H
 		OR		A,L
-		JR		NZ,$loop
+		JR		NZ,L_loop3
 		
 		; Finished, return SD_SUCCESS (which happens to be zero)
-$done:		XOR		A,A
-$exit:		LD		SP,IX
+L_done:		XOR		A,A
+L_exit2:		LD		SP,IX
 		POP		IX
 		RET
 
 		; Error exit, slow path so can save a couple of bytes
-$err_exit:	LD		A,SD_ERROR
-		JR		$exit
+L_err_exit:	LD		A,SD_ERROR
+		JR		L_exit2
 
 ; Delay by 30ms. Roughly how long an old 5.25" disk takes to read 512 bytes
 SD_delayDisc:
@@ -195,9 +193,9 @@ SD_delayDisc:
 		LD		DE, 1
 		LD		HL, 81000
 		; 81000 * 6 cycles per loop
-$loop4:	AND		A
+1:		AND		A
 		SBC		HL, DE
-		JR		NZ, $loop4
+		JR		NZ, 1b
 
 		POP		DE
 		POP		HL
@@ -211,32 +209,30 @@ $loop4:	AND		A
 ;
 ; Output: A := res1
 
-		SCOPE
-
 SD_readSingleBlock:
 		CALL	SD_delayDisc
-		LD		(IX-3),CMD17     | %40
-		LD		(IX-2),CMD17_CRC | %01
+		LD		(IX-3),CMD17     | 0x40
+		LD		(IX-2),CMD17_CRC | 0x01
 		
 		CALL		SD_sendIOCmd	; Sets *token to 0xFF too
 		PUSH		AF		; Save res1 to be returned
-		CP		A,%FF
-		JR		Z,$out3
+		CP		A,0xFF
+		JR		Z,L_out3
 
 		; Wait for a response token (timeout = 100ms)
 		TIMER_SET	0,100
 		TIMER_START	0
 		
-$loop1:		CALL		_spi_read_one
+L_loop5:		CALL		_spi_read_one
 		LD		B,A		; Move byte read to B
-		CP		A,%FF
-		JR		NZ,$out1
+		CP		A,0xFF
+		JR		NZ,L_out1
 
 		; Continue until the timer expires
-		TIMER_EXP?	0		; (clobbers just A)
-		JR		NC,$loop1
+		TIMER_EXP	0		; (clobbers just A)
+		JR		NC,L_loop5
 		
-$out1:		TIMER_RESET	0		; (clobbers just A)
+L_out1:		TIMER_RESET	0		; (clobbers just A)
 
 		; Check if card response is SD_START_TOKEN
 
@@ -246,7 +242,7 @@ $out1:		TIMER_RESET	0		; (clobbers just A)
 		; If response token is 0xFE then read the sector
 		LD		A,SD_START_TOKEN
 		CP		A,B
-		JR		NZ,$out3
+		JR		NZ,L_out3
 
 		; Read the sector
 		LD		BC,SD_BLOCK_LEN
@@ -262,7 +258,7 @@ $out1:		TIMER_RESET	0		; (clobbers just A)
 		CALL		_spi_read_one
 
 		; Deassert chip select
-$out3:		CALL		_SD_CS_disable
+L_out3:		CALL		_SD_CS_disable
 
 		; Restore res1 to return to caller
 		POP		AF
@@ -276,8 +272,6 @@ $out3:		CALL		_SD_CS_disable
 ;	IX-3/IX-2	Reserved for SD_writeSingleBlock
 ;	IX-1		token
 
-		SCOPE
-
 _SD_writeBlocks:
 		; Function prologue
 		PUSH		IX
@@ -290,35 +284,35 @@ _SD_writeBlocks:
 
 		; HL := count, then jump to the check for zero
 		LD		HL,(IX+15)
-		JR		$start
+		JR		L_start2
 
-$loop:		CALL		SD_writeSingleBlock
+L_loop6:		CALL		SD_writeSingleBlock
 
 		; Exit with SD_ERROR if res1 != 0x00
 		OR		A,A
-		JR		NZ,$err_exit
+		JR		NZ,L_err_exit2
 
 		; or if token != SD_DATA_ACCEPTED
 		LD		A,(IX-1)
 		CP		A,SD_DATA_ACCEPTED
-		JR		NZ,$err_exit
+		JR		NZ,L_err_exit2
 		
 		; Update sector, buf and count
 		; HL is set to the updated value of count
 		CALL		SD_updateIOVars
-$start:		LD		A,H
+L_start2:		LD		A,H
 		OR		A,L
-		JR		NZ,$loop
+		JR		NZ,L_loop6
 		
 		; Finished, return SD_SUCCESS (which happens to be zero)
-$done:		XOR		A,A
-$exit:		LD		SP,IX
+L_done2:		XOR		A,A
+L_exit3:		LD		SP,IX
 		POP		IX
 		RET
 
 		; Error exit, slow path so can save a couple of bytes
-$err_exit:	LD		A,SD_ERROR
-		JR		$exit
+L_err_exit2:	LD		A,SD_ERROR
+		JR		L_exit3
 
 
 ; SD_writeSingleBlock
@@ -328,17 +322,15 @@ $err_exit:	LD		A,SD_ERROR
 ;
 ; Output: A := res1
 
-		SCOPE
-
 SD_writeSingleBlock:
 		CALL	SD_delayDisc
-		LD		(IX-3),CMD24     | %40
-		LD		(IX-2),CMD24_CRC | %01
+		LD		(IX-3),CMD24     | 0x40
+		LD		(IX-2),CMD24_CRC | 0x01
 		
 		CALL		SD_sendIOCmd	; Sets *token to 0xFF too
 		PUSH		AF		; Save res1 to be returned
 		CP		A,SD_READY
-		JR		NZ,$out3
+		JP		NZ,L_out4
 
 		; Send start token
 		LD		C,SD_START_TOKEN
@@ -359,24 +351,24 @@ SD_writeSingleBlock:
 		TIMER_SET	0,250
 		TIMER_START	0
 		
-$loop1:		CALL		_spi_read_one
+L_loop7:		CALL		_spi_read_one
 		LD		B,A		; Save byte read
-		CP		A,%FF
-		JR		NZ,$gotit1
+		CP		A,0xFF
+		JR		NZ,L_gotit1
 
 		; Continue until the timer expires
-		TIMER_EXP?	0		; (clobbers just A)
-		JR		NC,$loop1
+		TIMER_EXP	0		; (clobbers just A)
+		JR		NC,L_loop7
 
 		; Timeout - just fall through
 
-$gotit1:	TIMER_RESET	0		; (clobbers just A)
+L_gotit1:	TIMER_RESET	0		; (clobbers just A)
 
 		; If data accepted
-		LD		A,%1F
+		LD		A,0x1F
 		AND		A,B
 		CP		A,5
-		JR		NZ,$out3
+		JR		NZ,L_out4
 
 		; *token = 0x05 (conveniently left in register A)
 		LD		(IX-1),A
@@ -385,26 +377,26 @@ $gotit1:	TIMER_RESET	0		; (clobbers just A)
 		TIMER_SET	0,250
 		TIMER_START	0
 
-$loop2:		CALL		_spi_read_one
-		CP		A,%00
-		JR		NZ,$gotit2
+L_loop8:		CALL		_spi_read_one
+		CP		A,0x00
+		JR		NZ,L_gotit2
 
 		; Continue until the timer expires
-		TIMER_EXP?	0
-		JR		NC,$loop2
+		TIMER_EXP	0
+		JR		NC,L_loop8
 
 		; Timeout, skip over setting token
-		JR		$notgot
+		JR		L_notgot
 
-$gotit2:	; Success: set token to 0x00
+L_gotit2:	; Success: set token to 0x00
 		XOR		A,A
 		LD		A,(IX-1)
 
-$notgot:	; Reset the timer
+L_notgot:	; Reset the timer
 		TIMER_RESET	0
 
 		; Deassert chip select
-$out3:		CALL		_SD_CS_disable
+L_out4:		CALL		_SD_CS_disable
 
 		; Restore res1 to return to caller
 		POP		AF
@@ -422,11 +414,9 @@ $out3:		CALL		_SD_CS_disable
 ; Output:
 ; A: response
 ;
-		SCOPE
-
 SD_sendIOCmd:
 		; Set token to none
-		LD		(IX-1),%FF
+		LD		(IX-1),0xFF
 
 		; Assert chip select
 		CALL		_SD_CS_enable
@@ -475,8 +465,6 @@ SD_sendIOCmd:
 ; Inputs:	None
 ; Outpus:	HL := updated value of count
 
-		SCOPE
-
 SD_updateIOVars:
 		; sector++
 		LD		HL,(IX+6)
@@ -504,22 +492,18 @@ SD_updateIOVars:
 ; BYTE SD_readRes1(void)
 ;
 
-		SCOPE
-
 _SD_readRes1:	LD		B,9
-$loop:		PUSH		BC	; save B over call to _spi_read_one
+1:		PUSH		BC	; save B over call to _spi_read_one
 		CALL		_spi_read_one
 		POP		BC
-		CP		A,%FF
-		JR		NZ,$out
-		DJNZ		$loop
-$out:		RET
+		CP		A,0xFF
+		JR		NZ,2f
+		DJNZ		1b
+2:		RET
 
 
 ; void SD_readRes7(BYTE *res)
 ;
-
-		SCOPE
 
 _SD_readRes7:	; Function prologue
 		PUSH		IX
@@ -559,8 +543,6 @@ _SD_readRes7:	; Function prologue
 
 ; BYTE SD_goIdleState(void);
 ;
-
-		SCOPE
 
 _SD_goIdleState:
 		LD		BC,cmd0_string
@@ -608,8 +590,6 @@ SD_sendCmdReadRes1:
 ; BYTE SD_sendIfCond(BYTE *res);
 ;
 
-		SCOPE
-
 _SD_sendIfCond:
 		LD		BC,cmd8_string
 		JR		SD_sendCmdReadRes7
@@ -656,8 +636,6 @@ SD_sendCmdReadRes7:
 ; void SD_powerUpSeq(void)
 ;
 
-		SCOPE
-
 _SD_powerUpSeq:
 		CALL		_SD_CS_disable_raw
 		DELAY_MS	10
@@ -665,17 +643,15 @@ _SD_powerUpSeq:
 		CALL		_SD_CS_disable_raw
 
 		LD		B,SD_INIT_CYCLES
-$loop:		PUSH		BC
+1:		PUSH		BC
 		CALL		_spi_read_one
 		POP		BC
-		DJNZ		$loop
+		DJNZ		1b
 		RET
 
 
 ; void SD_CS_enable();
 ;
-
-		SCOPE
 
 _SD_CS_enable:
 		CALL		_spi_read_one
@@ -688,8 +664,6 @@ _SD_CS_enable:
 ; void SD_CS_disable();
 ;
 
-		SCOPE
-
 _SD_CS_disable:
 		CALL		_spi_read_one
 		IN0		A,(PB_DR)
@@ -701,8 +675,6 @@ _SD_CS_disable:
 ; void SD_CS_disable_raw();
 ;
 
-		SCOPE
-
 _SD_CS_disable_raw:
 		IN0		A,(PB_DR)
 		SET		SD_CS,A
@@ -710,42 +682,42 @@ _SD_CS_disable_raw:
 		RET
 
 
-		SECTION		TEXT
+		.text
 
-cmd0_string:	DB		CMD0 | %40
-		DB		CMD0_ARG >> 24 & %FF
-		DB		CMD0_ARG >> 16 & %FF
-		DB		CMD0_ARG >>  8 & %FF
-		DB		CMD0_ARG       & %FF
-		DB		CMD0_CRC | %01
+cmd0_string:	DB		CMD0 | 0x40
+		DB		(CMD0_ARG >> 24) & 0xFF
+		DB		(CMD0_ARG >> 16) & 0xFF
+		DB		(CMD0_ARG >>  8) & 0xFF
+		DB		CMD0_ARG       & 0xFF
+		DB		CMD0_CRC | 0x01
 
-cmd8_string:	DB		CMD8 | %40
-		DB		CMD8_ARG >> 24 & %FF
-		DB		CMD8_ARG >> 16 & %FF
-		DB		CMD8_ARG >>  8 & %FF
-		DB		CMD8_ARG       & %FF
-		DB		CMD8_CRC | %01
+cmd8_string:	DB		CMD8 | 0x40
+		DB		(CMD8_ARG >> 24) & 0xFF
+		DB		(CMD8_ARG >> 16) & 0xFF
+		DB		(CMD8_ARG >>  8) & 0xFF
+		DB		CMD8_ARG       & 0xFF
+		DB		CMD8_CRC | 0x01
 
-cmd55_string:	DB		CMD55 | %40
-		DB		CMD55_ARG >> 24 & %FF
-		DB		CMD55_ARG >> 16 & %FF
-		DB		CMD55_ARG >>  8 & %FF
-		DB		CMD55_ARG       & %FF
-		DB		CMD55_CRC | %01
+cmd55_string:	DB		CMD55 | 0x40
+		DB		(CMD55_ARG >> 24) & 0xFF
+		DB		(CMD55_ARG >> 16) & 0xFF
+		DB		(CMD55_ARG >>  8) & 0xFF
+		DB		CMD55_ARG       & 0xFF
+		DB		CMD55_CRC | 0x01
 
-acmd41_string:	DB		ACMD41 | %40
-		DB		ACMD41_ARG >> 24 & %FF
-		DB		ACMD41_ARG >> 16 & %FF
-		DB		ACMD41_ARG >>  8 & %FF
-		DB		ACMD41_ARG       & %FF
-		DB		ACMD41_CRC | %01
+acmd41_string:	DB		ACMD41 | 0x40
+		DB		ACMD41_ARG >> 24 & 0xFF
+		DB		ACMD41_ARG >> 16 & 0xFF
+		DB		ACMD41_ARG >>  8 & 0xFF
+		DB		ACMD41_ARG       & 0xFF
+		DB		ACMD41_CRC | 0x01
 
-cmd58_string:	DB		CMD58 | %40
-		DB		CMD58_ARG >> 24 & %FF
-		DB		CMD58_ARG >> 16 & %FF
-		DB		CMD58_ARG >>  8 & %FF
-		DB		CMD58_ARG       & %FF
-		DB		CMD58_CRC | %01
+cmd58_string:	DB		CMD58 | 0x40
+		DB		(CMD58_ARG >> 24) & 0xFF
+		DB		(CMD58_ARG >> 16) & 0xFF
+		DB		(CMD58_ARG >>  8) & 0xFF
+		DB		CMD58_ARG       & 0xFF
+		DB		CMD58_CRC | 0x01
 
-		SECTION		BSS
+		.bss
 sd_cmd_buffer:	DS		6

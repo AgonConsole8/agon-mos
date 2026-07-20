@@ -16,8 +16,7 @@
 
 			.ASSUME	ADL = 1
 			
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
+			.text
 			
 			XDEF	UART0_serial_TX
 			XDEF	UART0_serial_RX
@@ -37,8 +36,8 @@
 
 			XREF	_serialFlags	; In globals.asm
 				
-UART0_PORT		EQU	%C0		; UART0
-UART1_PORT		EQU	%D0		; UART1
+UART0_PORT		EQU	0xC0		; UART0
+UART1_PORT		EQU	0xD0		; UART1
 				
 UART0_REG_RBR:		EQU	UART0_PORT+0	; Receive buffer
 UART0_REG_THR:		EQU	UART0_PORT+0	; Transmitter holding
@@ -68,10 +67,10 @@ UART1_REG_SCR:		EQU 	UART1_PORT+7	; Scratch
 
 TX_WAIT			EQU	16384 		; Count before a TX times out
 
-UART_LSR_ERR		EQU 	%80		; Error
-UART_LSR_ETX		EQU 	%40		; Transmit empty
-UART_LSR_ETH		EQU	%20		; Transmit holding register empty
-UART_LSR_RDY		EQU	%01		; Data ready
+UART_LSR_ERR		EQU 	0x80		; Error
+UART_LSR_ETX		EQU 	0x40		; Transmit empty
+UART_LSR_ETH		EQU	0x20		; Transmit holding register empty
+UART_LSR_RDY		EQU	0x01		; Data ready
 
 ; Check whether we're clear to send (UART0 only)
 ;
@@ -175,8 +174,8 @@ UART0_serial_GETCH:	PUSH		AF
 			TST		01h
 			JR		Z, UART_serial_NE
 			POP		AF
-$$:			CALL 		UART0_serial_RX
-			JR		NC,$B
+1:			CALL 		UART0_serial_RX
+			JR		NC,1b
 			RET 
 
 ; Read a character from UART1 (blocking)
@@ -190,8 +189,8 @@ UART1_serial_GETCH:	PUSH		AF
 			TST		10h
 			JR		Z, UART_serial_NE
 			POP		AF
-$$:			CALL 		UART1_serial_RX
-			JR		NC,$B
+1:			CALL 		UART1_serial_RX
+			JR		NC,1b
 			RET 
 
 ; Write a character to UART0 (blocking)
@@ -208,8 +207,8 @@ UART0_serial_PUTCH:	PUSH	AF
 			TST	02h				; If hardware flow control enabled then
 			CALL	NZ, UART0_wait_CTS		; Wait for clear to send signal
 			POP	AF
-$$:			CALL	UART0_serial_TX			; Send the character
-			JR	NC, $B				; Repeat until sent
+1:			CALL	UART0_serial_TX			; Send the character
+			JR	NC, 1b				; Repeat until sent
 			RET
 
 ; Write a character to UART1 (blocking)
@@ -226,8 +225,8 @@ UART1_serial_PUTCH:	PUSH	AF
 			TST	20h				; If hardware flow control enabled then
 			CALL	NZ, UART1_wait_CTS		; Wait for clear to send signal
 			POP	AF			
-$$:			CALL	UART1_serial_TX			; Send the character
-			JR	NC, $B				; Repeat until sent
+1:			CALL	UART1_serial_TX			; Send the character
+			JR	NC, 1b				; Repeat until sent
 			RET
 
 ; Called by UART0 and UART1 PUTCH and GETCH if the UART is not enabled

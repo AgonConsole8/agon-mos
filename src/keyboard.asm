@@ -10,8 +10,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
+			.text
 
 			XDEF	keyboard_handler
 
@@ -46,13 +45,13 @@ keyboard_map:		DEC	A 				;  A: Virtual keycode - 1
 			INC	HL
 			LD	HL, (HL)			; HL: Address to set into
 			BIT 	0, C				; Is the key down or up?
-			JR	NZ, $F 				; It is down so jump to the code that sets a bit
+			JR	NZ, 1f 				; It is down so jump to the code that sets a bit
 			CPL					; It is up so complement the bit
 			AND	(HL)				; Then AND it with the keymap entry
 			LD	(HL), A
 			RET 
 ;
-$$:			OR	(HL)				; OR with the keymap entry
+1:			OR	(HL)				; OR with the keymap entry
 			LD	(HL), A
 			RET 
 ;			
@@ -60,12 +59,12 @@ $$:			OR	(HL)				; OR with the keymap entry
 ;
 keyboard_reset:		LD	A, B				; Get the virtual key code
 			CP	130				; Check for DEL (cursor keys)
-			JR	Z, $F
+			JR	Z, 1f
 			CP	131				; Check for DEL (no numlock)
-			JR	Z , $F
+			JR	Z , 1f
 			CP	88				; And DEL (numlock)
 			RET	NZ
-$$:			LD	A, (_keymods)			; DEL is pressed so check CTRL + ALT
+1:			LD	A, (_keymods)			; DEL is pressed so check CTRL + ALT
 			AND	05h				; Bit 0 and 2
 			CP	05h
 			RET	NZ				; Exit if not pressed
@@ -85,14 +84,14 @@ $$:			LD	A, (_keymods)			; DEL is pressed so check CTRL + ALT
 ; - 1 byte:  The bit data to set into the keymap
 ; - 3 bytes: The address to set (precalculated)
 ;
-KEY:			MACRO VKEYCODE 
-			IF	VKEYCODE = 0
-			DL 	0
+		MACRO KEY VKEYCODE 
+			IF	\VKEYCODE = 0
+			D32 	0
 			ELSE
-			DB	1 << ((VKEYCODE - 1) & 00000111b)
-			DW24	_keymap + (((VKEYCODE - 1) & 11111000b) >> 3)
+			DB	1 << ((\VKEYCODE - 1) & 0b00000111)
+			D24	_keymap + (((\VKEYCODE - 1) & 0b11111000) >> 3)
 			ENDIF 
-			ENDMACRO 
+		.endm
 ;
 keyboard_lookup:	KEY(099)	; VK_SPACE
 			KEY(040)	; VK_0

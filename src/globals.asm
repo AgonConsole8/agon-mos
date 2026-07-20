@@ -22,7 +22,7 @@
 ; 13/08/2023:	Added keymap
 ; 11/11/2023:	Added i2c
 
-			INCLUDE	"../src/equs.inc"
+			INCLUDE	"equs.inc"
 			
 			XDEF	_sysvars
 			
@@ -58,7 +58,7 @@
 			XDEF	_mouseYDelta
 
 			XDEF	_errno
-			XDEF 	_coldBoot
+			XDEF 	_hardReset
 			XDEF	_gp
 			XDEF	_serialFlags
 			XDEF 	_callSM
@@ -83,17 +83,22 @@
 			XDEF	_i2c_msg_ptr
 			XDEF	_i2c_msg_size
 
-			SEGMENT BSS		; This section is reset to 0 in cstartup.asm
-			
+			.global _SysClkFreq
+
+			.text
+_SysClkFreq:		.d32 18432000
+
+			.bss		; This section is reset to 0 in cstartup.asm
+
 _sysvars:					; Please make sure the sysvar offsets match those in mos_api.inc
 ;
-_clock			DS	4		; + 00h: Clock timer in centiseconds (incremented by 2 every VBLANK)
+_clock:			DS	4		; + 00h: Clock timer in centiseconds (incremented by 2 every VBLANK)
 _vpd_protocol_flags:	DS	1		; + 04h: Flags to indicate completion of VDP commands
 _keyascii:		DS	1		; + 05h: ASCII keycode, or 0 if no key is pressed
 _keymods:		DS	1		; + 06h: Keycode modifiers
 _cursorX:		DS	1		; + 07h: Cursor X position
 _cursorY:		DS	1		; + 08h: Cursor Y position
-_scrchar		DS	1		; + 09h: Character read from screen
+_scrchar:		DS	1		; + 09h: Character read from screen
 _scrpixel:		DS	3		; + 0Ah: Pixel data read from screen (R,B,G)
 _audioChannel:		DS	1		; + 0Dh: Audio channel 
 _audioSuccess:		DS	1		; + 0Eh: Audio channel note queued (0 = no, 1 = yes)
@@ -121,7 +126,7 @@ _mouseXDelta:		DS	2		; + 2Fh: Mouse X delta
 _mouseYDelta:		DS	2		; + 31h: Mouse Y delta
 
 _errno:			DS 	3		; extern int _errno
-_coldBoot:		DS	1		; extern char _coldBoot
+_hardReset:		DS	1		; extern char hardReset
 _gp:			DS	1		; extern char _gp
 
 ; Serial Flags:
@@ -176,7 +181,3 @@ _i2c_msg_size:		DS	1		; The (remaining) message size
 ;
 _history_no:		DS	1
 _history_size:		DS 	1
-
-			SECTION DATA		; This section is copied to RAM in cstartup.asm
-
-			END

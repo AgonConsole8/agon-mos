@@ -12,9 +12,7 @@
 
 			.ASSUME	ADL = 1
 
-			DEFINE .STARTUP, SPACE = ROM
-			SEGMENT .STARTUP
-			
+			.text	
 			XDEF	__init_rtc
 			XDEF	_init_rtc
 

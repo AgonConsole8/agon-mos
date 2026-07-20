@@ -1,107 +1,179 @@
-;
-; Title:	AGON MOS - Equs
-; Author:	Dean Belfield
-; Created:	15/07/2022
-; Last Updated:	08/06/2023
-;
-; Modinfo:
-; 24/07/2022:	Added TMR2_CTL
-; 03/08/2022:	Added UART0_BUFFERLEN
-; 20/08/2022:	Added some VDP protocol flags
-; 18/09/2022:	Added VDPP_FLAG_MODE
-; 09/03/2023:	Renamed TMR2_CTL to TMR0_CTL
-; 15/03/2023:	Added VDPP_FLAG_RTC
-; 19/03/2023:	Fixed TMR0_RR_H to point to correct register
-; 08/06/2023:	Add MASTERCLOCK to permit clock delay calculations
-
 ; System clock speed in Hz
-MASTERCLOCK:		EQU		18432000
+MASTERCLOCK		EQU		18432000
 
 ; MOS specific
 ;
-VDPP_BUFFERLEN:		EQU		16	; VDP Protocol Buffer Length
+VDPP_BUFFERLEN		EQU		16	; VDP Protocol Buffer Length
 	
-VDPP_FLAG_CURSOR:	EQU		00000001b
-VDPP_FLAG_SCRCHAR:	EQU		00000010b
-VDPP_FLAG_POINT:	EQU		00000100b
-VDPP_FLAG_AUDIO:	EQU		00001000b	
-VDPP_FLAG_MODE:		EQU		00010000b
-VDPP_FLAG_RTC:		EQU		00100000b
-VDPP_FLAG_MOUSE:	EQU		01000000b
-; VDPP_FLAG_BUFFERED:	EQU		10000000b
+VDPP_FLAG_CURSOR	EQU		0b0000001
+VDPP_FLAG_SCRCHAR	EQU		0b0000010
+VDPP_FLAG_POINT	EQU		0b0000100
+VDPP_FLAG_AUDIO	EQU		0b0001000
+VDPP_FLAG_MODE		EQU		0b0010000
+VDPP_FLAG_RTC		EQU		0b0100000
+VDPP_FLAG_MOUSE	EQU		0b1000000
+; VDPP_FLAG_BUFFERED:	EQU		0b10000000
 
-; For GPIO
-; PA not available on eZ80F92
-;
-PA_DR:			EQU		96h
-PA_DDR:			EQU		97h
-PA_ALT1:		EQU		98h
-PA_ALT2:		EQU		99h
-PB_DR:          	EQU		9Ah
-PB_DDR:        	 	EQU		9Bh
-PB_ALT1:        	EQU		9Ch
-PB_ALT2:        	EQU		9Dh
-PC_DR:          	EQU		9Eh
-PC_DDR:         	EQU		9Fh
-PC_ALT1:        	EQU		A0h
-PC_ALT2:        	EQU		A1h
-PD_DR:          	EQU		A2h
-PD_DDR:			EQU		A3h
-PD_ALT1:		EQU		A4h
-PD_ALT2:		EQU		A5h
-	
-GPIOMODE_OUT:		EQU		0	; Output
-GPIOMODE_IN:		EQU		1	; Input
-GPIOMODE_DIO:		EQU		2	; Open Drain IO
-GPIOMODE_SIO:		EQU		3	; Open Source IO
-GPIOMODE_INTD:		EQU		4	; Interrupt, Dual Edge
-GPIOMODE_ALTF:		EQU		5;	; Alt Function
-GPIOMODE_INTAL:		EQU		6	; Interrupt, Active Low
-GPIOMODE_INTAH:		EQU		7	; Interrupt, Active High
-GPIOMODE_INTFE:		EQU		8	; Interrupt, Falling Edge
-GPIOMODE_INTRE:		EQU		9	; Interrupt, Rising Edge
-	
-; For interrupts.asm
-;
+; EZ80F92 IO space
 
-;UARTs
-;
-UART0_IVECT		EQU	18h
-UART1_IVECT		EQU	1Ah
+TMR0_CTL equ  0x80
+TMR0_DR_L equ  0x81
+TMR0_RR_L equ  0x81
+TMR0_DR_H equ  0x82
+TMR0_RR_H equ  0x82
+TMR1_CTL equ  0x83
+TMR1_DR_L equ  0x84
+TMR1_RR_L equ  0x84
+TMR1_DR_H equ  0x85
+TMR1_RR_H equ  0x85
+TMR2_CTL equ  0x86
+TMR2_DR_L equ  0x87
+TMR2_RR_L equ  0x87
+TMR2_DR_H equ  0x88
+TMR2_RR_H equ  0x88
+TMR3_CTL equ  0x89
+TMR3_DR_L equ  0x8a
+TMR3_RR_L equ  0x8a
+TMR3_DR_H equ  0x8b
+TMR3_RR_H equ  0x8b
+TMR4_CTL equ  0x8c
+TMR4_DR_L equ  0x8d
+TMR4_RR_L equ  0x8d
+TMR4_DR_H equ  0x8e
+TMR4_RR_H equ  0x8e
+TMR5_CTL equ  0x8f
+TMR5_DR_L equ  0x90
+TMR5_RR_L equ  0x90
+TMR5_DR_H equ  0x91
+TMR5_RR_H equ  0x91
+TMR_ISS equ  0x92
 
-;Ports
-;
-PB0_IVECT   		EQU   	30h	; AGON ITRP Interrupt   (Pin 28/IO17 of the ESP32)
-PB1_IVECT  	  	EQU  	32h	; AGON VBLANK Interrupt (Pin 23/IO15 of the ESP32)
-PB2_IVECT  	  	EQU   	34h
-PB3_IVECT  	  	EQU   	36h
-PB4_IVECT    		EQU   	38h
-PB5_IVECT    		EQU   	3Ah
-PB6_IVECT    		EQU   	3Ch
-PB7_IVECT    		EQU   	3Eh
-                       
-PC0_IVECT    		EQU   	40h
-PC1_IVECT    		EQU   	42h
-PC2_IVECT    		EQU   	44h
-PC3_IVECT    		EQU   	46h
-PC4_IVECT    		EQU   	48h
-PC5_IVECT    		EQU   	4Ah
-PC6_IVECT    		EQU   	4Ch
-PC7_IVECT    		EQU   	4Eh
-                       
-PD0_IVECT    		EQU   	50h
-PD1_IVECT    		EQU   	52h
-PD2_IVECT    		EQU   	54h
-PD3_IVECT    		EQU   	56h
-PD4_IVECT    		EQU   	58h
-PD5_IVECT    		EQU   	5Ah
-PD6_IVECT    		EQU   	5Ch
-PD7_IVECT    		EQU   	5Eh
+PA_DR			equ		0x96
+PA_DDR			equ		0x97
+PA_ALT1		equ		0x98
+PA_ALT2		equ		0x99
+PB_DR          	equ		0x9A
+PB_DDR        	 	equ		0x9B
+PB_ALT1        	equ		0x9C
+PB_ALT2        	equ		0x9D
+PC_DR          	equ		0x9E
+PC_DDR         	equ		0x9F
+PC_ALT1        	equ		0xA0
+PC_ALT2        	equ		0xA1
+PD_DR          	equ		0xA2
+PD_DDR			equ		0xA3
+PD_ALT1		equ		0xA4
+PD_ALT2		equ		0xA5
 
-; For vectors16.asm
-;
-TMR0_CTL		EQU	80h
-TMR0_DR_L               EQU     81h
-TMR0_RR_L               EQU     81h
-TMR0_DR_H               EQU     82h
-TMR0_RR_H               EQU     82h
+CS0_LBR	equ 0xA8
+CS0_UBR	equ 0xA9
+CS0_CTL	equ 0xAA
+CS1_LBR	equ 0xAB
+CS1_UBR	equ 0xAC
+CS1_CTL	equ 0xAD
+CS2_LBR	equ 0xAE
+CS2_UBR	equ 0xAF
+CS2_CTL	equ 0xB0
+CS3_LBR	equ 0xB1
+CS3_UBR	equ 0xB2
+CS3_CTL	equ 0xB3
+
+RAM_CTL0	equ 0xB4
+RAM_CTL	equ 0xB4
+RAM_ADDR_U	equ 0xB5
+
+; UART0 Registers
+UART0_RBR	equ  0xC0
+UART0_THR	equ  0xC0
+UART0_BRG_L	equ  0xC0
+UART0_IER	equ  0xC1
+UART0_BRG_H	equ  0xC1
+UART0_IIR	equ  0xC2
+UART0_FCTL	equ  0xC2
+UART0_LCTL	equ  0xC3
+UART0_MCTL	equ  0xC4
+UART0_LSR	equ  0xC5
+UART0_MSR	equ  0xC6
+UART0_SPR	equ  0xC7
+UART1_RBR	equ  0xD0
+UART1_THR	equ  0xD0
+UART1_BRG_L	equ  0xD0
+UART1_IER	equ  0xD1
+UART1_BRG_H	equ  0xD1
+UART1_IIR	equ  0xD2
+UART1_FCTL	equ  0xD2
+UART1_LCTL	equ  0xD3
+UART1_MCTL	equ  0xD4
+UART1_LSR	equ  0xD5
+UART1_MSR	equ  0xD6
+UART1_SPR	equ  0xD7
+
+; I2C Registers
+I2C_SAR	equ  0xC8
+I2C_XSAR	equ  0xC9
+I2C_DR		equ  0xCA
+I2C_CTL	equ  0xCB
+I2C_SR		equ  0xCC
+I2C_CCR	equ  0xCC
+I2C_SRR	equ  0xCD
+
+SPI_BRG_L	.equ 0xB8
+SPI_BRG_H	.equ 0xB9
+SPI_CTL	.equ 0xBA
+SPI_SR		.equ 0xBB
+SPI_RBR	.equ 0xBC
+SPI_TSR	.equ 0xBC
+
+RTC_CTRL	equ  0xED
+
+CS0_BMC	equ 0xF0
+CS1_BMC	equ 0xF1
+CS2_BMC	equ 0xF2
+CS3_BMC	equ 0xF3
+
+FLASH_KEY	equ  0xF5
+FLASH_DATA	equ  0xF6
+FLASH_ADDR_U	equ  0xF7
+FLASH_CTRL	equ  0xF8
+FLASH_FDIV	equ  0xF9
+FLASH_PROT	equ  0xFA
+FLASH_IRQ	equ  0xFB
+FLASH_PAGE	equ  0xFC
+FLASH_ROW	equ  0xFD
+FLASH_COL	equ  0xFE
+FLASH_PGCTL	equ  0xFF
+
+; GPIO modes
+GPIOMODE_OUT		equ		0	; Output
+GPIOMODE_IN		equ		1	; Input
+GPIOMODE_DIO		equ		2	; Open Drain IO
+GPIOMODE_SIO		equ		3	; Open Source IO
+GPIOMODE_INTD		equ		4	; Interrupt, Dual Edge
+GPIOMODE_ALTF		equ		5;	; Alt Function
+GPIOMODE_INTAL		equ		6	; Interrupt, Active Low
+GPIOMODE_INTAH		equ		7	; Interrupt, Active High
+GPIOMODE_INTFE		equ		8	; Interrupt, Falling Edge
+GPIOMODE_INTRE		equ		9	; Interrupt, Rising Edge
+
+; Chip select configuration
+__CS0_LBR_INIT_PARAM equ 0x04
+__CS0_UBR_INIT_PARAM equ 0x0b
+__CS0_CTL_INIT_PARAM equ 0x08
+__CS0_BMC_INIT_PARAM equ 0x01
+__CS1_LBR_INIT_PARAM equ 0xc0
+__CS1_UBR_INIT_PARAM equ 0xc7
+__CS1_CTL_INIT_PARAM equ 0x08
+__CS1_BMC_INIT_PARAM equ 0x00
+__CS2_LBR_INIT_PARAM equ 0x80
+__CS2_UBR_INIT_PARAM equ 0xbf
+__CS2_CTL_INIT_PARAM equ 0x08
+__CS2_BMC_INIT_PARAM equ 0x00
+__CS3_LBR_INIT_PARAM equ 0x03
+__CS3_UBR_INIT_PARAM equ 0x03
+__CS3_CTL_INIT_PARAM equ 0x18
+__CS3_BMC_INIT_PARAM equ 0x82
+__RAM_CTL_INIT_PARAM equ 0x80
+__RAM_ADDR_U_INIT_PARAM equ 0xB7
+__FLASH_CTL_INIT_PARAM equ 0x28
+__FLASH_ADDR_U_INIT_PARAM equ 0x00
+

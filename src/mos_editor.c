@@ -14,8 +14,8 @@
  * 31/03/2023:		Added timeout for VDP protocol
  */
 
-#include <eZ80.h>
-#include <defines.h>
+#include "ez80f92.h"
+#include "defines.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,8 +35,8 @@ extern volatile BYTE keycode;					// In globals.asm
 extern volatile BYTE keydown;					// In globals.asm
 extern volatile BYTE keycount;					// In globals.asm
 
-extern volatile BYTE history_no;
-extern volatile BYTE history_size;
+extern BYTE history_no;
+extern BYTE history_size;
 
 extern BYTE scrcols;
 

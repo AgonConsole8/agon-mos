@@ -19,4 +19,4 @@ bool isMoslet(char * filepath);
 int getResolvedPath(char * source, char ** resolvedPath, BYTE flags);
 int copyFile(char * source, char * dest);
 
-#endif MOS_FILE_H
+#endif /* MOS_FILE_H */

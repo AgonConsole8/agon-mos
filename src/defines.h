@@ -13,31 +13,42 @@
 #ifndef MOS_DEFINES_H
 #define MOS_DEFINES_H
 
-// Zilog's funny types
-#include <defines.h>
-
-/* Just for sanity */
-typedef UINT32 uint32_t;
-typedef INT32 int32_t;
-typedef UINT24 uint24_t;
-typedef INT24 int24_t;
-typedef UINT16 uint16_t;
-typedef INT16 int16_t;
-typedef UINT8 uint8_t;
-typedef INT8 int8_t;
-typedef BOOL bool;
-#define false FALSE
-#define true TRUE
-
 #define	DEBUG					0			// Set to 0 for production, 1 for extra debug information
 
+#include <stdint.h>
+#include <stdbool.h>
+
+/* For sanity */
+typedef int int24_t;
+typedef unsigned int uint24_t;
+
+/* Some legacy types to avoid huge search/replace right now */
+typedef uint32_t UINT32;
+typedef int32_t INT32;
+typedef uint24_t UINT ;
+typedef uint24_t UINT24 ;
+typedef int24_t INT24 ;
+typedef int24_t INT ;
+typedef uint16_t UINT16 ;
+typedef int16_t INT16 ;
+typedef uint8_t UINT8 ;
+typedef int8_t INT8 ;
+typedef uint8_t BYTE;
+typedef uint8_t UINT8;
+typedef uint8_t UCHAR;
+typedef bool BOOL;
+
+#define TRUE true
+#define FALSE false
+
 // ZDS segment stuff
-extern void _heapbot[];
-extern void _heaptop[];
-extern void _stack[];
-extern void _low_data[];
-extern void _low_bss[];
-extern void _low_romdata[];
+extern int8_t __heapbot[];
+extern int8_t __heaptop[];
+extern int8_t _stack[];
+extern int8_t __rodata_end[];
+extern int8_t __data_start[];
+extern int8_t __data_len[];
+extern int8_t _low_romdata[];
 extern int _len_data;
 
 /**
@@ -55,7 +66,7 @@ typedef enum {
 } MOSRESULT;
 
 #define SPL_STACK_SIZE				2048
-#define HEAP_LEN ((int)_stack - (int)_heapbot - SPL_STACK_SIZE)
+#define HEAP_LEN ((int)_stack - (int)__heapbot - SPL_STACK_SIZE)
 
 // VDP specific (for VDU 23,0,n commands)
 //
@@ -75,4 +86,4 @@ typedef enum {
 #define VDP_consolemode			0xFE
 #define VDP_terminalmode		0xFF
 
-#endif MOS_DEFINES_H
+#endif /* MOS_DEFINES_H */

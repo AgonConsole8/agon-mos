@@ -13,9 +13,9 @@
  * 03/08/2023:		Fixed timer0 setup overflow in init_timer0
  */
 
-#include <eZ80.h>
-#include <defines.h>
-
+#include "ez80f92.h"
+#include "defines.h"
+#include "z80_io.h"
 #include "timer.h"
 
 // Configure Timer 0
@@ -40,10 +40,10 @@ unsigned short init_timer0(int interval, int clkdiv, unsigned char ctrlbits) {
 
 	rr = (unsigned short)((SysClkFreq / 1000) / clkdiv) * interval;
 
-	TMR0_CTL = 0x00;													// Disable the timer and clear all settings	
-	TMR0_RR_L = (unsigned char)(rr);
-	TMR0_RR_H = (unsigned char)(rr >> 8);
-    TMR0_CTL = ctl;
+	io_out(TMR0_CTL, 0x00);													// Disable the timer and clear all settings	
+	io_out(TMR0_RR_L, (unsigned char)(rr));
+	io_out(TMR0_RR_H, (unsigned char)(rr >> 8));
+	io_out(TMR0_CTL, ctl);
 
 	return rr;
 }
@@ -56,17 +56,17 @@ void enable_timer0(unsigned char enable) {
 	unsigned char b;
 
 	if(enable <= 1) {
-		b = TMR0_CTL;
+		b = io_in(TMR0_CTL);
 		b &= 0xFC;
 		b |= (enable | 2); 
-		TMR0_CTL = b;	
+		io_out(TMR0_CTL, b);	
 	}
 }
 
 // Get data count of Timer 0
 //
 unsigned short get_timer0() {
-	unsigned char l = TMR0_DR_L;
-	unsigned char h = TMR0_DR_H;
+	unsigned char l = io_in(TMR0_DR_L);
+	unsigned char h = io_in(TMR0_DR_H);
 	return (h << 8) | l;
 }

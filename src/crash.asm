@@ -2,17 +2,17 @@
 
 	.ASSUME ADL = 1
 
-PUTS:	MACRO str
-	ld hl,str
+	.MACRO PUTS str
+	ld hl,\str
 	ld bc,0
 	xor a
 	rst.lil 018h
-	ENDMACRO
+	.ENDM
 
-PUTC:	MACRO chr
-	ld a,chr
+	.MACRO PUTC chr
+	ld a,\chr
 	rst.lil 010h
-	ENDMACRO
+	.ENDM
 
 _on_crash:
 	di
@@ -85,7 +85,7 @@ _on_crash:
 	ld hl,18
 	add hl,sp
 	ld b, 32
-$$:
+1:
 	ld a, b
 	and 7
 	call z, print_crlf
@@ -95,7 +95,7 @@ $$:
 	call print_hex8
 	ld a, ' '
 	rst.lil 010h
-	djnz $B
+	djnz 1b
 
 	call print_crlf
 	PUTS _debug_outro
@@ -105,16 +105,16 @@ $$:
 	PUTC 15
 
 	ei 		; enable interrupts so user can make keypresses
-$$:	xor a 		; wait for 'r'esume
+1:	xor a 		; wait for 'r'esume
 	rst.lil 08h
 	cp 'r'
-	jr z, $F
+	jr z, 1f
 	cp 'R'
-	jr z, $F
-	jr $B
+	jr z, 1f
+	jr 1b
 
 	; restore everything and return to userspace
-$$:	pop af
+1:	pop af
 	pop bc
 	pop de
 	pop hl
@@ -147,9 +147,9 @@ print_hex8:
 __print_hex_nibble:
 	add a, 48
 	cp 58
-	jr c, $F
+	jr c, 1f
 	add a, 39
-$$:	rst.lil 010h
+1:	rst.lil 010h
 	ret
 
 print_hex24: ; print hex u24 in `hl`

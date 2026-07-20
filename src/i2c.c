@@ -7,7 +7,8 @@
  * Modinfo:
  */
 
-#include <ez80.h>
+#include "ez80f92.h"
+#include "z80_io.h"
 #include "i2c.h"
 #include <defines.h>
 #include "timer.h"
@@ -16,30 +17,30 @@
 void I2C_setfrequency(UINT8 id) {
 	switch(id) {
 		case(I2C_SPEED_115200):
-			I2C_CCR = (0x01<<3) | 0x03;	// 115.2KHz fast-mode (400KHz max), sampling at 4.6MHz
+			io_out(I2C_CCR, (0x01<<3) | 0x03);	// 115.2KHz fast-mode (400KHz max), sampling at 4.6MHz
 			break;
 		case(I2C_SPEED_230400):
-			I2C_CCR = (0x01<<3) | 0x02;	// 230.4KHz fast-mode (400KHz max), sampling at 2.3Mhz
+			io_out(I2C_CCR, (0x01<<3) | 0x02);	// 230.4KHz fast-mode (400KHz max), sampling at 2.3Mhz
 			break;
 		case(I2C_SPEED_57600):
 		default:
-			I2C_CCR = (0x01<<3) | 0x04;	// 57.6KHz default standard-mode (100KHz max), sampling at 1.15Mhz
+			io_out(I2C_CCR, (0x01<<3) | 0x04);	// 57.6KHz default standard-mode (100KHz max), sampling at 1.15Mhz
 	}
 }
 
 // Initializes the I2C bus
 void init_I2C(void) {
 	i2c_msg_size = 0;
-	CLK_PPD1 = CLK_PPD_I2C_OFF;			// Power Down I2C block before enabling it, avoid locking bug
-	I2C_CTL = I2C_CTL_ENAB;				// Enable I2C block, don't enable interrupts yet
+	io_out(CLK_PPD1, CLK_PPD_I2C_OFF);			// Power Down I2C block before enabling it, avoid locking bug
+	io_out(I2C_CTL, I2C_CTL_ENAB);				// Enable I2C block, don't enable interrupts yet
 	I2C_setfrequency(0);
-	CLK_PPD1 = 0x0;						// Power up I2C block
+	io_out(CLK_PPD1, 0x0);						// Power up I2C block
 }
 
 // Internal function
 void I2C_handletimeout(void) {
 	// reset the interface
-	I2C_CTL = 0;
+	io_out(I2C_CTL, 0);
 	init_I2C();
 }
 
@@ -55,8 +56,8 @@ void mos_I2C_OPEN(UINT8 frequency) {
 // Parameters: None
 // Returns: None
 void mos_I2C_CLOSE(void) {
-	CLK_PPD1 = CLK_PPD_I2C_OFF;			// Power Down I2C block
-	I2C_CTL &= ~(I2C_CTL_ENAB);			// Disable I2C block
+	io_out(CLK_PPD1, CLK_PPD_I2C_OFF);			// Power Down I2C block
+	io_out(I2C_CTL, io_in(I2C_CTL) & ~(I2C_CTL_ENAB));			// Disable I2C block
 }
 
 // Write a number of bytes to an address on the I2C bus
@@ -90,7 +91,7 @@ UINT8 mos_I2C_WRITE(UINT8 i2c_address, UINT8 size, char * buffer) {
 	i2c_error = RET_OK;
 	i2c_slave_rw = i2c_address << 1;	// shift one bit left, 0 on bit 0 == write action on I2C
 
-	I2C_CTL = I2C_CTL_IEN | I2C_CTL_ENAB | I2C_CTL_STA; // send start condition
+	io_out(I2C_CTL, I2C_CTL_IEN | I2C_CTL_ENAB | I2C_CTL_STA); // send start condition
 
 	init_timer0(1, 16, 0x00);  		// 1ms timer for delay
 	enable_timer0(1);
@@ -139,7 +140,7 @@ UINT8 mos_I2C_READ(UINT8 i2c_address, UINT8 size, char* buffer)
 	i2c_slave_rw = (1<<0);				// receive bit 0
 	i2c_slave_rw |= i2c_address << 1;	// shift 7-bit address one bit left
 
-	I2C_CTL = I2C_CTL_IEN | I2C_CTL_ENAB | I2C_CTL_STA; // send start condition
+	io_out(I2C_CTL, I2C_CTL_IEN | I2C_CTL_ENAB | I2C_CTL_STA); // send start condition
 
 	init_timer0(1, 16, 0x00);  		// 1ms timer for delay
 	enable_timer0(1);
