@@ -178,7 +178,7 @@ _exec16:		PUSH 	IY
 			LD	(IX + 1), 0xCD
 			LD	(IX + 2), E
 			LD	(IX + 3), D
-			LD	(IX + 4), 0xcd	; RET		
+			LD	(IX + 4), 0xC9	; RET		
 ;
 _execSM:		CALL	_callSM		; Call the subroutine
 ;
