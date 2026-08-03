@@ -1,8 +1,9 @@
 # agon-mos
 
 This is a port in progress from the proprietary Zilog ZDS-II toolchain
-to the open source Clang-based AgonAdev toolchain. This does not work on
-real hardwware yet! Don't try! It does run on fab-agon-emulator.
+to the open source Clang-based AgonAdev toolchain. We run on real
+hardware, but it's not ready for release.  It also runs on
+fab-agon-emulator.
 
 DO NOT INSTALL ON REAL HARDWARE YET!
 

@@ -225,13 +225,15 @@ void path_tests(bool verbose) {
 
 	// check resolveRelativePath - path to check needs to be writable (not in ROM)
 	tempString = mos_strdup("../../../path-tests-tmp/testfile-1.txt");
-	passed = expectEq("resolveRelativePath on a relative path with pattern returns FR_OK", resolveRelativePath(tempString, tempBuffer2, 255), FR_OK) && passed;
+	length = 255;
+	passed = expectEq("resolveRelativePath on a relative path with pattern returns FR_OK", resolveRelativePath(tempString, tempBuffer2, &length), FR_OK) && passed;
 	passed = expectStrEq("  result (resolveRelativePath) should be /path-tests-tmp/testfile-1.txt", tempBuffer2, "/path-tests-tmp/testfile-1.txt") && passed;
 	umm_free(tempString);
 
 	f_chdir("/path-tests-tmp/subdir");
 	tempString = mos_strdup("../../../../../..");
-	passed = expectEq("resolveRelativePath on a relative path to root with pattern returns FR_OK", resolveRelativePath(tempString, tempBuffer2, 255), FR_OK) && passed;
+	length = 255;
+	passed = expectEq("resolveRelativePath on a relative path to root with pattern returns FR_OK", resolveRelativePath(tempString, tempBuffer2, &length), FR_OK) && passed;
 	passed = expectStrEq("  result (resolveRelativePath) should be /", tempBuffer2, "/") && passed;
 	umm_free(tempString);
 	f_chdir(cwd);
@@ -260,7 +262,7 @@ void path_tests(bool verbose) {
 	createOrUpdateSystemVariable("Path-Tests$Path", MOS_VAR_STRING, tempString);
 
 	// use getResolvedPath to resolve our path into tempString - single test only, heavy lifting done by resolvePath tested below
-	fr = getResolvedPath("path-tests:file.txt", &tempString);
+	fr = getResolvedPath("path-tests:file.txt", &tempString, 0);
 	passed = expectEq("getResolvedPath on path-tests:file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectStrEq("  getResolvedPath, path should be /path-tests-tmp/file.txt", tempString, "/path-tests-tmp/file.txt") && passed;
 	umm_free(tempString);
@@ -352,7 +354,7 @@ void path_tests(bool verbose) {
 	f_closedir(&dir);
 	index = 0;
 	length = 0;
-	fr = resolvePath("path-tests:file.txt", NULL, &length, &index, &dir);
+	fr = resolvePath("path-tests:file.txt", NULL, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath (fetching length) on path-tests:file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	// Keeping index at 0 is not implemented
 	// passed = expectEq("  index should remain at 0", index, 0) && passed;
@@ -360,44 +362,44 @@ void path_tests(bool verbose) {
 
 	index = 0;
 	length = 0;
-	fr = resolvePath("path-tests:file.txt", NULL, &length, &index, NULL);
+	fr = resolvePath("path-tests:file.txt", NULL, &length, &index, NULL, 0);
 	passed = expectEq("resolvePath (fetching length, null dir) on path-tests:file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	// passed = expectEq("  index should remain at 0", index, 0) && passed;
 	passed = expectEq("  length should be match or be length of /path-tests-tmp/subdir/file.txt", length, strlen("/path-tests-tmp/subdir/file.txt") + 1) && passed;
 
 	length = 0;
-	fr = resolvePath("path-tests:file.txt", NULL, &length, NULL, NULL);
+	fr = resolvePath("path-tests:file.txt", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath (fetching length, no index or dir) on path-tests:file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectEq("  length should be long enough (resolvePath, no index or dir)", length, strlen("/path-tests-tmp/subdir/file.txt") + 1) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectStrEq("  resolved path should be /path-tests-tmp/subdir/file.txt", tempBuffer, "/path-tests-tmp/subdir/file.txt") && passed;
 	passed = expectEq("  index should be 2 (one after what we have resolved to)", index, 2) && passed;
 	// if we iterate, then we should get the next directory
 	length = 255;
-	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:file.txt (first iteration) returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectStrEq("  resolved path (iter 1) should be /path-tests-tmp/file.txt", tempBuffer, "/path-tests-tmp/file.txt") && passed;
 	passed = expectEq("  index should be 3 (one after what we have resolved to)", index, 3) && passed;
 	// and iterate again should return FR_NO_PATH
 	length = 255;
-	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:file.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:file.txt returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 	passed = expectStrEq("  resolved path (iter 2) should be empty", tempBuffer, "") && passed;
 	passed = expectEq("  index should still be 3 (one after what we have resolved to)", index, 3) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("path-tests:subdir/file.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:subdir/file.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:subdir/file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectStrEq("  resolved path (with subdir) should be /path-tests-tmp/subdir/file.txt", tempBuffer, "/path-tests-tmp/subdir/file.txt") && passed;
 	passed = expectEq("  index should be 3 (one after what we have resolved to)", index, 3) && passed;
 
 	length = 0;
-	fr = resolvePath("path-tests:subdir/file.txt", NULL, &length, NULL, NULL);
+	fr = resolvePath("path-tests:subdir/file.txt", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on path-tests:subdir/file.txt returns FR_NO_FILE", fr, FR_NO_FILE) && passed;
 	passed = expectEq("  resolved length should match /path-tests-tmp/subdir/file.txt", length, strlen("/path-tests-tmp/subdir/file.txt") + 1) && passed;
 
@@ -405,7 +407,7 @@ void path_tests(bool verbose) {
 	// iterate over a directory using a wildcard, passing in our result buffer to get next matches
 	for (i=0; i<5; i++) {
 		length = 255;
-		fr = resolvePath("path-tests:testfile-*.txt", tempBuffer, &length, &index, &dir);
+		fr = resolvePath("path-tests:testfile-*.txt", tempBuffer, &length, &index, &dir, 0);
 		// printf("  %d: %s\n", i, tempBuffer);
 		passed = expectEq("resolvePath check returned pattern match", pmatch("/path-tests-tmp/testfile-*.txt", tempBuffer, MATCH_CASE_INSENSITIVE), 0) && passed;
 	}
@@ -413,111 +415,111 @@ void path_tests(bool verbose) {
 
 	// next match should fail with no path
 	length = 255;
-	fr = resolvePath("path-tests:testfile-*.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:testfile-*.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath with pattern returns FR_NO_PATH after all files matched", fr, FR_NO_PATH) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("path-tests:", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests: returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be /path-tests-tmp/subdir/", tempBuffer, "/path-tests-tmp/subdir/") && passed;
 	passed = expectEq("  index should be 2 (one after what we have resolved to)", index, 2) && passed;
 
 	length = 0;
-	fr = resolvePath("path-tests:subdir", NULL, &length, NULL, NULL);
+	fr = resolvePath("path-tests:subdir", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on path-tests:subdir returns FR_OK", fr, FR_OK) && passed;
 	passed = expectEq("  length should match length of /path-tests-tmp/subdir", length, strlen("/path-tests-tmp/subdir") + 1) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("path-tests:unknown-dir/file.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:unknown-dir/file.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:unknown-dir/file.txt returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 	passed = expectStrEq("  resolved path for unknown subdir with file should be empty", tempBuffer, "") && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("path-tests:unknown-dir/", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("path-tests:unknown-dir/", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on path-tests:unknown-dir/ returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 	passed = expectStrEq("  resolved path for unknown subdir (no file) should be empty", tempBuffer, "") && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("unknown-prefix:", NULL, &length, NULL, NULL);
+	fr = resolvePath("unknown-prefix:", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on unknown-prefix: returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("unknown-prefix:with-dir/", NULL, &length, NULL, NULL);
+	fr = resolvePath("unknown-prefix:with-dir/", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on unknown-prefix:with-dir/ returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("unknown-prefix:file.txt", NULL, &length, NULL, NULL);
+	fr = resolvePath("unknown-prefix:file.txt", NULL, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on unknown-prefix:file.txt returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("/path-tests-tmp/unknown-dir/file.txt", tempBuffer, &length, &index, NULL);
+	fr = resolvePath("/path-tests-tmp/unknown-dir/file.txt", tempBuffer, &length, &index, NULL, 0);
 	passed = expectEq("resolvePath on path-tests:unknown-dir/file.txt returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 	passed = expectStrEq("  resolved path for unknown subdir 3 should be empty", tempBuffer, "") && passed;
 	passed = expectEq("  index for path non-prefixed should remain 0", index, 0) && passed;
 
 	index = 0;
 	length = 255;
-	fr = resolvePath("/path-tests-tmp/unknown-dir/", NULL, &length, &index, NULL);
+	fr = resolvePath("/path-tests-tmp/unknown-dir/", NULL, &length, &index, NULL, 0);
 	passed = expectEq("resolvePath on path-tests:unknown-dir/ returns FR_NO_PATH", fr, FR_NO_PATH) && passed;
 	passed = expectEq("  index for path non-prefixed should remain 0", index, 0) && passed;
 
 	// check index is still at zero
 
 	length = 255;
-	fr = resolvePath("/", tempBuffer, &length, NULL, &dir);
+	fr = resolvePath("/", tempBuffer, &length, NULL, &dir, 0);
 	passed = expectEq("resolvePath on / returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be /", tempBuffer, "/") && passed;
 
 	length = 255;
-	fr = resolvePath(".", tempBuffer, &length, NULL, NULL);
+	fr = resolvePath(".", tempBuffer, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on . returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be .", tempBuffer, ".") && passed;
 
 	length = 255;
-	fr = resolvePath("..", tempBuffer, &length, NULL, NULL);
+	fr = resolvePath("..", tempBuffer, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on .. returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be ..", tempBuffer, "..") && passed;
 
 	length = 255;
-	fr = resolvePath("./..", tempBuffer, &length, NULL, NULL);
+	fr = resolvePath("./..", tempBuffer, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on ./.. returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be ./..", tempBuffer, "./..") && passed;
 
 	length = 255;
-	fr = resolvePath("../../../", tempBuffer, &length, NULL, NULL);
+	fr = resolvePath("../../../", tempBuffer, &length, NULL, NULL, 0);
 	passed = expectEq("resolvePath on ../../../ returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be ../../../", tempBuffer, "../../../") && passed;
 
 	// TODO change directory to a subdir and test resolvePath ../path-tests-tmp
 
 	length = 255;
-	fr = resolvePath("/path-tests-tmp", tempBuffer, &length, NULL, &dir);
+	fr = resolvePath("/path-tests-tmp", tempBuffer, &length, NULL, &dir, 0);
 	passed = expectEq("resolvePath on /path-tests-tmp returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be /path-tests-tmp", tempBuffer, "/path-tests-tmp") && passed;
 
 	length = 255;
-	fr = resolvePath("/path-tests-tmp/", tempBuffer, &length, NULL, &dir);
+	fr = resolvePath("/path-tests-tmp/", tempBuffer, &length, NULL, &dir, 0);
 	passed = expectEq("resolvePath on /path-tests-tmp/ returns FR_OK", fr, FR_OK) && passed;
 	passed = expectStrEq("  resolved path should be /path-tests-tmp/", tempBuffer, "/path-tests-tmp/") && passed;
 
 	// Check we can resolve with a direct directory
 	length = 255;
 	index = 0;
-	fr = resolvePath("/path-tests-tmp/testfile-*.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("/path-tests-tmp/testfile-*.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on /path-tests-tmp/testfile-*.txt returns FR_OK", fr, FR_OK) && passed;
 	passed = expectEq("  resolved path matches pattern", pmatch("/path-tests-tmp/testfile-*.txt", tempBuffer, MATCH_CASE_INSENSITIVE), 0) && passed;
 	// When a match is found, index will go to 1
 	// this is harmless for non-prefix matches, as long as there's an accompanying persistent DIR object
 	passed = expectEq("  index for path (with pattern) non-prefixed will go to 1", index, 1) && passed;
 
-	fr = resolvePath("/path-tests-tmp/testfile-*.txt", tempBuffer, &length, &index, &dir);
+	fr = resolvePath("/path-tests-tmp/testfile-*.txt", tempBuffer, &length, &index, &dir, 0);
 	passed = expectEq("resolvePath on /path-tests-tmp/testfile-*.txt second call returns FR_OK", fr, FR_OK) && passed;
 	passed = expectEq("  resolved (repeat) path matches pattern", pmatch("/path-tests-tmp/testfile-*.txt", tempBuffer, MATCH_CASE_INSENSITIVE), 0) && passed;
 	passed = expectEq("  index for path (with pattern) non-prefixed stays at 1", index, 1) && passed;

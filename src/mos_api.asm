@@ -964,7 +964,7 @@ mos_api_uopen:		LEA	HL, IX + 0	; HLU: Pointer to struct
 			PUSH	HL		; UART * pUART
 			CALL	_open_UART1	; Initialise the UART port
 			POP	HL 		; Tidy up the stack
-			RET
+			RET 
 
 ; Close UART1
 ;

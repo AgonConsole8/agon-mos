@@ -89,7 +89,7 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 	init_timer0(10, 16, 0x00);			// 10ms timer for delay
 
 	gp = 0;
-	while (gp == 0) {					// Wait for the ESP32 to respond with a GP packet
+	while (gp==0) {					// Wait for the ESP32 to respond with a GP packet	  
 		putch(23);						// Send a general poll packet
 		putch(0);
 		putch(VDP_gp);
@@ -98,10 +98,8 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 			if (gp != 0) break;
 			wait_timer0();
 		}
-		if(gp == 1) break;				// If general poll returned, then exit for loop
 	}
 	enable_timer0(0);					// Disable the timer
-
 	// Set feature flag for full-duplex, flag 0x0101, non-zero 16-bit value
 	putch(23);
 	putch(0);
@@ -120,7 +118,7 @@ void wait_ESP32(UART * pUART, UINT24 baudRate) {
 
 // Initialise the interrupts
 //
-static void init_interrupts(void) {
+void init_interrupts(void) {
 	set_vector(PORTB1_IVECT, vblank_handler); 	// 0x32
 	set_vector(UART0_IVECT, uart0_handler);		// 0x18
 	set_vector(I2C_IVECT, i2c_handler);			// 0x1C
@@ -141,13 +139,10 @@ void rainbow_msg(char* msg) {
 	if (i == 0)
 		i++;
 	for (; *msg; msg++) {
-		putch(17);
-		putch(i);
-		putch(*msg);
+		printf("%c%c%c", 17, i, *msg);
 		i = (i + 1 < scrcolours) ? i + 1 : 1;
 	}
-	putch(17);
-	putch(15);
+	printf("%c%c", 17, 15);
 }
 
 void bootmsg(void) {
@@ -174,8 +169,6 @@ bool shiftPressed() {
 	return keydown && (keymods & 0x02);		// Shift indicator is keymods bit 1
 }
 
-//extern UINT24 bottom;
-//extern uint8_t __heapbot[];
 
 // The main loop
 //
@@ -193,17 +186,15 @@ int main(void) {
 	wait_ESP32(&pUART0, 1152000);					// Connect to VDP at maximum rate
 
 	if (hardReset == 0) {							// If a warm boot detected then
-		putch(12);									// Clear the screen
+	  putch(12);									// Clear the screen
 	}
-
 	umm_init_heap((void*)__heapbot, HEAP_LEN);
-
 	scrcolours = 0;
 	scrpixelIndex = 255;
 	getModeInformation();
 	while (scrcolours == 0) { }
 	readPalette(128, TRUE);
-
+	
 	if (scrpixelIndex < 128) {
 		vdpSupportsTextPalette = TRUE;
 	} else {

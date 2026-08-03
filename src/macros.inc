@@ -1,4 +1,4 @@
-;
+; vim:ft=ez80
 ; Title:	AGON MOS - Useful Macros
 ; Author:	Dean Belfield
 ; Created:	15/07/2022
@@ -131,10 +131,10 @@ ENDM
 ; Parameters:
 ; - TIMER: Timer to wait on
 ;
-			.MACRO TIMER_WAIT TIMER
+MACRO	TIMER_WAIT		TIMER
 1:			TIMER_EXP	\TIMER
 			JR		NC,1b
-			.ENDM
+ENDM
 
 ; Delay for the given (constant) number of milliseconds using *Timer 0*
 ; Parameters:
