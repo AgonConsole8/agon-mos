@@ -5,8 +5,6 @@ to the open source Clang-based AgonAdev toolchain. We run on real
 hardware, but it's not ready for release.  It also runs on
 fab-agon-emulator.
 
-DO NOT INSTALL ON REAL HARDWARE YET!
-
 Part of the official Agon Platform organisation firmware for all Agon computers.
 
 This firmware is intended for use on any Agon Light compatible computer.  As well as the Agon Console8, it has been tested on the Olimex Agon Light 2.
