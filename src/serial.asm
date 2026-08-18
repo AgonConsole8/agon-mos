@@ -121,7 +121,7 @@ UART1_serial_TX:	PUSH		BC			; Stack BC
 			PUSH		AF 			; Stack AF
 			LD		BC,TX_WAIT		; Set CB to the transmit timeout
 UART1_serial_TX1:	IN0		A,(UART1_REG_LSR)	; Get the line status register
-			AND 		UART_LSR_ETX		; Check for TX empty
+			AND 		UART_LSR_ETH		; Check for TX empty
 			JR		NZ, UART1_serial_TX2	; If set, then TX is empty, goto transmit
 			DEC		BC
 			LD		A, B

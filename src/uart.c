@@ -67,7 +67,7 @@ BYTE open_UART0(UART * pUART) {
 	io_setreg(PD_ALT2, pins);
 
 	if(pUART->flowControl == FCTL_HW) {
-		io_setreg(PD_DDR, PORTPIN_THREE | PORTPIN_TWO);								// Set Port D bit 3 (CTS) for input
+		io_setreg(PD_DDR, PORTPIN_THREE | PORTPIN_TWO);						      // Set Port D bits 2 (RTS) and  3 (CTS) for alternat function.
 		io_resetreg(PD_ALT1, PORTPIN_THREE | PORTPIN_TWO);
 		io_setreg(PD_ALT2, PORTPIN_THREE | PORTPIN_TWO);
 		serialFlags |= 0x02;
@@ -106,9 +106,9 @@ BYTE open_UART1(UART * pUART) {
 	io_setreg(PC_ALT2, pins);
 
 	if(pUART->flowControl == FCTL_HW) {
-		io_setreg(PC_DDR, PORTPIN_THREE);								// Set Port C bit 3 (CTS) for input
-		io_resetreg(PC_ALT1, PORTPIN_THREE);
-		io_resetreg(PC_ALT2, PORTPIN_THREE);
+	  io_setreg(PC_DDR, PORTPIN_THREE|PORTPIN_TWO);  // Set Port C bits 2 (RTS) and 3 (CTS) for alternate function
+		io_resetreg(PC_ALT1, PORTPIN_THREE|PORTPIN_TWO);
+		io_setreg(PC_ALT2, PORTPIN_THREE|PORTPIN_TWO);
 		serialFlags |= 0x20;
 	}
 	

@@ -1665,27 +1665,20 @@ extern uint8_t sysvars[];
 // - MOS error code
 //
 int mos_cmdMEM(char * ptr) {
-  	int try_len = HEAP_LEN;
+	uint24_t heapUsed, heapFree, heapLargest;
+	umm_heap_stats(NULL, &heapUsed, &heapFree, &heapLargest);
 
 	printf("ROM      &000000-&01ffff     %2d%% used\r\n", ((int)__rodata_end+(int)__data_len) / 1311);
 	printf("USER:LO  &%06x-&%06x %6d bytes\r\n", 0x40000, (int)__data_start-1, (int)__data_start - 0x40000);
 	// data and bss together
 	printf("MOS:DATA &%06x-&%06x %6d bytes\r\n", (int)__data_start, (int)__heapbot-1, (int)__heapbot - (int)__data_start);
 	printf("MOS:HEAP &%06x-&%06x %6d bytes\r\n", (int)__heapbot, (int)_stack - SPL_STACK_SIZE - 1, HEAP_LEN);
-	printf("STACK24  &%06x-&%06x %6d bytes\r\n", 0xc0000 - SPL_STACK_SIZE, 0xbffff, SPL_STACK_SIZE);
+	printf("STACK24  &%06x-&%06x %6d bytes\r\n", (int)_stack - SPL_STACK_SIZE, (int)_stack-1, SPL_STACK_SIZE);
 	printf("USER:HI  &b7e000-&b7ffff   8192 bytes\r\n");
 	printf("\r\n");
 
-	// find largest kmalloc contiguous region
-	for (; try_len > 0; try_len-=8) {
-		void *p = umm_malloc(try_len);
-		if (p) {
-			umm_free(p);
-			break;
-		}
-	}
-
-	printf("Largest free MOS:HEAP fragment: %d bytes\r\n", try_len);
+	printf("MOS:HEAP used: %d bytes, free: %d bytes\r\n", heapUsed, heapFree);
+	printf("Largest free MOS:HEAP fragment: %d bytes\r\n", heapLargest);
 	printf("Sysvars at &%06x\r\n", (uint24_t)sysvars);
 	printf("\r\n");
 	return FR_OK;

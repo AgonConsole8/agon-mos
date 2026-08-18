@@ -67,65 +67,65 @@ _SD_init:
 
 		; Command card to idle
 		LD		B,10
-1:		PUSH		BC
+Idle_Count_Loop:PUSH		BC
 		CALL		_SD_goIdleState
 		POP		BC
 		LD		(IX-6),A
 		CP		A,0x01
-		JR		Z,L_success1
-		DJNZ		1b
+		JR		Z,Idle_Success
+		DJNZ		Idle_Count_Loop
 
 		; Failed after 10 attempts
-		JR		L_out_error
+		JR		Init_out_error
 		
 		; Send interface conditions
-L_success1:	PEA		IX-6
+Idle_Success:	PEA		IX-6
 		CALL		_SD_sendIfCond
 		POP		BC
 
 		; Check first byte of response is 0x01
 		LD		A,(IX-6)
 		CP		A,1
-		JR		NZ,L_out_error
+		JR		NZ,Init_out_error
 
 		; Check fifth byte of response is 0xAA
 		LD		A,(IX-2)
 		CP		A,0xAA
-		JR		NZ,L_out_error
+		JR		NZ,Init_out_error
 
 		; Attempt to initialize card
 
 		; Repeat up to 100 times
 		LD		B,100
-L_loop2:		PUSH		BC
+Init_loop:	PUSH		BC
 		CALL		_SD_sendApp
 		CP		A,2		; is res[0] < 2 ?
-		JR		NC,L_wait2
+		JR		NC,Init_wait
 		CALL		_SD_sendOpCond
 		CP		A,SD_READY
-		JR		Z,L_success2
+		JR		Z,Init_send_success
 
 		; Wait 10ms before we try again
-L_wait2:		DELAY_MS	10
+Init_wait:	DELAY_MS	10
 		POP		BC
-		DJNZ		L_loop2
+		DJNZ		Init_loop
 
 		; Timeout: error
-		JR		L_out_error
+		JR		Init_out_error
 
-L_success2:	PEA		IX-6
+Init_send_success:PEA		IX-6
 		CALL		_SD_readOCR
 		POP		BC
 		LD		A,(IX-5)
 		RLA
-		JR		C,L_out_success
+		JR		C,Init_out_success
 		; Fall through to L_out_error
 
-L_out_error:	LD		A,SD_ERROR
-		JR		L_exit
+Init_out_error:	LD		A,SD_ERROR
+		JR		Init_exit
 
-L_out_success:	XOR		A,A	; LD A,LD_SUCCESS
-L_exit:		LD		SP,IX
+Init_out_success:XOR		A,A	; LD A,LD_SUCCESS
+Init_exit:	LD		SP,IX
 		POP		IX
 		RET
 
@@ -150,36 +150,36 @@ _SD_readBlocks:
 
 		; HL := count, then jump to the check for zero
 		LD		HL,(IX+15)
-		JR		L_start
+		JR		RdBlks_start
 		
 		; Read current block
-L_loop3:		CALL		SD_readSingleBlock
+RdBlks_loop:		CALL		SD_readSingleBlock
 
 		; Exit with SD_ERROR if res1 >= 2
 		CP		A,2
-		JR		NC,L_err_exit
+		JR		NC,RdBlks_err_exit
 
 		; or if token != SD_DATA_ACCEPTED
 		LD		A,(IX-1)
 		CP		A,0xFE
-		JR		NZ,L_err_exit
+		JR		NZ,RdBlks_err_exit
 		
 		; Update sector, buf and count
 		; HL is set to the updated value of count
 		CALL		SD_updateIOVars
-L_start:		LD		A,H
+RdBlks_start:	LD		A,H
 		OR		A,L
-		JR		NZ,L_loop3
+		JR		NZ,RdBlks_loop
 		
 		; Finished, return SD_SUCCESS (which happens to be zero)
-L_done:		XOR		A,A
-L_exit2:		LD		SP,IX
+RdBlks_done:    XOR 		A,A
+RdBlks_exit:	LD		SP,IX
 		POP		IX
 		RET
 
 		; Error exit, slow path so can save a couple of bytes
-L_err_exit:	LD		A,SD_ERROR
-		JR		L_exit2
+RdBlks_err_exit:LD		A,SD_ERROR
+		JR		RdBlks_exit
 
 ; Delay by 30ms. Roughly how long an old 5.25" disk takes to read 512 bytes
 SD_delayDisc:
@@ -217,22 +217,22 @@ SD_readSingleBlock:
 		CALL		SD_sendIOCmd	; Sets *token to 0xFF too
 		PUSH		AF		; Save res1 to be returned
 		CP		A,0xFF
-		JR		Z,L_out3
+		JR		Z,RdBlk_out
 
 		; Wait for a response token (timeout = 100ms)
 		TIMER_SET	0,100
 		TIMER_START	0
 		
-L_loop5:		CALL		_spi_read_one
+RdBlk_loop:	CALL		_spi_read_one
 		LD		B,A		; Move byte read to B
 		CP		A,0xFF
-		JR		NZ,L_out1
+		JR		NZ,RdBlk_loopexit
 
 		; Continue until the timer expires
 		TIMER_EXP	0		; (clobbers just A)
-		JR		NC,L_loop5
+		JR		NC,RdBlk_loop
 		
-L_out1:		TIMER_RESET	0		; (clobbers just A)
+RdBlk_loopexit:		TIMER_RESET	0		; (clobbers just A)
 
 		; Check if card response is SD_START_TOKEN
 
@@ -242,7 +242,7 @@ L_out1:		TIMER_RESET	0		; (clobbers just A)
 		; If response token is 0xFE then read the sector
 		LD		A,SD_START_TOKEN
 		CP		A,B
-		JR		NZ,L_out3
+		JR		NZ,RdBlk_out
 
 		; Read the sector
 		LD		BC,SD_BLOCK_LEN
@@ -258,7 +258,7 @@ L_out1:		TIMER_RESET	0		; (clobbers just A)
 		CALL		_spi_read_one
 
 		; Deassert chip select
-L_out3:		CALL		_SD_CS_disable
+RdBlk_out:	CALL		_SD_CS_disable
 
 		; Restore res1 to return to caller
 		POP		AF
@@ -284,35 +284,35 @@ _SD_writeBlocks:
 
 		; HL := count, then jump to the check for zero
 		LD		HL,(IX+15)
-		JR		L_start2
+		JR		WrBlks_start
 
-L_loop6:		CALL		SD_writeSingleBlock
+WrBlks_loop:	CALL		SD_writeSingleBlock
 
 		; Exit with SD_ERROR if res1 != 0x00
 		OR		A,A
-		JR		NZ,L_err_exit2
+		JR		NZ,WrBlks_err_exit
 
 		; or if token != SD_DATA_ACCEPTED
 		LD		A,(IX-1)
 		CP		A,SD_DATA_ACCEPTED
-		JR		NZ,L_err_exit2
+		JR		NZ,WrBlks_exit
 		
 		; Update sector, buf and count
 		; HL is set to the updated value of count
 		CALL		SD_updateIOVars
-L_start2:		LD		A,H
+WrBlks_start:	LD		A,H
 		OR		A,L
-		JR		NZ,L_loop6
+		JR		NZ,WrBlks_loop
 		
 		; Finished, return SD_SUCCESS (which happens to be zero)
-L_done2:		XOR		A,A
-L_exit3:		LD		SP,IX
+WrBlks_done:	XOR		A,A
+WrBlks_exit:	LD		SP,IX
 		POP		IX
 		RET
 
 		; Error exit, slow path so can save a couple of bytes
-L_err_exit2:	LD		A,SD_ERROR
-		JR		L_exit3
+WrBlks_err_exit:LD		A,SD_ERROR
+		JR		WrBlks_exit
 
 
 ; SD_writeSingleBlock
@@ -330,7 +330,7 @@ SD_writeSingleBlock:
 		CALL		SD_sendIOCmd	; Sets *token to 0xFF too
 		PUSH		AF		; Save res1 to be returned
 		CP		A,SD_READY
-		JP		NZ,L_out4
+		JP		NZ,WrBlk_out
 
 		; Send start token
 		LD		C,SD_START_TOKEN
@@ -351,24 +351,24 @@ SD_writeSingleBlock:
 		TIMER_SET	0,250
 		TIMER_START	0
 		
-L_loop7:		CALL		_spi_read_one
+WrBlk_loop:	CALL		_spi_read_one
 		LD		B,A		; Save byte read
 		CP		A,0xFF
-		JR		NZ,L_gotit1
+		JR		NZ,WrBlk_gotresp
 
 		; Continue until the timer expires
 		TIMER_EXP	0		; (clobbers just A)
-		JR		NC,L_loop7
+		JR		NC,WrBlk_loop
 
 		; Timeout - just fall through
 
-L_gotit1:	TIMER_RESET	0		; (clobbers just A)
+WrBlk_gotresp:	TIMER_RESET	0		; (clobbers just A)
 
 		; If data accepted
 		LD		A,0x1F
 		AND		A,B
 		CP		A,5
-		JR		NZ,L_out4
+		JR		NZ,WrBlk_out
 
 		; *token = 0x05 (conveniently left in register A)
 		LD		(IX-1),A
@@ -377,26 +377,26 @@ L_gotit1:	TIMER_RESET	0		; (clobbers just A)
 		TIMER_SET	0,250
 		TIMER_START	0
 
-L_loop8:		CALL		_spi_read_one
+WrBlk_fin_loop:	CALL		_spi_read_one
 		CP		A,0x00
-		JR		NZ,L_gotit2
+		JR		NZ,WrBlk_gotfin
 
 		; Continue until the timer expires
 		TIMER_EXP	0
-		JR		NC,L_loop8
+		JR		NC,WrBlk_fin_loop
 
 		; Timeout, skip over setting token
-		JR		L_notgot
+		JR		WrBlk_notgot
 
-L_gotit2:	; Success: set token to 0x00
+WrBlk_gotfin:	; Success: set token to 0x00
 		XOR		A,A
 		LD		A,(IX-1)
 
-L_notgot:	; Reset the timer
+WrBlk_notgot:	; Reset the timer
 		TIMER_RESET	0
 
 		; Deassert chip select
-L_out4:		CALL		_SD_CS_disable
+WrBlk_out:	CALL		_SD_CS_disable
 
 		; Restore res1 to return to caller
 		POP		AF
