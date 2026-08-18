@@ -77,7 +77,7 @@ BYTE open_UART0(UART * pUART) {
 	io_out(UART0_BRG_L, br & 0xFF);										// Load divisor low
 	io_out(UART0_BRG_H, (BYTE)(( br & 0xFF00 ) >> 8));						// Load divisor high
 	io_out(UART0_LCTL, io_in(UART0_LCTL) & (~UART_LCTL_DLAB)); 								// Reset DLAB; dont disturb other bits
-	io_out(UART0_MCTL, 0x02);												// Bring modem control register to reset value
+	io_out(UART0_MCTL, 0x02);												// Multidrop, loopback, DTR disabled, RTS enabled
 	io_out(UART0_FCTL, 0x07);												// Enable and clear hardware FIFOs
 	io_out(UART0_IER, pUART->interrupts);									// Set interrupts
 	
