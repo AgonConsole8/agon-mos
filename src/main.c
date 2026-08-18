@@ -72,8 +72,6 @@ extern BOOL	vdpSupportsTextPalette;
 // Parameters:
 // - pUART: Pointer to a UART structure
 // - baudRate: Baud rate to initialise UART with
-// Returns:
-// - 1 if the function succeeded, otherwise 0
 //
 void wait_ESP32(UART * pUART, UINT24 baudRate) {	
 	int	i, t;
